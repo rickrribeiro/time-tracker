@@ -126,7 +126,7 @@ async function createTag(name, color, isProductive) {
   run(db2, "INSERT INTO tags (name, color, isProductive) VALUES (?, ?, ?)", [
     name,
     color,
-    isProductive ? 1 : 0
+    isProductive
   ]);
   const id = lastInsertId(db2);
   return getOne(db2, "SELECT * FROM tags WHERE id = ?", [id]);
@@ -136,7 +136,7 @@ async function updateTag(id, name, color, isProductive) {
   run(db2, "UPDATE tags SET name = ?, color = ?, isProductive = ? WHERE id = ?", [
     name,
     color,
-    isProductive ? 1 : 0,
+    isProductive,
     id
   ]);
   return getOne(db2, "SELECT * FROM tags WHERE id = ?", [id]);
@@ -227,7 +227,14 @@ async function getDailyStats(startDate, endDate) {
            THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
            ELSE 0
          END
-       ) as productiveMinutes
+       ) as productiveMinutes,
+       SUM(
+         CASE
+           WHEN tg.isProductive = 2 AND t.endTime IS NOT NULL
+           THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
+           ELSE 0
+         END
+       ) as semiProductiveMinutes
      FROM tasks t
      LEFT JOIN tags tg ON t.tagId = tg.id
      WHERE t.startTime >= ? AND t.startTime < ?

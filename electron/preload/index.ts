@@ -4,9 +4,9 @@ const api = {
   // Tags
   tags: {
     getAll: () => ipcRenderer.invoke('tags:getAll'),
-    create: (name: string, color: string, isProductive: boolean) =>
+    create: (name: string, color: string, isProductive: number) =>
       ipcRenderer.invoke('tags:create', name, color, isProductive),
-    update: (id: number, name: string, color: string, isProductive: boolean) =>
+    update: (id: number, name: string, color: string, isProductive: number) =>
       ipcRenderer.invoke('tags:update', id, name, color, isProductive),
     delete: (id: number) => ipcRenderer.invoke('tags:delete', id)
   },

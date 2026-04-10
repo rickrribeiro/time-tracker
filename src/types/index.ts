@@ -2,7 +2,7 @@ export interface Tag {
   id: number
   name: string
   color: string
-  isProductive: number // 1 = true, 0 = false
+  isProductive: number // 1 = true, 0 = false, 2 = semi-productive
 }
 
 export interface Task {
@@ -23,6 +23,7 @@ export interface DailyStats {
   date: string
   totalMinutes: number
   productiveMinutes: number
+  semiProductiveMinutes: number
 }
 
 export interface TagStats {
@@ -40,8 +41,8 @@ declare global {
     api: {
       tags: {
         getAll: () => Promise<Tag[]>
-        create: (name: string, color: string, isProductive: boolean) => Promise<Tag>
-        update: (id: number, name: string, color: string, isProductive: boolean) => Promise<Tag>
+        create: (name: string, color: string, isProductive: number) => Promise<Tag>
+        update: (id: number, name: string, color: string, isProductive: number) => Promise<Tag>
         delete: (id: number) => Promise<void>
       }
       tasks: {

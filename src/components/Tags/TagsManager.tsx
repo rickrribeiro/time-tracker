@@ -10,10 +10,10 @@ const PRESET_COLORS = [
 interface FormState {
   name: string
   color: string
-  isProductive: boolean
+  isProductive: number
 }
 
-const defaultForm: FormState = { name: '', color: '#6366f1', isProductive: true }
+const defaultForm: FormState = { name: '', color: '#6366f1', isProductive: 1 }
 
 export function TagsManager(): React.ReactElement {
   const { tags, createTag, updateTag, deleteTag } = useTagStore()
@@ -23,7 +23,7 @@ export function TagsManager(): React.ReactElement {
 
   function startEdit(tag: Tag) {
     setEditing(tag)
-    setForm({ name: tag.name, color: tag.color, isProductive: tag.isProductive === 1 })
+    setForm({ name: tag.name, color: tag.color, isProductive: tag.isProductive })
     setShowForm(true)
   }
 
@@ -95,16 +95,20 @@ export function TagsManager(): React.ReactElement {
               ))}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              id="productive-check"
-              checked={form.isProductive}
-              onChange={(e) => setForm({ ...form, isProductive: e.target.checked })}
-            />
-            <label htmlFor="productive-check" style={{ fontSize: 13, cursor: 'pointer' }}>
-              Productive tag (counts toward productive hours)
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+            <label htmlFor="productive-select" style={{ fontSize: 13 }}>
+              Type:
             </label>
+            <select
+              id="productive-select"
+              value={form.isProductive}
+              onChange={(e) => setForm({ ...form, isProductive: Number(e.target.value) })}
+              style={{ fontSize: 13, padding: '4px 8px' }}
+            >
+              <option value={0}>Non-productive</option>
+              <option value={1}>Productive</option>
+              <option value={2}>Semi-productive</option>
+            </select>
           </div>
           <div className="tag-form-actions">
             <button className="btn btn-secondary btn-sm" onClick={() => { setShowForm(false); setEditing(null) }}>
@@ -122,8 +126,8 @@ export function TagsManager(): React.ReactElement {
           <div key={tag.id} className="tag-item">
             <div className="tag-color-dot" style={{ background: tag.color }} />
             <span className="tag-name">{tag.name}</span>
-            <span className={`tag-badge ${tag.isProductive ? 'productive' : 'idle'}`}>
-              {tag.isProductive ? 'Productive' : 'Non-productive'}
+            <span className={`tag-badge ${tag.isProductive === 1 ? 'productive' : tag.isProductive === 2 ? 'semi-productive' : 'idle'}`}>
+              {tag.isProductive === 1 ? 'Productive' : tag.isProductive === 2 ? 'Semi-productive' : 'Non-productive'}
             </span>
             <div className="tag-actions">
               <button

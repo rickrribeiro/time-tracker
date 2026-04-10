@@ -64,11 +64,11 @@ app.on('window-all-closed', () => {
 
 ipcMain.handle('tags:getAll', () => getAllTags())
 
-ipcMain.handle('tags:create', (_, name: string, color: string, isProductive: boolean) =>
+ipcMain.handle('tags:create', (_, name: string, color: string, isProductive: number) =>
   createTag(name, color, isProductive)
 )
 
-ipcMain.handle('tags:update', (_, id: number, name: string, color: string, isProductive: boolean) =>
+ipcMain.handle('tags:update', (_, id: number, name: string, color: string, isProductive: number) =>
   updateTag(id, name, color, isProductive)
 )
 

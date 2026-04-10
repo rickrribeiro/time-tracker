@@ -1,4 +1,6 @@
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -42,7 +44,9 @@ button {
   font: inherit;
 }
 
-input, textarea, select {
+input,
+textarea,
+select {
   font: inherit;
   color: inherit;
   background: var(--bg-tertiary);
@@ -53,7 +57,9 @@ input, textarea, select {
   transition: border-color 0.15s;
 }
 
-input:focus, textarea:focus, select:focus {
+input:focus,
+textarea:focus,
+select:focus {
   border-color: var(--accent);
 }
 
@@ -150,6 +156,7 @@ input:focus, textarea:focus, select:focus {
 .sidebar-footer .export-btn {
   color: var(--text-muted);
 }
+
 .sidebar-footer .export-btn:hover {
   color: var(--text-primary);
   background: rgba(255, 255, 255, 0.05);
@@ -200,8 +207,15 @@ input:focus, textarea:focus, select:focus {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .active-task-title {
@@ -266,26 +280,38 @@ input:focus, textarea:focus, select:focus {
   white-space: nowrap;
 }
 
-.btn:active { transform: scale(0.97); }
+.btn:active {
+  transform: scale(0.97);
+}
 
 .btn-primary {
   background: var(--accent);
   color: white;
 }
-.btn-primary:hover { background: var(--accent-hover); }
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
 
 .btn-danger {
   background: rgba(239, 68, 68, 0.15);
   color: var(--danger);
 }
-.btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
 
 .btn-secondary {
   background: var(--bg-tertiary);
   color: var(--text-secondary);
   border: 1px solid var(--border);
 }
-.btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
 
 .btn-sm {
   padding: 4px 10px;
@@ -333,7 +359,11 @@ input:focus, textarea:focus, select:focus {
   color: var(--text-secondary);
   transition: background 0.15s;
 }
-.date-nav-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.date-nav-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
 
 .date-display {
   font-size: 16px;
@@ -350,7 +380,8 @@ input:focus, textarea:focus, select:focus {
 
 .timeline-scroll {
   position: relative;
-  min-height: 1440px; /* 1px per minute */
+  min-height: 1440px;
+  /* 1px per minute */
 }
 
 .timeline-hours {
@@ -402,12 +433,12 @@ input:focus, textarea:focus, select:focus {
 
 .timeline-block:hover {
   opacity: 0.85;
-  border-color: rgba(255,255,255,0.2);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .timeline-block.selected {
   border-color: white;
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
 }
 
 .timeline-block-content {
@@ -427,7 +458,7 @@ input:focus, textarea:focus, select:focus {
 
 .timeline-block-time {
   font-size: 10px;
-  color: rgba(255,255,255,0.7);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .timeline-block-resize {
@@ -437,7 +468,7 @@ input:focus, textarea:focus, select:focus {
   right: 0;
   height: 6px;
   cursor: ns-resize;
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .timeline-now-line {
@@ -516,6 +547,7 @@ input:focus, textarea:focus, select:focus {
   color: var(--text-secondary);
   transition: background 0.15s, color 0.15s;
 }
+
 .quick-start-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
@@ -601,8 +633,8 @@ input:focus, textarea:focus, select:focus {
 }
 
 .calendar-day-hours {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 14px;
+  color: red;
 }
 
 /* ── Dashboard ─────────────────────────────────────────────────────────────────── */
@@ -690,7 +722,9 @@ input:focus, textarea:focus, select:focus {
   min-width: 8px;
 }
 
-.bar-chart-bar:hover { opacity: 0.8; }
+.bar-chart-bar:hover {
+  opacity: 0.8;
+}
 
 .bar-chart-label {
   position: absolute;
@@ -805,6 +839,11 @@ input:focus, textarea:focus, select:focus {
   color: var(--success);
 }
 
+.tag-badge.semi-productive {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
 .tag-badge.idle {
   background: rgba(100, 116, 139, 0.15);
   color: var(--text-muted);
@@ -862,7 +901,7 @@ input:focus, textarea:focus, select:focus {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -896,13 +935,16 @@ input:focus, textarea:focus, select:focus {
 ::-webkit-scrollbar {
   width: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 3px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
@@ -1067,10 +1109,12 @@ input:focus, textarea:focus, select:focus {
   color: var(--text-secondary);
   transition: background 0.15s;
 }
+
 .period-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
+
 .period-btn.active {
   background: var(--accent-dim);
   color: var(--accent-hover);

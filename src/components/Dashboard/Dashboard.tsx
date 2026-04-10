@@ -60,8 +60,12 @@ export function Dashboard(): React.ReactElement {
 
   const totalMinutes = dailyStats.reduce((a, b) => a + b.totalMinutes, 0)
   const productiveMinutes = dailyStats.reduce((a, b) => a + b.productiveMinutes, 0)
+  const semiProductiveMinutes = dailyStats.reduce((a, b) => a + (b.semiProductiveMinutes || 0), 0)
+  const prodPlusSemiMinutes = productiveMinutes + semiProductiveMinutes
   const productivePercent =
     totalMinutes > 0 ? Math.round((productiveMinutes / totalMinutes) * 100) : 0
+  const prodPlusSemiPercent =
+    totalMinutes > 0 ? Math.round((prodPlusSemiMinutes / totalMinutes) * 100) : 0
 
   const maxDayMinutes = Math.max(...dailyStats.map((d) => d.totalMinutes), 1)
   const maxTagMinutes = Math.max(...tagStats.map((t) => t.totalMinutes), 1)
@@ -89,7 +93,7 @@ export function Dashboard(): React.ReactElement {
         </div>
       ) : (
         <>
-          <div className="stats-grid">
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
             <div className="stat-card">
               <div className="stat-card-label">Total Tracked</div>
               <div className="stat-card-value">{formatHoursShort(totalMinutes)}<span style={{ fontSize: 18, color: 'var(--text-muted)' }}>h</span></div>
@@ -99,6 +103,11 @@ export function Dashboard(): React.ReactElement {
               <div className="stat-card-label">Productive</div>
               <div className="stat-card-value">{formatHoursShort(productiveMinutes)}<span style={{ fontSize: 18, color: 'var(--text-muted)' }}>h</span></div>
               <div className="stat-card-sub">{productivePercent}% of tracked time</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-label">Prod + Semi</div>
+              <div className="stat-card-value">{formatHoursShort(prodPlusSemiMinutes)}<span style={{ fontSize: 18, color: 'var(--text-muted)' }}>h</span></div>
+              <div className="stat-card-sub">{prodPlusSemiPercent}% of tracked time</div>
             </div>
             <div className="stat-card">
               <div className="stat-card-label">Active Days</div>
@@ -117,13 +126,16 @@ export function Dashboard(): React.ReactElement {
                     const prodPct = d.totalMinutes > 0
                       ? (d.productiveMinutes / d.totalMinutes) * 100
                       : 0
+                    const semiPct = d.totalMinutes > 0
+                      ? ((d.semiProductiveMinutes || 0) / d.totalMinutes) * 100
+                      : 0
                     const dateLabel = d.date.slice(5) // MM-DD
                     return (
                       <div
                         key={d.date}
                         className="bar-chart-bar"
                         style={{ height: `${Math.max(2, heightPct)}%`, background: '#6366f1', position: 'relative' }}
-                        title={`${d.date}: ${formatHours(d.totalMinutes)} (${Math.round(prodPct)}% productive)`}
+                        title={`${d.date}: ${formatHours(d.totalMinutes)} (${Math.round(prodPct)}% prod, ${Math.round(semiPct)}% semi)`}
                       >
                         <div
                           style={{
@@ -133,7 +145,19 @@ export function Dashboard(): React.ReactElement {
                             right: 0,
                             height: `${prodPct}%`,
                             background: '#22c55e',
-                            borderRadius: 'inherit'
+                            borderRadius: 'inherit',
+                            zIndex: 2
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: `${prodPct}%`,
+                            left: 0,
+                            right: 0,
+                            height: `${semiPct}%`,
+                            background: '#a855f7',
+                            zIndex: 1
                           }}
                         />
                         <div className="bar-chart-label">{dateLabel}</div>
@@ -149,6 +173,10 @@ export function Dashboard(): React.ReactElement {
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: '#22c55e', display: 'inline-block' }} />
                     Productive
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: '#a855f7', display: 'inline-block' }} />
+                    Semi-productive
                   </span>
                 </div>
               </div>

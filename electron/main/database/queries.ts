@@ -85,12 +85,12 @@ export async function getAllTags(): Promise<DbTag[]> {
   return getAll<DbTag>(db, 'SELECT * FROM tags ORDER BY id')
 }
 
-export async function createTag(name: string, color: string, isProductive: boolean): Promise<DbTag> {
+export async function createTag(name: string, color: string, isProductive: number): Promise<DbTag> {
   const db = await getDb()
   run(db, 'INSERT INTO tags (name, color, isProductive) VALUES (?, ?, ?)', [
     name,
     color,
-    isProductive ? 1 : 0
+    isProductive
   ])
   const id = lastInsertId(db)
   return getOne<DbTag>(db, 'SELECT * FROM tags WHERE id = ?', [id])!
@@ -100,13 +100,13 @@ export async function updateTag(
   id: number,
   name: string,
   color: string,
-  isProductive: boolean
+  isProductive: number
 ): Promise<DbTag> {
   const db = await getDb()
   run(db, 'UPDATE tags SET name = ?, color = ?, isProductive = ? WHERE id = ?', [
     name,
     color,
-    isProductive ? 1 : 0,
+    isProductive,
     id
   ])
   return getOne<DbTag>(db, 'SELECT * FROM tags WHERE id = ?', [id])!
@@ -223,7 +223,14 @@ export async function getDailyStats(startDate: string, endDate: string): Promise
            THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
            ELSE 0
          END
-       ) as productiveMinutes
+       ) as productiveMinutes,
+       SUM(
+         CASE
+           WHEN tg.isProductive = 2 AND t.endTime IS NOT NULL
+           THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
+           ELSE 0
+         END
+       ) as semiProductiveMinutes
      FROM tasks t
      LEFT JOIN tags tg ON t.tagId = tg.id
      WHERE t.startTime >= ? AND t.startTime < ?

@@ -117,8 +117,12 @@ export function CalendarView({
               onClick={() => cell.date && onSelectDate(cell.date)}
             >
               <span className="calendar-day-num">{cell.day}</span>
-              {mins > 0 && (
-                <span className="calendar-day-hours">{formatHours(mins)}</span>
+              {mins > 0 && stats && (
+                <div className="calendar-day-hours">
+                  <div>T: {formatHours(mins)}</div>
+                  <div>Productive: {formatHours(stats.productiveMinutes)}</div>
+                  <div>Semi + productive: {formatHours(stats.productiveMinutes + (stats.semiProductiveMinutes || 0))}</div>
+                </div>
               )}
             </div>
           )

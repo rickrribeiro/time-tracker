@@ -1,0 +1,3 @@
+botar "semi productive" pra hk e velt
+colocar banco de horas. calcular 8 por dia util. ver como fazer com fériados
+colocar o saldo do dia no calendario ex: +3, -2, etc...

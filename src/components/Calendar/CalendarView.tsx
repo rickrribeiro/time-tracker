@@ -35,7 +35,7 @@ export function CalendarView({
   const [statsMap, setStatsMap] = useState<Record<string, DailyStats>>({})
   const [maxMinutes, setMaxMinutes] = useState(0)
 
-  useEffect(() => {
+  const refreshStats = () => {
     const startStr = localDayStartISO(localDateStr(new Date(year, month, 1)))
     const endStr = localDayStartISO(localDateStr(new Date(year, month + 1, 1)))
     window.api.stats.daily(startStr, endStr).then((stats) => {
@@ -48,7 +48,20 @@ export function CalendarView({
       setStatsMap(map)
       setMaxMinutes(max)
     })
+  }
+
+  useEffect(() => {
+    refreshStats()
   }, [year, month])
+
+  const toggleWorkDay = async (date: string, current: number) => {
+    const next = current === 1 ? 0 : 1
+    await window.api.dayConfig.update(date, next)
+    setStatsMap(prev => ({
+      ...prev,
+      [date]: { ...(prev[date] || { date, totalMinutes: 0, productiveMinutes: 0, semiProductiveMinutes: 0, productiveErosMinutes: 0 }), isWorkDay: next }
+    }))
+  }
 
   const firstDay = new Date(year, month, 1)
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -78,6 +91,11 @@ export function CalendarView({
     cells.push({ date: localDateStr(new Date(year, month + 1, d)), day: d, otherMonth: true })
   }
 
+  const weeks: (typeof cells)[] = []
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks.push(cells.slice(i, i + 7))
+  }
+
   function formatHours(minutes: number): string {
     if (!minutes) return ''
     const h = Math.floor(minutes / 60)
@@ -95,37 +113,91 @@ export function CalendarView({
         <button className="date-nav-btn" onClick={onNextMonth}>›</button>
       </div>
 
-      <div className="calendar-grid">
+      <div className="calendar-grid" style={{ gridTemplateColumns: 'repeat(8, 1fr)' }}>
         {WEEKDAYS.map((d) => (
           <div key={d} className="calendar-day-header">{d}</div>
         ))}
-        {cells.map((cell, i) => {
-          const stats = cell.date ? statsMap[cell.date] : null
-          const mins = stats?.totalMinutes || 0
-          const bg = cell.date && !cell.otherMonth ? heatmapColor(mins, maxMinutes) : undefined
+        <div className="calendar-day-header">Banco de Horas</div>
+
+        {weeks.map((week, weekIdx) => {
+          let weekProd = 0
+          let weekWorkDays = 0
+
+          const dayCells = week.map((cell, i) => {
+            const stats = cell.date ? statsMap[cell.date] : null
+            const mins = stats?.totalMinutes || 0
+            const isWork = stats?.isWorkDay === 1
+            const bg = cell.date && !cell.otherMonth ? heatmapColor(mins, maxMinutes) : undefined
+
+            if (stats && !cell.otherMonth) {
+              weekProd += stats.productiveMinutes
+              if (isWork) weekWorkDays++
+            }
+
+            return (
+              <div
+                key={i}
+                className={[
+                  'calendar-day',
+                  cell.otherMonth ? 'other-month' : '',
+                  cell.date === today ? 'today' : '',
+                  cell.date === selectedDate ? 'selected' : ''
+                ].join(' ')}
+                style={bg ? { background: bg } : {}}
+                onClick={() => cell.date && onSelectDate(cell.date)}
+              >
+                <div className="calendar-day-top">
+                  <span className="calendar-day-num">{cell.day}</span>
+                  {!cell.otherMonth && (
+                    <input
+                      type="checkbox"
+                      checked={isWork}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        toggleWorkDay(cell.date, isWork ? 1 : 0)
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Work Day"
+                      style={{ width: 18, height: 18, cursor: 'pointer', zIndex: 10 }}
+                    />
+                  )}
+                </div>
+                {mins > 0 && stats && (
+                  <div className="calendar-day-hours">
+                    <div>T: {formatHours(mins)}</div>
+                    <div>Productive: {formatHours(stats.productiveMinutes)}</div>
+                    {stats.productiveErosMinutes > 0 && <div>ProductiveEros: {formatHours(stats.productiveErosMinutes)}</div>}
+                    <div>Semi + productive: {formatHours(stats.productiveMinutes + (stats.semiProductiveMinutes || 0) + (stats.productiveErosMinutes || 0))}</div>
+                  </div>
+                )}
+              </div>
+            )
+          })
+
+          const balanceMins = weekProd - (weekWorkDays * 8 * 60)
+          const absBalance = Math.abs(balanceMins)
+          const balanceStr = formatHours(absBalance) || '0m'
+          const balancePrefix = balanceMins < 0 ? '-' : '+'
 
           return (
-            <div
-              key={i}
-              className={[
-                'calendar-day',
-                cell.otherMonth ? 'other-month' : '',
-                cell.date === today ? 'today' : '',
-                cell.date === selectedDate ? 'selected' : ''
-              ].join(' ')}
-              style={bg ? { background: bg } : {}}
-              onClick={() => cell.date && onSelectDate(cell.date)}
-            >
-              <span className="calendar-day-num">{cell.day}</span>
-              {mins > 0 && stats && (
-                <div className="calendar-day-hours">
-                  <div>T: {formatHours(mins)}</div>
-                  <div>Productive: {formatHours(stats.productiveMinutes)}</div>
-                  <div>ProductiveEros: {formatHours(stats.productiveErosMinutes)}</div>
-                  <div>Semi + productive: {formatHours(stats.productiveMinutes + (stats.semiProductiveMinutes || 0) + (stats.productiveErosMinutes || 0))}</div>
+            <React.Fragment key={weekIdx}>
+              {dayCells}
+              <div className="calendar-week-stats">
+                <div className="week-stat-group">
+                  <div className="week-stat-label">Productive</div>
+                  <div className="week-stat-value">
+                    {formatHours(weekProd) || '0m'}/{weekWorkDays * 8}h
+                  </div>
                 </div>
-              )}
-            </div>
+                <div className="week-stat-group" style={{ marginTop: 8 }}>
+                  <div className="week-stat-label">Saldo</div>
+                  <div className="week-stat-value" style={{ color: balanceMins < 0 ? '#ef4444' : '#10b981' }}>
+                    {balancePrefix}{balanceStr}
+                  </div>
+                </div>
+              </div>
+            </React.Fragment>
           )
         })}
       </div>

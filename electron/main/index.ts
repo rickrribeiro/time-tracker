@@ -17,7 +17,8 @@ import {
   stopAllActiveTasks,
   getDailyStats,
   getTagStats,
-  fillGapsWithIdle
+  fillGapsWithIdle,
+  updateDayConfig
 } from './database/queries'
 
 function createWindow(): void {
@@ -125,6 +126,10 @@ ipcMain.handle('stats:daily', (_, startDate: string, endDate: string) =>
 
 ipcMain.handle('stats:byTag', (_, startDate: string, endDate: string) =>
   getTagStats(startDate, endDate)
+)
+
+ipcMain.handle('dayConfig:update', (_, date: string, isWorkDay: number) =>
+  updateDayConfig(date, isWorkDay)
 )
 
 // ── IPC: App ──────────────────────────────────────────────────────────────────

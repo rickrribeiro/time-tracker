@@ -28,6 +28,7 @@ export interface DailyStats {
   productiveMinutes: number
   semiProductiveMinutes: number
   productiveErosMinutes: number
+  isWorkDay: number
 }
 
 export interface TagStats {
@@ -77,6 +78,9 @@ declare global {
       stats: {
         daily: (startDate: string, endDate: string) => Promise<DailyStats[]>
         byTag: (startDate: string, endDate: string) => Promise<TagStats[]>
+      }
+      dayConfig: {
+        update: (date: string, isWorkDay: number) => Promise<void>
       }
       app: {
         exportDb: () => Promise<boolean>

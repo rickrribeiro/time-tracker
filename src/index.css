@@ -608,6 +608,7 @@ select:focus {
   transition: background 0.15s;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
+  position: relative;
 }
 
 .calendar-day:hover {
@@ -632,9 +633,66 @@ select:focus {
   font-weight: 600;
 }
 
+.calendar-day-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0 8px;
+  position: absolute;
+  top: 6px;
+  left: 0;
+}
+
+.calendar-day-top input[type="checkbox"] {
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
 .calendar-day-hours {
-  font-size: 14px;
-  color: red;
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+  margin-top: 14px;
+}
+
+.calendar-week-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  aspect-ratio: 1;
+  padding: 6px;
+  text-align: center;
+}
+
+.week-stat-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.week-stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.week-stat-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-hover);
+  font-family: 'SF Mono', monospace;
+  white-space: nowrap;
 }
 
 /* ── Dashboard ─────────────────────────────────────────────────────────────────── */

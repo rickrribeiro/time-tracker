@@ -25,6 +25,9 @@ const api = {
     daily: (startDate, endDate) => electron.ipcRenderer.invoke("stats:daily", startDate, endDate),
     byTag: (startDate, endDate) => electron.ipcRenderer.invoke("stats:byTag", startDate, endDate)
   },
+  dayConfig: {
+    update: (date, isWorkDay) => electron.ipcRenderer.invoke("dayConfig:update", date, isWorkDay)
+  },
   // App
   app: {
     exportDb: () => electron.ipcRenderer.invoke("app:exportDb")

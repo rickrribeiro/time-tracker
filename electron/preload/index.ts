@@ -40,6 +40,10 @@ const api = {
     byTag: (startDate: string, endDate: string) =>
       ipcRenderer.invoke('stats:byTag', startDate, endDate)
   },
+  dayConfig: {
+    update: (date: string, isWorkDay: number) =>
+      ipcRenderer.invoke('dayConfig:update', date, isWorkDay)
+  },
   // App
   app: {
     exportDb: () => ipcRenderer.invoke('app:exportDb')

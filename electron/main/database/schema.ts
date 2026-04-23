@@ -23,4 +23,8 @@ export const SCHEMA = `
 
   INSERT OR IGNORE INTO tags (id, name, color, isProductive)
   VALUES (3, 'Break', '#f59e0b', 0);
+  CREATE TABLE IF NOT EXISTS day_configs (
+    date TEXT PRIMARY KEY,
+    isWorkDay INTEGER NOT NULL DEFAULT 0
+  );
 `;

@@ -50,6 +50,10 @@ const SCHEMA = `
 
   INSERT OR IGNORE INTO tags (id, name, color, isProductive)
   VALUES (3, 'Break', '#f59e0b', 0);
+  CREATE TABLE IF NOT EXISTS day_configs (
+    date TEXT PRIMARY KEY,
+    isWorkDay INTEGER NOT NULL DEFAULT 0
+  );
 `;
 let db = null;
 let dbPath;
@@ -251,13 +255,29 @@ async function getDailyStats(startDate, endDate) {
            THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
            ELSE 0
          END
-       ) as productiveErosMinutes
+       ) as productiveErosMinutes,
+       COALESCE(dc.isWorkDay, 0) as isWorkDay
      FROM tasks t
      LEFT JOIN tags tg ON t.tagId = tg.id
+     LEFT JOIN day_configs dc ON substr(t.startTime, 1, 10) = dc.date
      WHERE t.startTime >= ? AND t.startTime < ?
      GROUP BY substr(t.startTime, 1, 10)
+     
+     UNION ALL
+     
+     SELECT
+       date,
+       0 as totalMinutes,
+       0 as productiveMinutes,
+       0 as semiProductiveMinutes,
+       0 as productiveErosMinutes,
+       isWorkDay
+     FROM day_configs
+     WHERE date >= substr(?, 1, 10) AND date < substr(?, 1, 10)
+       AND date NOT IN (SELECT substr(startTime, 1, 10) FROM tasks WHERE startTime >= ? AND startTime < ?)
+
      ORDER BY date ASC`,
-    [startDate, endDate]
+    [startDate, endDate, startDate, endDate, startDate, endDate]
   );
 }
 async function getTagStats(startDate, endDate) {
@@ -284,6 +304,10 @@ async function getTagStats(startDate, endDate) {
      ORDER BY totalMinutes DESC`,
     [startDate, endDate, startDate, endDate]
   );
+}
+async function updateDayConfig(date, isWorkDay) {
+  const db2 = await getDb();
+  run(db2, "INSERT OR REPLACE INTO day_configs (date, isWorkDay) VALUES (?, ?)", [date, isWorkDay]);
 }
 async function fillGapsWithIdle(date) {
   const db2 = await getDb();
@@ -416,6 +440,10 @@ electron.ipcMain.handle(
 electron.ipcMain.handle(
   "stats:byTag",
   (_, startDate, endDate) => getTagStats(startDate, endDate)
+);
+electron.ipcMain.handle(
+  "dayConfig:update",
+  (_, date, isWorkDay) => updateDayConfig(date, isWorkDay)
 );
 electron.ipcMain.handle("app:exportDb", async () => {
   saveDb();

@@ -31,6 +31,12 @@ export interface DailyStats {
   productiveMinutes: number
   semiProductiveMinutes: number
   productiveErosMinutes: number
+  isWorkDay: number
+}
+
+export interface DayConfig {
+  date: string
+  isWorkDay: number
 }
 
 export interface TagStats {
@@ -248,13 +254,29 @@ export async function getDailyStats(startDate: string, endDate: string): Promise
            THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
            ELSE 0
          END
-       ) as productiveErosMinutes
+       ) as productiveErosMinutes,
+       COALESCE(dc.isWorkDay, 0) as isWorkDay
      FROM tasks t
      LEFT JOIN tags tg ON t.tagId = tg.id
+     LEFT JOIN day_configs dc ON substr(t.startTime, 1, 10) = dc.date
      WHERE t.startTime >= ? AND t.startTime < ?
      GROUP BY substr(t.startTime, 1, 10)
+     
+     UNION ALL
+     
+     SELECT
+       date,
+       0 as totalMinutes,
+       0 as productiveMinutes,
+       0 as semiProductiveMinutes,
+       0 as productiveErosMinutes,
+       isWorkDay
+     FROM day_configs
+     WHERE date >= substr(?, 1, 10) AND date < substr(?, 1, 10)
+       AND date NOT IN (SELECT substr(startTime, 1, 10) FROM tasks WHERE startTime >= ? AND startTime < ?)
+
      ORDER BY date ASC`,
-    [startDate, endDate]
+    [startDate, endDate, startDate, endDate, startDate, endDate]
   )
 }
 
@@ -282,6 +304,12 @@ export async function getTagStats(startDate: string, endDate: string): Promise<T
      ORDER BY totalMinutes DESC`,
     [startDate, endDate, startDate, endDate]
   )
+}
+
+// ── Day Configs ──────────────────────────────────────────────────────────────
+export async function updateDayConfig(date: string, isWorkDay: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'INSERT OR REPLACE INTO day_configs (date, isWorkDay) VALUES (?, ?)', [date, isWorkDay])
 }
 
 // ── Smart Logic ───────────────────────────────────────────────────────────────

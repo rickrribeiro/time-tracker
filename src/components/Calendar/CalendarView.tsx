@@ -121,7 +121,8 @@ export function CalendarView({
                 <div className="calendar-day-hours">
                   <div>T: {formatHours(mins)}</div>
                   <div>Productive: {formatHours(stats.productiveMinutes)}</div>
-                  <div>Semi + productive: {formatHours(stats.productiveMinutes + (stats.semiProductiveMinutes || 0))}</div>
+                  <div>ProductiveEros: {formatHours(stats.productiveErosMinutes)}</div>
+                  <div>Semi + productive: {formatHours(stats.productiveMinutes + (stats.semiProductiveMinutes || 0) + (stats.productiveErosMinutes || 0))}</div>
                 </div>
               )}
             </div>

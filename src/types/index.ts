@@ -2,7 +2,7 @@ export interface Tag {
   id: number
   name: string
   color: string
-  isProductive: number // 1 = true, 0 = false, 2 = semi-productive
+  isProductive: number // 1 = true, 0 = false, 2 = semi-productive, 3 = productive-eros
 }
 
 export interface Task {

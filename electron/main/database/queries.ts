@@ -26,6 +26,8 @@ export interface DailyStats {
   date: string
   totalMinutes: number
   productiveMinutes: number
+  semiProductiveMinutes: number
+  productiveErosMinutes: number
 }
 
 export interface TagStats {
@@ -230,7 +232,14 @@ export async function getDailyStats(startDate: string, endDate: string): Promise
            THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
            ELSE 0
          END
-       ) as semiProductiveMinutes
+       ) as semiProductiveMinutes,
+       SUM(
+         CASE
+           WHEN tg.isProductive = 3 AND t.endTime IS NOT NULL
+           THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
+           ELSE 0
+         END
+       ) as productiveErosMinutes
      FROM tasks t
      LEFT JOIN tags tg ON t.tagId = tg.id
      WHERE t.startTime >= ? AND t.startTime < ?

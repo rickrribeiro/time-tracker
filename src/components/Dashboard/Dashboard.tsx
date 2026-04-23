@@ -60,8 +60,9 @@ export function Dashboard(): React.ReactElement {
 
   const totalMinutes = dailyStats.reduce((a, b) => a + b.totalMinutes, 0)
   const productiveMinutes = dailyStats.reduce((a, b) => a + b.productiveMinutes, 0)
+  const productiveErosMinutes = dailyStats.reduce((a, b) => a + (b.productiveErosMinutes || 0), 0)
   const semiProductiveMinutes = dailyStats.reduce((a, b) => a + (b.semiProductiveMinutes || 0), 0)
-  const prodPlusSemiMinutes = productiveMinutes + semiProductiveMinutes
+  const prodPlusSemiMinutes = productiveMinutes + semiProductiveMinutes + productiveErosMinutes
   const productivePercent =
     totalMinutes > 0 ? Math.round((productiveMinutes / totalMinutes) * 100) : 0
   const prodPlusSemiPercent =
@@ -126,6 +127,9 @@ export function Dashboard(): React.ReactElement {
                     const prodPct = d.totalMinutes > 0
                       ? (d.productiveMinutes / d.totalMinutes) * 100
                       : 0
+                    const erosPct = d.totalMinutes > 0
+                      ? ((d.productiveErosMinutes || 0) / d.totalMinutes) * 100
+                      : 0
                     const semiPct = d.totalMinutes > 0
                       ? ((d.semiProductiveMinutes || 0) / d.totalMinutes) * 100
                       : 0
@@ -135,7 +139,7 @@ export function Dashboard(): React.ReactElement {
                         key={d.date}
                         className="bar-chart-bar"
                         style={{ height: `${Math.max(2, heightPct)}%`, background: '#6366f1', position: 'relative' }}
-                        title={`${d.date}: ${formatHours(d.totalMinutes)} (${Math.round(prodPct)}% prod, ${Math.round(semiPct)}% semi)`}
+                        title={`${d.date}: ${formatHours(d.totalMinutes)} (${Math.round(prodPct)}% prod, ${Math.round(erosPct)}% eros, ${Math.round(semiPct)}% semi)`}
                       >
                         <div
                           style={{
@@ -146,13 +150,24 @@ export function Dashboard(): React.ReactElement {
                             height: `${prodPct}%`,
                             background: '#22c55e',
                             borderRadius: 'inherit',
-                            zIndex: 2
+                            zIndex: 3
                           }}
                         />
                         <div
                           style={{
                             position: 'absolute',
                             bottom: `${prodPct}%`,
+                            left: 0,
+                            right: 0,
+                            height: `${erosPct}%`,
+                            background: '#fb7185',
+                            zIndex: 2
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: `${prodPct + erosPct}%`,
                             left: 0,
                             right: 0,
                             height: `${semiPct}%`,
@@ -173,6 +188,10 @@ export function Dashboard(): React.ReactElement {
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: '#22c55e', display: 'inline-block' }} />
                     Productive
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: '#fb7185', display: 'inline-block' }} />
+                    ProductiveEros
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: '#a855f7', display: 'inline-block' }} />

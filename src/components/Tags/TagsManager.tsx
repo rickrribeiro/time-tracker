@@ -108,6 +108,7 @@ export function TagsManager(): React.ReactElement {
               <option value={0}>Non-productive</option>
               <option value={1}>Productive</option>
               <option value={2}>Semi-productive</option>
+              <option value={3}>ProductiveEros</option>
             </select>
           </div>
           <div className="tag-form-actions">
@@ -126,8 +127,8 @@ export function TagsManager(): React.ReactElement {
           <div key={tag.id} className="tag-item">
             <div className="tag-color-dot" style={{ background: tag.color }} />
             <span className="tag-name">{tag.name}</span>
-            <span className={`tag-badge ${tag.isProductive === 1 ? 'productive' : tag.isProductive === 2 ? 'semi-productive' : 'idle'}`}>
-              {tag.isProductive === 1 ? 'Productive' : tag.isProductive === 2 ? 'Semi-productive' : 'Non-productive'}
+            <span className={`tag-badge ${tag.isProductive === 1 ? 'productive' : tag.isProductive === 2 ? 'semi-productive' : tag.isProductive === 3 ? 'productive-eros' : 'idle'}`}>
+              {tag.isProductive === 1 ? 'Productive' : tag.isProductive === 2 ? 'Semi-productive' : tag.isProductive === 3 ? 'ProductiveEros' : 'Non-productive'}
             </span>
             <div className="tag-actions">
               <button

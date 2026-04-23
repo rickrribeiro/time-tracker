@@ -844,6 +844,11 @@ select:focus {
   color: #a855f7;
 }
 
+.tag-badge.productive-eros {
+  background: rgba(251, 113, 133, 0.15);
+  color: #fb7185;
+}
+
 .tag-badge.idle {
   background: rgba(100, 116, 139, 0.15);
   color: var(--text-muted);

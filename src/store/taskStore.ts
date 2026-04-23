@@ -11,9 +11,9 @@ interface TaskState {
   setTodayTasks: (tasks: TaskWithTag[]) => void
   setLoading: (v: boolean) => void
 
-  startTask: (title: string, tagId: number | null) => Promise<void>
+  startTask: (title: string, tagId: number | null, secondaryTagId?: number | null) => Promise<void>
   stopActiveTask: () => Promise<void>
-  switchTask: (title: string, tagId: number | null) => Promise<void>
+  switchTask: (title: string, tagId: number | null, secondaryTagId?: number | null) => Promise<void>
   refreshTasks: (date: string) => Promise<void>
   refreshActive: () => Promise<void>
   deleteTask: (id: number) => Promise<void>
@@ -21,6 +21,7 @@ interface TaskState {
     id: number,
     title: string,
     tagId: number | null,
+    secondaryTagId: number | null,
     startTime: string,
     endTime: string | null
   ) => Promise<void>
@@ -46,8 +47,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set({ todayTasks: tasks, isLoading: false })
   },
 
-  startTask: async (title: string, tagId: number | null) => {
-    await window.api.tasks.start(title, tagId)
+  startTask: async (title: string, tagId: number | null, secondaryTagId: number | null = null) => {
+    await window.api.tasks.start(title, tagId, secondaryTagId)
     await get().refreshActive()
   },
 
@@ -58,8 +59,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await get().refreshActive()
   },
 
-  switchTask: async (title: string, tagId: number | null) => {
-    await window.api.tasks.start(title, tagId)
+  switchTask: async (title: string, tagId: number | null, secondaryTagId: number | null = null) => {
+    await window.api.tasks.start(title, tagId, secondaryTagId)
     await get().refreshActive()
   },
 
@@ -71,9 +72,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     id: number,
     title: string,
     tagId: number | null,
+    secondaryTagId: number | null,
     startTime: string,
     endTime: string | null
   ) => {
-    await window.api.tasks.update(id, title, tagId, startTime, endTime)
+    await window.api.tasks.update(id, title, tagId, secondaryTagId, startTime, endTime)
   }
 }))

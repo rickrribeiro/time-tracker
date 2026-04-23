@@ -113,7 +113,21 @@ export function TimelineBlock({
         {height > 20 && (
           <div className="timeline-block-title">{task.title}</div>
         )}
-        {height > 34 && (
+        {height > 40 && (task.tagName || task.secondaryTagName) && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
+            {task.tagName && (
+              <span style={{ fontSize: 9, background: 'rgba(255,255,255,0.2)', padding: '1px 4px', borderRadius: 4 }}>
+                {task.tagName}
+              </span>
+            )}
+            {task.secondaryTagName && (
+              <span style={{ fontSize: 9, background: 'rgba(255,255,255,0.2)', padding: '1px 4px', borderRadius: 4 }}>
+                {task.secondaryTagName}
+              </span>
+            )}
+          </div>
+        )}
+        {height > 50 && (
           <div className="timeline-block-time">
             {formatTime(task.startTime)}
             {task.endTime ? ` – ${formatTime(task.endTime)}` : ' (active)'}

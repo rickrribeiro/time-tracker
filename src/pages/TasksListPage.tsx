@@ -32,6 +32,7 @@ interface EditState {
   task: TaskWithTag
   title: string
   tagId: number | null
+  secondaryTagId: number | null
   startTime: string
   endTime: string
 }
@@ -65,7 +66,8 @@ export function TasksListPage(): React.ReactElement {
     return tasks.filter(
       (t) =>
         t.title.toLowerCase().includes(q) ||
-        (t.tagName ?? '').toLowerCase().includes(q)
+        (t.tagName ?? '').toLowerCase().includes(q) ||
+        (t.secondaryTagName ?? '').toLowerCase().includes(q)
     )
   }, [tasks, search])
 
@@ -85,6 +87,7 @@ export function TasksListPage(): React.ReactElement {
       task,
       title: task.title,
       tagId: task.tagId,
+      secondaryTagId: task.secondaryTagId,
       startTime: toLocalInput(task.startTime),
       endTime: task.endTime ? toLocalInput(task.endTime) : ''
     })
@@ -94,7 +97,7 @@ export function TasksListPage(): React.ReactElement {
     if (!editState) return
     const startISO = new Date(editState.startTime).toISOString()
     const endISO = editState.endTime ? new Date(editState.endTime).toISOString() : null
-    await window.api.tasks.update(editState.task.id, editState.title, editState.tagId, startISO, endISO)
+    await window.api.tasks.update(editState.task.id, editState.title, editState.tagId, editState.secondaryTagId, startISO, endISO)
     setEditState(null)
     load()
   }
@@ -149,10 +152,20 @@ export function TasksListPage(): React.ReactElement {
             />
           </div>
           <div className="form-row">
-            <label>Tag</label>
+            <label>Tag 1</label>
             <select
               value={editState.tagId ?? ''}
               onChange={(e) => setEditState({ ...editState, tagId: e.target.value ? Number(e.target.value) : null })}
+            >
+              <option value="">None</option>
+              {tags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <div className="form-row">
+            <label>Tag 2</label>
+            <select
+              value={editState.secondaryTagId ?? ''}
+              onChange={(e) => setEditState({ ...editState, secondaryTagId: e.target.value ? Number(e.target.value) : null })}
             >
               <option value="">None</option>
               {tags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -209,11 +222,18 @@ export function TasksListPage(): React.ReactElement {
                     />
                     <div className="task-row-main">
                       <span className="task-row-title">{task.title}</span>
-                      {task.tagName && (
-                        <span className="task-row-tag" style={{ background: task.tagColor + '33', color: task.tagColor || undefined }}>
-                          {task.tagName}
-                        </span>
-                      )}
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {task.tagName && (
+                          <span className="task-row-tag" style={{ background: task.tagColor + '33', color: task.tagColor || undefined }}>
+                            {task.tagName}
+                          </span>
+                        )}
+                        {task.secondaryTagName && (
+                          <span className="task-row-tag" style={{ background: task.secondaryTagColor + '33', color: task.secondaryTagColor || undefined, opacity: 0.8 }}>
+                            {task.secondaryTagName}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="task-row-times">
                       <span>{formatTime(task.startTime)}</span>

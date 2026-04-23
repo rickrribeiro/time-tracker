@@ -10,6 +10,7 @@ export const SCHEMA = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     tagId INTEGER REFERENCES tags(id) ON DELETE SET NULL,
+    secondaryTagId INTEGER REFERENCES tags(id) ON DELETE SET NULL,
     startTime TEXT NOT NULL,
     endTime TEXT
   );

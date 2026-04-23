@@ -17,6 +17,7 @@ export function ActiveTask(): React.ReactElement {
   const [timer, setTimer] = useState('')
   const [newTitle, setNewTitle] = useState('')
   const [newTagId, setNewTagId] = useState<number | null>(null)
+  const [newSecondaryTagId, setNewSecondaryTagId] = useState<number | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -35,13 +36,13 @@ export function ActiveTask(): React.ReactElement {
 
   const handleStart = async () => {
     if (!newTitle.trim()) return
-    await startTask(newTitle.trim(), newTagId)
+    await startTask(newTitle.trim(), newTagId, newSecondaryTagId)
     setNewTitle('')
   }
 
   const handleSwitch = async () => {
     if (!newTitle.trim()) return
-    await switchTask(newTitle.trim(), newTagId)
+    await switchTask(newTitle.trim(), newTagId, newSecondaryTagId)
     setNewTitle('')
   }
 
@@ -59,14 +60,24 @@ export function ActiveTask(): React.ReactElement {
           <div className="active-task-info">
             <div className="active-task-dot" />
             <span className="active-task-title">{activeTask.title}</span>
-            {activeTask.tagName && (
-              <span
-                className="active-task-tag"
-                style={{ background: activeTask.tagColor || '#6b7280' }}
-              >
-                {activeTask.tagName}
-              </span>
-            )}
+            <div style={{ display: 'flex', gap: 6 }}>
+              {activeTask.tagName && (
+                <span
+                  className="active-task-tag"
+                  style={{ background: activeTask.tagColor || '#6b7280' }}
+                >
+                  {activeTask.tagName}
+                </span>
+              )}
+              {activeTask.secondaryTagName && (
+                <span
+                  className="active-task-tag"
+                  style={{ background: activeTask.secondaryTagColor || '#6b7280', opacity: 0.8 }}
+                >
+                  {activeTask.secondaryTagName}
+                </span>
+              )}
+            </div>
           </div>
           <div className="active-task-timer">{timer}</div>
           <div className="active-task-controls">
@@ -82,7 +93,16 @@ export function ActiveTask(): React.ReactElement {
                 value={newTagId ?? ''}
                 onChange={(e) => setNewTagId(e.target.value ? Number(e.target.value) : null)}
               >
-                <option value="">No tag</option>
+                <option value="">Tag 1</option>
+                {tags.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <select
+                value={newSecondaryTagId ?? ''}
+                onChange={(e) => setNewSecondaryTagId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Tag 2</option>
                 {tags.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
@@ -112,7 +132,16 @@ export function ActiveTask(): React.ReactElement {
             value={newTagId ?? ''}
             onChange={(e) => setNewTagId(e.target.value ? Number(e.target.value) : null)}
           >
-            <option value="">No tag</option>
+            <option value="">Tag 1</option>
+            {tags.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+          <select
+            value={newSecondaryTagId ?? ''}
+            onChange={(e) => setNewSecondaryTagId(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">Tag 2</option>
             {tags.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}

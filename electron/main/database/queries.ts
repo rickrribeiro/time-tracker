@@ -12,6 +12,7 @@ export interface DbTask {
   id: number
   title: string
   tagId: number | null
+  secondaryTagId: number | null
   startTime: string
   endTime: string | null
 }
@@ -20,6 +21,8 @@ export interface DbTaskWithTag extends DbTask {
   tagName: string | null
   tagColor: string | null
   tagIsProductive: number | null
+  secondaryTagName: string | null
+  secondaryTagColor: string | null
 }
 
 export interface DailyStats {
@@ -123,10 +126,12 @@ export async function deleteTag(id: number): Promise<void> {
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 
 const TASK_WITH_TAG_SQL = `
-  SELECT t.id, t.title, t.tagId, t.startTime, t.endTime,
-         tg.name as tagName, tg.color as tagColor, tg.isProductive as tagIsProductive
+  SELECT t.id, t.title, t.tagId, t.secondaryTagId, t.startTime, t.endTime,
+         tg.name as tagName, tg.color as tagColor, tg.isProductive as tagIsProductive,
+         stg.name as secondaryTagName, stg.color as secondaryTagColor
   FROM tasks t
   LEFT JOIN tags tg ON t.tagId = tg.id
+  LEFT JOIN tags stg ON t.secondaryTagId = stg.id
 `
 
 export async function getTasksForRange(startDate: string, endDate: string): Promise<DbTaskWithTag[]> {
@@ -162,31 +167,35 @@ export async function getActiveTask(): Promise<DbTaskWithTag | null> {
 export async function createTask(
   title: string,
   tagId: number | null,
+  secondaryTagId: number | null,
   startTime: string
 ): Promise<DbTask> {
   const db = await getDb()
-  run(db, 'INSERT INTO tasks (title, tagId, startTime) VALUES (?, ?, ?)', [title, tagId, startTime])
+  run(db, 'INSERT INTO tasks (title, tagId, secondaryTagId, startTime) VALUES (?, ?, ?, ?)', [
+    title,
+    tagId,
+    secondaryTagId,
+    startTime
+  ])
   const id = lastInsertId(db)
-  // Build the object directly — avoids a SELECT that may miss due to sql.js rowid quirks
-  return { id, title, tagId, startTime, endTime: null }
+  return { id, title, tagId, secondaryTagId, startTime, endTime: null }
 }
 
 export async function updateTask(
   id: number,
   title: string,
   tagId: number | null,
+  secondaryTagId: number | null,
   startTime: string,
   endTime: string | null
 ): Promise<DbTask> {
   const db = await getDb()
-  run(db, 'UPDATE tasks SET title = ?, tagId = ?, startTime = ?, endTime = ? WHERE id = ?', [
-    title,
-    tagId,
-    startTime,
-    endTime,
-    id
-  ])
-  return { id, title, tagId, startTime, endTime }
+  run(
+    db,
+    'UPDATE tasks SET title = ?, tagId = ?, secondaryTagId = ?, startTime = ?, endTime = ? WHERE id = ?',
+    [title, tagId, secondaryTagId, startTime, endTime, id]
+  )
+  return { id, title, tagId, secondaryTagId, startTime, endTime }
 }
 
 export async function stopTask(id: number, endTime: string): Promise<void> {
@@ -253,24 +262,25 @@ export async function getTagStats(startDate: string, endDate: string): Promise<T
   const db = await getDb()
   return getAll<TagStats>(
     db,
-    `SELECT
-       t.tagId,
-       tg.name as tagName,
-       tg.color as tagColor,
-       tg.isProductive,
-       SUM(
-         CASE
-           WHEN t.endTime IS NOT NULL
-           THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
-           ELSE 0
-         END
-       ) as totalMinutes
-     FROM tasks t
-     LEFT JOIN tags tg ON t.tagId = tg.id
-     WHERE t.startTime >= ? AND t.startTime < ?
-     GROUP BY t.tagId
+    `SELECT tagId, tagName, tagColor, isProductive, SUM(minutes) as totalMinutes
+     FROM (
+       SELECT t.tagId, tg.name as tagName, tg.color as tagColor, tg.isProductive,
+              CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER) as minutes
+       FROM tasks t
+       JOIN tags tg ON t.tagId = tg.id
+       WHERE t.endTime IS NOT NULL AND t.startTime >= ? AND t.startTime < ?
+       
+       UNION ALL
+       
+       SELECT t.secondaryTagId as tagId, tg.name as tagName, tg.color as tagColor, tg.isProductive,
+              CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER) as minutes
+       FROM tasks t
+       JOIN tags tg ON t.secondaryTagId = tg.id
+       WHERE t.endTime IS NOT NULL AND t.startTime >= ? AND t.startTime < ?
+     )
+     GROUP BY tagId
      ORDER BY totalMinutes DESC`,
-    [startDate, endDate]
+    [startDate, endDate, startDate, endDate]
   )
 }
 

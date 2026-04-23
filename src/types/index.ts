@@ -9,6 +9,7 @@ export interface Task {
   id: number
   title: string
   tagId: number | null
+  secondaryTagId: number | null
   startTime: string
   endTime: string | null
 }
@@ -17,6 +18,8 @@ export interface TaskWithTag extends Task {
   tagName: string | null
   tagColor: string | null
   tagIsProductive: number | null
+  secondaryTagName: string | null
+  secondaryTagColor: string | null
 }
 
 export interface DailyStats {
@@ -24,6 +27,7 @@ export interface DailyStats {
   totalMinutes: number
   productiveMinutes: number
   semiProductiveMinutes: number
+  productiveErosMinutes: number
 }
 
 export interface TagStats {
@@ -49,17 +53,24 @@ declare global {
         getAll: () => Promise<TaskWithTag[]>
         getForRange: (startDate: string, endDate: string) => Promise<TaskWithTag[]>
         getActive: () => Promise<TaskWithTag | null>
-        start: (title: string, tagId: number | null, startTime?: string) => Promise<Task>
+        start: (title: string, tagId: number | null, secondaryTagId: number | null, startTime?: string) => Promise<Task>
         stop: (id: number, endTime?: string) => Promise<Task>
         update: (
           id: number,
           title: string,
           tagId: number | null,
+          secondaryTagId: number | null,
           startTime: string,
           endTime: string | null
         ) => Promise<Task>
         delete: (id: number) => Promise<void>
-        add: (title: string, tagId: number | null, startTime: string, endTime: string | null) => Promise<Task>
+        add: (
+          title: string,
+          tagId: number | null,
+          secondaryTagId: number | null,
+          startTime: string,
+          endTime: string | null
+        ) => Promise<Task>
         stopAll: (endTime: string) => Promise<void>
         fillGaps: (date: string) => Promise<void>
       }

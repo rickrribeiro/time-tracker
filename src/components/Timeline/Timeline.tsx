@@ -18,6 +18,7 @@ interface FormState {
   task: TaskWithTag | null // null = creating new
   title: string
   tagId: number | null
+  secondaryTagId: number | null
   startTime: string
   endTime: string
 }
@@ -52,6 +53,7 @@ export function Timeline({ tasks, selectedDate, onRefresh }: Props): React.React
       task,
       title: task.title,
       tagId: task.tagId,
+      secondaryTagId: task.secondaryTagId,
       startTime: toLocalInput(task.startTime),
       endTime: task.endTime ? toLocalInput(task.endTime) : ''
     })
@@ -63,7 +65,7 @@ export function Timeline({ tasks, selectedDate, onRefresh }: Props): React.React
       ? toLocalInput(new Date().toISOString())
       : `${selectedDate}T09:00`
     setSelected(null)
-    setForm({ task: null, title: '', tagId: null, startTime: defaultStart, endTime: '' })
+    setForm({ task: null, title: '', tagId: null, secondaryTagId: null, startTime: defaultStart, endTime: '' })
   }
 
   function closeForm() {
@@ -80,9 +82,9 @@ export function Timeline({ tasks, selectedDate, onRefresh }: Props): React.React
 
     try {
       if (form.task) {
-        await updateTask(form.task.id, form.title.trim(), form.tagId, startISO, endISO)
+        await updateTask(form.task.id, form.title.trim(), form.tagId, form.secondaryTagId, startISO, endISO)
       } else {
-        await window.api.tasks.add(form.title.trim(), form.tagId, startISO, endISO)
+        await window.api.tasks.add(form.title.trim(), form.tagId, form.secondaryTagId, startISO, endISO)
       }
       closeForm()
       onRefresh()
@@ -100,7 +102,7 @@ export function Timeline({ tasks, selectedDate, onRefresh }: Props): React.React
   }
 
   async function handleBlockUpdate(task: TaskWithTag, startTime: string, endTime: string | null) {
-    await updateTask(task.id, task.title, task.tagId, startTime, endTime)
+    await updateTask(task.id, task.title, task.tagId, task.secondaryTagId, startTime, endTime)
     onRefresh()
   }
 
@@ -127,10 +129,22 @@ export function Timeline({ tasks, selectedDate, onRefresh }: Props): React.React
             />
           </div>
           <div className="form-row">
-            <label>Tag</label>
+            <label>Tag 1</label>
             <select
               value={form.tagId ?? ''}
               onChange={(e) => setForm({ ...form, tagId: e.target.value ? Number(e.target.value) : null })}
+            >
+              <option value="">None</option>
+              {tags.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-row">
+            <label>Tag 2</label>
+            <select
+              value={form.secondaryTagId ?? ''}
+              onChange={(e) => setForm({ ...form, secondaryTagId: e.target.value ? Number(e.target.value) : null })}
             >
               <option value="">None</option>
               {tags.map((t) => (

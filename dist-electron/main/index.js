@@ -37,6 +37,7 @@ const SCHEMA = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     tagId INTEGER REFERENCES tags(id) ON DELETE SET NULL,
+    secondaryTagId INTEGER REFERENCES tags(id) ON DELETE SET NULL,
     startTime TEXT NOT NULL,
     endTime TEXT
   );
@@ -68,6 +69,10 @@ async function getDb() {
   }
   db.run("PRAGMA foreign_keys = ON;");
   db.run(SCHEMA);
+  try {
+    db.run("ALTER TABLE tasks ADD COLUMN secondaryTagId INTEGER REFERENCES tags(id) ON DELETE SET NULL;");
+  } catch (e) {
+  }
   saveDb();
   return db;
 }
@@ -147,10 +152,12 @@ async function deleteTag(id) {
   run(db2, "DELETE FROM tags WHERE id = ?", [id]);
 }
 const TASK_WITH_TAG_SQL = `
-  SELECT t.id, t.title, t.tagId, t.startTime, t.endTime,
-         tg.name as tagName, tg.color as tagColor, tg.isProductive as tagIsProductive
+  SELECT t.id, t.title, t.tagId, t.secondaryTagId, t.startTime, t.endTime,
+         tg.name as tagName, tg.color as tagColor, tg.isProductive as tagIsProductive,
+         stg.name as secondaryTagName, stg.color as secondaryTagColor
   FROM tasks t
   LEFT JOIN tags tg ON t.tagId = tg.id
+  LEFT JOIN tags stg ON t.secondaryTagId = stg.id
 `;
 async function getTasksForRange(startDate, endDate) {
   const db2 = await getDb();
@@ -179,22 +186,25 @@ async function getActiveTask() {
      LIMIT 1`
   );
 }
-async function createTask(title, tagId, startTime) {
+async function createTask(title, tagId, secondaryTagId, startTime) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO tasks (title, tagId, startTime) VALUES (?, ?, ?)", [title, tagId, startTime]);
-  const id = lastInsertId(db2);
-  return { id, title, tagId, startTime, endTime: null };
-}
-async function updateTask(id, title, tagId, startTime, endTime) {
-  const db2 = await getDb();
-  run(db2, "UPDATE tasks SET title = ?, tagId = ?, startTime = ?, endTime = ? WHERE id = ?", [
+  run(db2, "INSERT INTO tasks (title, tagId, secondaryTagId, startTime) VALUES (?, ?, ?, ?)", [
     title,
     tagId,
-    startTime,
-    endTime,
-    id
+    secondaryTagId,
+    startTime
   ]);
-  return { id, title, tagId, startTime, endTime };
+  const id = lastInsertId(db2);
+  return { id, title, tagId, secondaryTagId, startTime, endTime: null };
+}
+async function updateTask(id, title, tagId, secondaryTagId, startTime, endTime) {
+  const db2 = await getDb();
+  run(
+    db2,
+    "UPDATE tasks SET title = ?, tagId = ?, secondaryTagId = ?, startTime = ?, endTime = ? WHERE id = ?",
+    [title, tagId, secondaryTagId, startTime, endTime, id]
+  );
+  return { id, title, tagId, secondaryTagId, startTime, endTime };
 }
 async function stopTask(id, endTime) {
   const db2 = await getDb();
@@ -254,24 +264,25 @@ async function getTagStats(startDate, endDate) {
   const db2 = await getDb();
   return getAll(
     db2,
-    `SELECT
-       t.tagId,
-       tg.name as tagName,
-       tg.color as tagColor,
-       tg.isProductive,
-       SUM(
-         CASE
-           WHEN t.endTime IS NOT NULL
-           THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
-           ELSE 0
-         END
-       ) as totalMinutes
-     FROM tasks t
-     LEFT JOIN tags tg ON t.tagId = tg.id
-     WHERE t.startTime >= ? AND t.startTime < ?
-     GROUP BY t.tagId
+    `SELECT tagId, tagName, tagColor, isProductive, SUM(minutes) as totalMinutes
+     FROM (
+       SELECT t.tagId, tg.name as tagName, tg.color as tagColor, tg.isProductive,
+              CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER) as minutes
+       FROM tasks t
+       JOIN tags tg ON t.tagId = tg.id
+       WHERE t.endTime IS NOT NULL AND t.startTime >= ? AND t.startTime < ?
+       
+       UNION ALL
+       
+       SELECT t.secondaryTagId as tagId, tg.name as tagName, tg.color as tagColor, tg.isProductive,
+              CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER) as minutes
+       FROM tasks t
+       JOIN tags tg ON t.secondaryTagId = tg.id
+       WHERE t.endTime IS NOT NULL AND t.startTime >= ? AND t.startTime < ?
+     )
+     GROUP BY tagId
      ORDER BY totalMinutes DESC`,
-    [startDate, endDate]
+    [startDate, endDate, startDate, endDate]
   );
 }
 async function fillGapsWithIdle(date) {
@@ -373,10 +384,10 @@ electron.ipcMain.handle(
   (_, startDate, endDate) => getTasksForRange(startDate, endDate)
 );
 electron.ipcMain.handle("tasks:getActive", () => getActiveTask());
-electron.ipcMain.handle("tasks:start", async (_, title, tagId, startTime) => {
+electron.ipcMain.handle("tasks:start", async (_, title, tagId, secondaryTagId, startTime) => {
   const now = startTime || (/* @__PURE__ */ new Date()).toISOString();
   await stopAllActiveTasks(now);
-  return createTask(title, tagId, now);
+  return createTask(title, tagId, secondaryTagId, now);
 });
 electron.ipcMain.handle("tasks:stop", async (_, id, endTime) => {
   const now = endTime || (/* @__PURE__ */ new Date()).toISOString();
@@ -384,15 +395,15 @@ electron.ipcMain.handle("tasks:stop", async (_, id, endTime) => {
 });
 electron.ipcMain.handle(
   "tasks:update",
-  (_, id, title, tagId, startTime, endTime) => updateTask(id, title, tagId, startTime, endTime)
+  (_, id, title, tagId, secondaryTagId, startTime, endTime) => updateTask(id, title, tagId, secondaryTagId, startTime, endTime)
 );
 electron.ipcMain.handle("tasks:delete", (_, id) => deleteTask(id));
 electron.ipcMain.handle(
   "tasks:add",
-  async (_, title, tagId, startTime, endTime) => {
-    const task = await createTask(title, tagId, startTime);
+  async (_, title, tagId, secondaryTagId, startTime, endTime) => {
+    const task = await createTask(title, tagId, secondaryTagId, startTime);
     console.log("Created task:", task);
-    if (endTime) return updateTask(task.id, title, tagId, startTime, endTime);
+    if (endTime) return updateTask(task.id, title, tagId, secondaryTagId, startTime, endTime);
     return task;
   }
 );

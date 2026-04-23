@@ -29,6 +29,14 @@ export async function getDb(): Promise<Database> {
 
   db.run('PRAGMA foreign_keys = ON;')
   db.run(SCHEMA)
+
+  // Migration: Add secondaryTagId to tasks if it doesn't exist
+  try {
+    db.run('ALTER TABLE tasks ADD COLUMN secondaryTagId INTEGER REFERENCES tags(id) ON DELETE SET NULL;')
+  } catch (e) {
+    // Column likely already exists
+  }
+
   saveDb()
 
   return db

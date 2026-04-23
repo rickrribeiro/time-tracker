@@ -16,20 +16,21 @@ const api = {
     getForRange: (startDate: string, endDate: string) =>
       ipcRenderer.invoke('tasks:getForRange', startDate, endDate),
     getActive: () => ipcRenderer.invoke('tasks:getActive'),
-    start: (title: string, tagId: number | null, startTime?: string) =>
-      ipcRenderer.invoke('tasks:start', title, tagId, startTime || new Date().toISOString()),
+    start: (title: string, tagId: number | null, secondaryTagId: number | null, startTime?: string) =>
+      ipcRenderer.invoke('tasks:start', title, tagId, secondaryTagId, startTime || new Date().toISOString()),
     stop: (id: number, endTime?: string) =>
       ipcRenderer.invoke('tasks:stop', id, endTime),
     update: (
       id: number,
       title: string,
       tagId: number | null,
+      secondaryTagId: number | null,
       startTime: string,
       endTime: string | null
-    ) => ipcRenderer.invoke('tasks:update', id, title, tagId, startTime, endTime),
+    ) => ipcRenderer.invoke('tasks:update', id, title, tagId, secondaryTagId, startTime, endTime),
     delete: (id: number) => ipcRenderer.invoke('tasks:delete', id),
-    add: (title: string, tagId: number | null, startTime: string, endTime: string | null) =>
-      ipcRenderer.invoke('tasks:add', title, tagId, startTime, endTime),
+    add: (title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, endTime: string | null) =>
+      ipcRenderer.invoke('tasks:add', title, tagId, secondaryTagId, startTime, endTime),
     stopAll: (endTime: string) => ipcRenderer.invoke('tasks:stopAll', endTime),
     fillGaps: (date: string) => ipcRenderer.invoke('tasks:fillGaps', date)
   },

@@ -84,10 +84,10 @@ ipcMain.handle('tasks:getForRange', (_, startDate: string, endDate: string) =>
 
 ipcMain.handle('tasks:getActive', () => getActiveTask())
 
-ipcMain.handle('tasks:start', async (_, title: string, tagId: number | null, startTime: string) => {
+ipcMain.handle('tasks:start', async (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string) => {
   const now = startTime || new Date().toISOString()
   await stopAllActiveTasks(now)
-  return createTask(title, tagId, now)
+  return createTask(title, tagId, secondaryTagId, now)
 })
 
 ipcMain.handle('tasks:stop', async (_, id: number, endTime?: string) => {
@@ -97,18 +97,18 @@ ipcMain.handle('tasks:stop', async (_, id: number, endTime?: string) => {
 
 ipcMain.handle(
   'tasks:update',
-  (_, id: number, title: string, tagId: number | null, startTime: string, endTime: string | null) =>
-    updateTask(id, title, tagId, startTime, endTime)
+  (_, id: number, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, endTime: string | null) =>
+    updateTask(id, title, tagId, secondaryTagId, startTime, endTime)
 )
 
 ipcMain.handle('tasks:delete', (_, id: number) => deleteTask(id))
 
 ipcMain.handle(
   'tasks:add',
-  async (_, title: string, tagId: number | null, startTime: string, endTime: string | null) => {
-    const task = await createTask(title, tagId, startTime)
+  async (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, endTime: string | null) => {
+    const task = await createTask(title, tagId, secondaryTagId, startTime)
     console.log('Created task:', task)
-    if (endTime) return updateTask(task.id, title, tagId, startTime, endTime)
+    if (endTime) return updateTask(task.id, title, tagId, secondaryTagId, startTime, endTime)
     return task
   }
 )

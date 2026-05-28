@@ -1183,3 +1183,35 @@ select:focus {
   color: var(--accent-hover);
   border-color: var(--accent);
 }
+
+.period-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.current-range {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.date-nav-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.date-nav-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-muted);
+}

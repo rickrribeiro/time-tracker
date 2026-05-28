@@ -25,7 +25,7 @@ function offsetDate(dateStr: string, days: number): string {
 
 export function TimelinePage(): React.ReactElement {
   const { selectedDate, setSelectedDate } = useUIStore()
-  const { todayTasks, refreshTasks, startTask } = useTaskStore()
+  const { todayTasks, refreshTasks, startTask, activeTask } = useTaskStore()
   const { tags } = useTagStore()
 
   const load = useCallback(() => {
@@ -35,6 +35,12 @@ export function TimelinePage(): React.ReactElement {
   useEffect(() => {
     load()
   }, [load])
+
+  // Refresh task list when active task changes (start/stop from the ActiveTask bar)
+  const activeTaskId = activeTask?.id ?? null
+  useEffect(() => {
+    refreshTasks(selectedDate)
+  }, [activeTaskId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFillGaps = async () => {
     await window.api.tasks.fillGaps(selectedDate)

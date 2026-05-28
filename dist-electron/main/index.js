@@ -190,16 +190,17 @@ async function getActiveTask() {
      LIMIT 1`
   );
 }
-async function createTask(title, tagId, secondaryTagId, startTime) {
+async function createTask(title, tagId, secondaryTagId, startTime, endTime = null) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO tasks (title, tagId, secondaryTagId, startTime) VALUES (?, ?, ?, ?)", [
+  run(db2, "INSERT INTO tasks (title, tagId, secondaryTagId, startTime, endTime) VALUES (?, ?, ?, ?, ?)", [
     title,
     tagId,
     secondaryTagId,
-    startTime
+    startTime,
+    endTime
   ]);
   const id = lastInsertId(db2);
-  return { id, title, tagId, secondaryTagId, startTime, endTime: null };
+  return { id, title, tagId, secondaryTagId, startTime, endTime };
 }
 async function updateTask(id, title, tagId, secondaryTagId, startTime, endTime) {
   const db2 = await getDb();
@@ -424,12 +425,7 @@ electron.ipcMain.handle(
 electron.ipcMain.handle("tasks:delete", (_, id) => deleteTask(id));
 electron.ipcMain.handle(
   "tasks:add",
-  async (_, title, tagId, secondaryTagId, startTime, endTime) => {
-    const task = await createTask(title, tagId, secondaryTagId, startTime);
-    console.log("Created task:", task);
-    if (endTime) return updateTask(task.id, title, tagId, secondaryTagId, startTime, endTime);
-    return task;
-  }
+  (_, title, tagId, secondaryTagId, startTime, endTime) => createTask(title, tagId, secondaryTagId, startTime, endTime)
 );
 electron.ipcMain.handle("tasks:stopAll", (_, endTime) => stopAllActiveTasks(endTime));
 electron.ipcMain.handle("tasks:fillGaps", (_, date) => fillGapsWithIdle(date));

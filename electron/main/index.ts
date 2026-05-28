@@ -106,12 +106,8 @@ ipcMain.handle('tasks:delete', (_, id: number) => deleteTask(id))
 
 ipcMain.handle(
   'tasks:add',
-  async (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, endTime: string | null) => {
-    const task = await createTask(title, tagId, secondaryTagId, startTime)
-    console.log('Created task:', task)
-    if (endTime) return updateTask(task.id, title, tagId, secondaryTagId, startTime, endTime)
-    return task
-  }
+  (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, endTime: string | null) =>
+    createTask(title, tagId, secondaryTagId, startTime, endTime)
 )
 
 ipcMain.handle('tasks:stopAll', (_, endTime: string) => stopAllActiveTasks(endTime))

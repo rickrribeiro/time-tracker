@@ -174,17 +174,19 @@ export async function createTask(
   title: string,
   tagId: number | null,
   secondaryTagId: number | null,
-  startTime: string
+  startTime: string,
+  endTime: string | null = null
 ): Promise<DbTask> {
   const db = await getDb()
-  run(db, 'INSERT INTO tasks (title, tagId, secondaryTagId, startTime) VALUES (?, ?, ?, ?)', [
+  run(db, 'INSERT INTO tasks (title, tagId, secondaryTagId, startTime, endTime) VALUES (?, ?, ?, ?, ?)', [
     title,
     tagId,
     secondaryTagId,
-    startTime
+    startTime,
+    endTime
   ])
   const id = lastInsertId(db)
-  return { id, title, tagId, secondaryTagId, startTime, endTime: null }
+  return { id, title, tagId, secondaryTagId, startTime, endTime }
 }
 
 export async function updateTask(

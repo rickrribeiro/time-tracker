@@ -4,29 +4,31 @@ import { localDateStr, localDayStartISO, localDayEndISO } from '../../utils/date
 
 type Period = 'day' | 'week' | 'month'
 
-function getRange(period: Period): { start: string; end: string; label: string } {
-  const now = new Date()
-  const today = localDateStr(now)
+function getRange(period: Period, baseDate: Date): { start: string; end: string; label: string } {
+  const d = new Date(baseDate)
 
   if (period === 'day') {
-    return { start: localDayStartISO(today), end: localDayEndISO(today), label: 'Today' }
+    const dayStr = localDateStr(d)
+    const label = d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
+    return { start: localDayStartISO(dayStr), end: localDayEndISO(dayStr), label }
   }
 
   if (period === 'week') {
-    const day = now.getDay()
-    const monday = new Date(now)
-    monday.setDate(now.getDate() - day + (day === 0 ? -6 : 1))
+    const day = d.getDay()
+    const monday = new Date(d)
+    monday.setDate(d.getDate() - day + (day === 0 ? -6 : 1))
     monday.setHours(0, 0, 0, 0)
     const sunday = new Date(monday)
-    sunday.setDate(monday.getDate() + 7)
+    sunday.setDate(monday.getDate() + 6)
     sunday.setHours(23, 59, 59, 999)
-    return { start: monday.toISOString(), end: sunday.toISOString(), label: 'This Week' }
+    const label = `Week of ${monday.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} - ${sunday.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`
+    return { start: monday.toISOString(), end: sunday.toISOString(), label }
   }
 
-  const first = new Date(now.getFullYear(), now.getMonth(), 1)
-  const last = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-  last.setMilliseconds(last.getMilliseconds() - 1)
-  return { start: first.toISOString(), end: last.toISOString(), label: 'This Month' }
+  const first = new Date(d.getFullYear(), d.getMonth(), 1)
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+  const label = d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  return { start: first.toISOString(), end: last.toISOString(), label }
 }
 
 function formatHours(minutes: number): string {
@@ -41,22 +43,40 @@ function formatHoursShort(minutes: number): string {
 
 export function Dashboard(): React.ReactElement {
   const [period, setPeriod] = useState<Period>('week')
+  const [baseDate, setBaseDate] = useState(new Date())
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [tagStats, setTagStats] = useState<TagStats[]>([])
   const [loading, setLoading] = useState(false)
 
+  const range = getRange(period, baseDate)
+
   useEffect(() => {
-    const { start, end } = getRange(period)
     setLoading(true)
     Promise.all([
-      window.api.stats.daily(start, end),
-      window.api.stats.byTag(start, end)
+      window.api.stats.daily(range.start, range.end),
+      window.api.stats.byTag(range.start, range.end)
     ]).then(([daily, tags]) => {
       setDailyStats(daily)
       setTagStats(tags)
       setLoading(false)
     })
-  }, [period])
+  }, [period, baseDate])
+
+  const handlePrev = () => {
+    const next = new Date(baseDate)
+    if (period === 'day') next.setDate(next.getDate() - 1)
+    else if (period === 'week') next.setDate(next.getDate() - 7)
+    else next.setMonth(next.getMonth() - 1)
+    setBaseDate(next)
+  }
+
+  const handleNext = () => {
+    const next = new Date(baseDate)
+    if (period === 'day') next.setDate(next.getDate() + 1)
+    else if (period === 'week') next.setDate(next.getDate() + 7)
+    else next.setMonth(next.getMonth() + 1)
+    setBaseDate(next)
+  }
 
   const totalMinutes = dailyStats.reduce((a, b) => a + b.totalMinutes, 0)
   const productiveMinutes = dailyStats.reduce((a, b) => a + b.productiveMinutes, 0)
@@ -74,13 +94,23 @@ export function Dashboard(): React.ReactElement {
   return (
     <div className="dashboard-page">
       <div className="dashboard-header">
-        <h2 className="dashboard-title">Statistics</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <h2 className="dashboard-title">Statistics</h2>
+          <div className="period-navigation">
+            <button className="date-nav-btn" onClick={handlePrev}>‹</button>
+            <span className="current-range">{range.label}</span>
+            <button className="date-nav-btn" onClick={handleNext}>›</button>
+          </div>
+        </div>
         <div className="period-selector">
           {(['day', 'week', 'month'] as Period[]).map((p) => (
             <button
               key={p}
               className={`period-btn ${period === p ? 'active' : ''}`}
-              onClick={() => setPeriod(p)}
+              onClick={() => {
+                setPeriod(p)
+                setBaseDate(new Date()) // Reset to today when changing period type? Or keep baseDate?
+              }}
             >
               {p.charAt(0).toUpperCase() + p.slice(1)}
             </button>

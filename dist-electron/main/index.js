@@ -457,3 +457,18 @@ electron.ipcMain.handle("app:exportDb", async () => {
   }
   return false;
 });
+electron.ipcMain.handle("app:importDb", async (event) => {
+  const result = await electron.dialog.showOpenDialog({
+    title: "Import Database Snapshot",
+    buttonLabel: "Import",
+    filters: [{ name: "SQLite Database", extensions: ["sqlite", "db"] }],
+    properties: ["openFile"]
+  });
+  if (result.canceled || !result.filePaths[0]) return false;
+  const dbPath2 = path.join(electron.app.getPath("userData"), "timetracker.db");
+  closeDb();
+  fs.copyFileSync(result.filePaths[0], dbPath2);
+  const win = electron.BrowserWindow.fromWebContents(event.sender);
+  win?.webContents.reload();
+  return true;
+});

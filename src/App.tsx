@@ -90,6 +90,21 @@ export default function App(): React.ReactElement {
             <span className="nav-icon">💾</span>
             <span className="nav-label">Export DB</span>
           </button>
+          <button
+            className="nav-btn export-btn"
+            onClick={async () => {
+              const confirmed = window.confirm(
+                'This will replace ALL current data with the imported snapshot. Continue?'
+              )
+              if (!confirmed) return
+              await window.api.app.importDb()
+            }}
+            title="Import Database Snapshot"
+            style={{ marginTop: '4px' }}
+          >
+            <span className="nav-icon">📂</span>
+            <span className="nav-label">Import DB</span>
+          </button>
         </div>
       </nav>
 

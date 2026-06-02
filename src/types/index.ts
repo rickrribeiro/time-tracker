@@ -84,6 +84,7 @@ declare global {
       }
       app: {
         exportDb: () => Promise<boolean>
+        importDb: () => Promise<boolean>
       }
     }
   }

@@ -30,7 +30,8 @@ const api = {
   },
   // App
   app: {
-    exportDb: () => electron.ipcRenderer.invoke("app:exportDb")
+    exportDb: () => electron.ipcRenderer.invoke("app:exportDb"),
+    importDb: () => electron.ipcRenderer.invoke("app:importDb")
   }
 };
 electron.contextBridge.exposeInMainWorld("api", api);

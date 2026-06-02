@@ -46,7 +46,8 @@ const api = {
   },
   // App
   app: {
-    exportDb: () => ipcRenderer.invoke('app:exportDb')
+    exportDb: () => ipcRenderer.invoke('app:exportDb'),
+    importDb: () => ipcRenderer.invoke('app:importDb')
   }
 }
 

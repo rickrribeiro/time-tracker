@@ -41,8 +41,26 @@ import {
   getUpcomingEvents,
   getEventsForRange,
   createCalendarEvent,
-  deleteCalendarEvent
+  deleteCalendarEvent,
+  getAccounts,
+  createAccount,
+  updateAccount,
+  deleteAccount,
+  getCategories,
+  createCategory,
+  deleteCategory,
+  getTransactions,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction,
+  bulkInsertTransactions,
+  getBudgets,
+  setBudget,
+  getInvestments,
+  createInvestment,
+  deleteInvestment
 } from './database/queries'
+import type { DbTransaction } from './database/queries'
 import { syncGithubIssues } from './services/github'
 
 function createWindow(): void {
@@ -277,6 +295,34 @@ ipcMain.handle(
     createCalendarEvent(title, startTime, endTime, location)
 )
 ipcMain.handle('calendar:delete', (_, id: number) => deleteCalendarEvent(id))
+
+// ── IPC: Finance ──────────────────────────────────────────────────────────────
+
+ipcMain.handle('accounts:getAll', () => getAccounts())
+ipcMain.handle('accounts:create', (_, name: string, currency: string, balance: number) => createAccount(name, currency, balance))
+ipcMain.handle('accounts:update', (_, id: number, name: string, currency: string, balance: number) => updateAccount(id, name, currency, balance))
+ipcMain.handle('accounts:delete', (_, id: number) => deleteAccount(id))
+
+ipcMain.handle('categories:getAll', () => getCategories())
+ipcMain.handle('categories:create', (_, name: string, type: string, color: string) => createCategory(name, type, color))
+ipcMain.handle('categories:delete', (_, id: number) => deleteCategory(id))
+
+ipcMain.handle('transactions:getAll', (_, month?: string) => getTransactions(month))
+ipcMain.handle('transactions:create', (_, accountId: number | null, categoryId: number | null, amount: number, currency: string, type: string, description: string | null, date: string) =>
+  createTransaction(accountId, categoryId, amount, currency, type, description, date)
+)
+ipcMain.handle('transactions:update', (_, id: number, accountId: number | null, categoryId: number | null, amount: number, currency: string, type: string, description: string | null, date: string) =>
+  updateTransaction(id, accountId, categoryId, amount, currency, type, description, date)
+)
+ipcMain.handle('transactions:delete', (_, id: number) => deleteTransaction(id))
+ipcMain.handle('transactions:bulk', (_, rows: Omit<DbTransaction, 'id'>[]) => bulkInsertTransactions(rows))
+
+ipcMain.handle('budgets:getForMonth', (_, month: string) => getBudgets(month))
+ipcMain.handle('budgets:set', (_, categoryId: number, month: string, amount: number) => setBudget(categoryId, month, amount))
+
+ipcMain.handle('investments:getAll', () => getInvestments())
+ipcMain.handle('investments:create', (_, name: string, type: string | null, amount: number, currency: string) => createInvestment(name, type, amount, currency))
+ipcMain.handle('investments:delete', (_, id: number) => deleteInvestment(id))
 
 // ── IPC: App ──────────────────────────────────────────────────────────────────
 

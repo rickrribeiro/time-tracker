@@ -713,3 +713,169 @@ export async function deleteCalendarEvent(id: number): Promise<void> {
   const db = await getDb()
   run(db, 'DELETE FROM calendar_events WHERE id = ?', [id])
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Finance (accounts, categories, transactions, budgets, investments)
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface DbAccount {
+  id: number
+  name: string
+  currency: string
+  balance: number
+}
+export interface DbCategory {
+  id: number
+  name: string
+  type: string
+  color: string
+}
+export interface DbTransaction {
+  id: number
+  accountId: number | null
+  categoryId: number | null
+  amount: number
+  currency: string
+  type: string
+  description: string | null
+  date: string
+}
+export interface DbBudget {
+  id: number
+  categoryId: number | null
+  month: string
+  amount: number
+}
+export interface DbInvestment {
+  id: number
+  name: string
+  type: string | null
+  amount: number
+  currency: string
+}
+
+// ── Accounts ──
+export async function getAccounts(): Promise<DbAccount[]> {
+  const db = await getDb()
+  return getAll<DbAccount>(db, 'SELECT * FROM accounts ORDER BY name')
+}
+export async function createAccount(name: string, currency: string, balance: number): Promise<DbAccount> {
+  const db = await getDb()
+  run(db, 'INSERT INTO accounts (name, currency, balance) VALUES (?, ?, ?)', [name, currency, balance])
+  return getOne<DbAccount>(db, 'SELECT * FROM accounts WHERE id = ?', [lastInsertId(db)])!
+}
+export async function updateAccount(id: number, name: string, currency: string, balance: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE accounts SET name = ?, currency = ?, balance = ? WHERE id = ?', [name, currency, balance, id])
+}
+export async function deleteAccount(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM accounts WHERE id = ?', [id])
+}
+
+// ── Categories ──
+export async function getCategories(): Promise<DbCategory[]> {
+  const db = await getDb()
+  return getAll<DbCategory>(db, 'SELECT * FROM categories ORDER BY type DESC, name')
+}
+export async function createCategory(name: string, type: string, color: string): Promise<DbCategory> {
+  const db = await getDb()
+  run(db, 'INSERT INTO categories (name, type, color) VALUES (?, ?, ?)', [name, type, color])
+  return getOne<DbCategory>(db, 'SELECT * FROM categories WHERE id = ?', [lastInsertId(db)])!
+}
+export async function deleteCategory(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM categories WHERE id = ?', [id])
+}
+
+// ── Transactions ──
+export async function getTransactions(month?: string): Promise<DbTransaction[]> {
+  const db = await getDb()
+  if (month) {
+    return getAll<DbTransaction>(
+      db,
+      "SELECT * FROM transactions WHERE substr(date, 1, 7) = ? ORDER BY date DESC, id DESC",
+      [month]
+    )
+  }
+  return getAll<DbTransaction>(db, 'SELECT * FROM transactions ORDER BY date DESC, id DESC')
+}
+export async function createTransaction(
+  accountId: number | null,
+  categoryId: number | null,
+  amount: number,
+  currency: string,
+  type: string,
+  description: string | null,
+  date: string
+): Promise<DbTransaction> {
+  const db = await getDb()
+  run(
+    db,
+    'INSERT INTO transactions (accountId, categoryId, amount, currency, type, description, date) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [accountId, categoryId, amount, currency, type, description, date]
+  )
+  return getOne<DbTransaction>(db, 'SELECT * FROM transactions WHERE id = ?', [lastInsertId(db)])!
+}
+export async function updateTransaction(
+  id: number,
+  accountId: number | null,
+  categoryId: number | null,
+  amount: number,
+  currency: string,
+  type: string,
+  description: string | null,
+  date: string
+): Promise<void> {
+  const db = await getDb()
+  run(
+    db,
+    'UPDATE transactions SET accountId = ?, categoryId = ?, amount = ?, currency = ?, type = ?, description = ?, date = ? WHERE id = ?',
+    [accountId, categoryId, amount, currency, type, description, date, id]
+  )
+}
+export async function deleteTransaction(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM transactions WHERE id = ?', [id])
+}
+export async function bulkInsertTransactions(rows: Omit<DbTransaction, 'id'>[]): Promise<number> {
+  const db = await getDb()
+  for (const r of rows) {
+    run(
+      db,
+      'INSERT INTO transactions (accountId, categoryId, amount, currency, type, description, date) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [r.accountId, r.categoryId, r.amount, r.currency, r.type, r.description, r.date]
+    )
+  }
+  return rows.length
+}
+
+// ── Budgets ──
+export async function getBudgets(month: string): Promise<DbBudget[]> {
+  const db = await getDb()
+  return getAll<DbBudget>(db, 'SELECT * FROM budgets WHERE month = ?', [month])
+}
+export async function setBudget(categoryId: number, month: string, amount: number): Promise<void> {
+  const db = await getDb()
+  const existing = getOne<DbBudget>(db, 'SELECT * FROM budgets WHERE categoryId = ? AND month = ?', [categoryId, month])
+  if (existing) {
+    run(db, 'UPDATE budgets SET amount = ? WHERE id = ?', [amount, existing.id])
+  } else {
+    run(db, 'INSERT INTO budgets (categoryId, month, amount) VALUES (?, ?, ?)', [categoryId, month, amount])
+  }
+}
+
+// ── Investments ──
+export async function getInvestments(): Promise<DbInvestment[]> {
+  const db = await getDb()
+  return getAll<DbInvestment>(db, 'SELECT * FROM investments ORDER BY name')
+}
+export async function createInvestment(name: string, type: string | null, amount: number, currency: string): Promise<DbInvestment> {
+  const db = await getDb()
+  run(db, 'INSERT INTO investments (name, type, amount, currency) VALUES (?, ?, ?, ?)', [name, type, amount, currency])
+  return getOne<DbInvestment>(db, 'SELECT * FROM investments WHERE id = ?', [lastInsertId(db)])!
+}
+export async function deleteInvestment(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM investments WHERE id = ?', [id])
+}

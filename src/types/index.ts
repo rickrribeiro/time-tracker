@@ -95,6 +95,46 @@ export interface CalendarEvent {
   source: string // manual | google
 }
 
+export interface Account {
+  id: number
+  name: string
+  currency: string
+  balance: number
+}
+
+export interface Category {
+  id: number
+  name: string
+  type: string // income | expense
+  color: string
+}
+
+export interface Transaction {
+  id: number
+  accountId: number | null
+  categoryId: number | null
+  amount: number
+  currency: string
+  type: string // income | expense
+  description: string | null
+  date: string // YYYY-MM-DD
+}
+
+export interface Budget {
+  id: number
+  categoryId: number | null
+  month: string // YYYY-MM
+  amount: number
+}
+
+export interface Investment {
+  id: number
+  name: string
+  type: string | null
+  amount: number
+  currency: string
+}
+
 export type Page =
   // Time Tracker (existente)
   | 'timeline'
@@ -229,6 +269,33 @@ declare global {
         upcoming: (fromISO: string, limit: number) => Promise<CalendarEvent[]>
         range: (startISO: string, endISO: string) => Promise<CalendarEvent[]>
         create: (title: string, startTime: string, endTime: string | null, location: string | null) => Promise<CalendarEvent>
+        delete: (id: number) => Promise<void>
+      }
+      accounts: {
+        getAll: () => Promise<Account[]>
+        create: (name: string, currency: string, balance: number) => Promise<Account>
+        update: (id: number, name: string, currency: string, balance: number) => Promise<void>
+        delete: (id: number) => Promise<void>
+      }
+      categories: {
+        getAll: () => Promise<Category[]>
+        create: (name: string, type: string, color: string) => Promise<Category>
+        delete: (id: number) => Promise<void>
+      }
+      transactions: {
+        getAll: (month?: string) => Promise<Transaction[]>
+        create: (accountId: number | null, categoryId: number | null, amount: number, currency: string, type: string, description: string | null, date: string) => Promise<Transaction>
+        update: (id: number, accountId: number | null, categoryId: number | null, amount: number, currency: string, type: string, description: string | null, date: string) => Promise<void>
+        delete: (id: number) => Promise<void>
+        bulk: (rows: Omit<Transaction, 'id'>[]) => Promise<number>
+      }
+      budgets: {
+        getForMonth: (month: string) => Promise<Budget[]>
+        set: (categoryId: number, month: string, amount: number) => Promise<void>
+      }
+      investments: {
+        getAll: () => Promise<Investment[]>
+        create: (name: string, type: string | null, amount: number, currency: string) => Promise<Investment>
         delete: (id: number) => Promise<void>
       }
       on: {

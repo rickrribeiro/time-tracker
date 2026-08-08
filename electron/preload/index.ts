@@ -115,6 +115,36 @@ const api = {
       ipcRenderer.invoke('calendar:create', title, startTime, endTime, location),
     delete: (id: number) => ipcRenderer.invoke('calendar:delete', id)
   },
+  // Finance
+  accounts: {
+    getAll: () => ipcRenderer.invoke('accounts:getAll'),
+    create: (name: string, currency: string, balance: number) => ipcRenderer.invoke('accounts:create', name, currency, balance),
+    update: (id: number, name: string, currency: string, balance: number) => ipcRenderer.invoke('accounts:update', id, name, currency, balance),
+    delete: (id: number) => ipcRenderer.invoke('accounts:delete', id)
+  },
+  categories: {
+    getAll: () => ipcRenderer.invoke('categories:getAll'),
+    create: (name: string, type: string, color: string) => ipcRenderer.invoke('categories:create', name, type, color),
+    delete: (id: number) => ipcRenderer.invoke('categories:delete', id)
+  },
+  transactions: {
+    getAll: (month?: string) => ipcRenderer.invoke('transactions:getAll', month),
+    create: (accountId: number | null, categoryId: number | null, amount: number, currency: string, type: string, description: string | null, date: string) =>
+      ipcRenderer.invoke('transactions:create', accountId, categoryId, amount, currency, type, description, date),
+    update: (id: number, accountId: number | null, categoryId: number | null, amount: number, currency: string, type: string, description: string | null, date: string) =>
+      ipcRenderer.invoke('transactions:update', id, accountId, categoryId, amount, currency, type, description, date),
+    delete: (id: number) => ipcRenderer.invoke('transactions:delete', id),
+    bulk: (rows: unknown[]) => ipcRenderer.invoke('transactions:bulk', rows)
+  },
+  budgets: {
+    getForMonth: (month: string) => ipcRenderer.invoke('budgets:getForMonth', month),
+    set: (categoryId: number, month: string, amount: number) => ipcRenderer.invoke('budgets:set', categoryId, month, amount)
+  },
+  investments: {
+    getAll: () => ipcRenderer.invoke('investments:getAll'),
+    create: (name: string, type: string | null, amount: number, currency: string) => ipcRenderer.invoke('investments:create', name, type, amount, currency),
+    delete: (id: number) => ipcRenderer.invoke('investments:delete', id)
+  },
   // Events (main → renderer)
   on: {
     quickCapture: (cb: () => void) => {

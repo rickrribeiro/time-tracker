@@ -109,18 +109,23 @@ Restante:
 - [ ] Sync automático dos próximos 7 dias (source='google').
 - [ ] Overlay de eventos no calendário mensal do time-tracker.
 
-## 6. Finanças  *(prioridade #6)*
+## 6. Finanças  *(prioridade #6 — FEITO no MVP)*
 
-**Fundação:** tabelas `accounts`, `categories`, `transactions`, `budgets`, `investments` já existem (páginas placeholder).
+**Fundação:** tabelas `accounts`, `categories`, `transactions`, `budgets`, `investments` já existem.
 
-Próximos passos:
-- [ ] CRUD de contas, categorias, transações (multi-moeda BRL/JPY/USD).
-- [ ] **Importar CSV** Nubank/Inter/Wise (parser por banco) + processo reverso (exportar).
-- [ ] Orçamento mensal por categoria; alerta de estouro.
-- [ ] Relatórios mensais (evolução, top categorias, meta).
-- [ ] Dashboard financeiro: saldo total, gastos do mês, top categorias, evolução, meta.
-- [ ] Ver app do Gabriel / export do Sheets como referência de importação.
-- [ ] Sem Open Finance agora.
+Feito:
+- [x] CRUD de contas, categorias (6 seed), transações e investimentos (multi-moeda BRL/USD/JPY/EUR).
+- [x] **Importar CSV** genérico (auto-detecta delimitador + colunas; testado Nubank e Inter) + **Exportar CSV**.
+- [x] Orçamento mensal por categoria com barra e **alerta de estouro**.
+- [x] Relatórios mensais (tabela receitas/despesas/saldo, 6 meses).
+- [x] Dashboard financeiro: saldo por conta, receitas/gastos do mês, top categorias, evolução 6 meses, meta.
+- [x] Navegação por mês (MonthNav) em todas as telas.
+
+Restante / melhorias:
+- [ ] Parsers específicos por banco (Wise, cartões) e mapeamento de categorias na importação (hoje entra tudo em "Outros").
+- [ ] Conversão entre moedas (hoje soma por moeda separadamente).
+- [ ] Editar transação inline (hoje: criar/excluir).
+- [ ] Sem Open Finance (mantido fora de escopo).
 
 ## 7. Viagens  *(prioridade #7)*
 

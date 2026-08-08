@@ -46,8 +46,10 @@ const api = {
   habits: {
     getAll: () => electron.ipcRenderer.invoke("habits:getAll"),
     create: (name, frequency, target) => electron.ipcRenderer.invoke("habits:create", name, frequency, target),
+    update: (id, name, frequency, target, active) => electron.ipcRenderer.invoke("habits:update", id, name, frequency, target, active),
     delete: (id) => electron.ipcRenderer.invoke("habits:delete", id),
     getEntries: (date) => electron.ipcRenderer.invoke("habits:getEntries", date),
+    getEntriesRange: (startDate, endDate) => electron.ipcRenderer.invoke("habits:getEntriesRange", startDate, endDate),
     toggleEntry: (habitId, date, completed) => electron.ipcRenderer.invoke("habits:toggleEntry", habitId, date, completed)
   },
   // Settings (key-value)
@@ -60,6 +62,41 @@ const api = {
   github: {
     getIssues: () => electron.ipcRenderer.invoke("github:getIssues"),
     sync: () => electron.ipcRenderer.invoke("github:sync")
+  },
+  // Calendar
+  calendar: {
+    upcoming: (fromISO, limit) => electron.ipcRenderer.invoke("calendar:upcoming", fromISO, limit),
+    range: (startISO, endISO) => electron.ipcRenderer.invoke("calendar:range", startISO, endISO),
+    create: (title, startTime, endTime, location) => electron.ipcRenderer.invoke("calendar:create", title, startTime, endTime, location),
+    delete: (id) => electron.ipcRenderer.invoke("calendar:delete", id)
+  },
+  // Finance
+  accounts: {
+    getAll: () => electron.ipcRenderer.invoke("accounts:getAll"),
+    create: (name, currency, balance) => electron.ipcRenderer.invoke("accounts:create", name, currency, balance),
+    update: (id, name, currency, balance) => electron.ipcRenderer.invoke("accounts:update", id, name, currency, balance),
+    delete: (id) => electron.ipcRenderer.invoke("accounts:delete", id)
+  },
+  categories: {
+    getAll: () => electron.ipcRenderer.invoke("categories:getAll"),
+    create: (name, type, color) => electron.ipcRenderer.invoke("categories:create", name, type, color),
+    delete: (id) => electron.ipcRenderer.invoke("categories:delete", id)
+  },
+  transactions: {
+    getAll: (month) => electron.ipcRenderer.invoke("transactions:getAll", month),
+    create: (accountId, categoryId, amount, currency, type, description, date) => electron.ipcRenderer.invoke("transactions:create", accountId, categoryId, amount, currency, type, description, date),
+    update: (id, accountId, categoryId, amount, currency, type, description, date) => electron.ipcRenderer.invoke("transactions:update", id, accountId, categoryId, amount, currency, type, description, date),
+    delete: (id) => electron.ipcRenderer.invoke("transactions:delete", id),
+    bulk: (rows) => electron.ipcRenderer.invoke("transactions:bulk", rows)
+  },
+  budgets: {
+    getForMonth: (month) => electron.ipcRenderer.invoke("budgets:getForMonth", month),
+    set: (categoryId, month, amount) => electron.ipcRenderer.invoke("budgets:set", categoryId, month, amount)
+  },
+  investments: {
+    getAll: () => electron.ipcRenderer.invoke("investments:getAll"),
+    create: (name, type, amount, currency) => electron.ipcRenderer.invoke("investments:create", name, type, amount, currency),
+    delete: (id) => electron.ipcRenderer.invoke("investments:delete", id)
   },
   // Events (main → renderer)
   on: {

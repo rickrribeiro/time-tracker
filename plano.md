@@ -49,7 +49,7 @@ Feito:
 Restante:
 - [x] Refinar Quick Capture: parsing leve (`parse.ts` — `//` para nota rápida, `A→B` para trecho, sugestão viagem/financeiro/tarefa por palavra-chave/moeda) + hint ao vivo.
 - [x] Processar Inbox direto p/ **Viagem** (cria trip, extrai A→B e orçamento) ou **Financeiro** (cria transação "Outros", extrai valor); botão da sugestão vem destacado.
-- [ ] Atalhos de teclado para completar/adiar direto na lista.
+- [x] Atalhos de teclado na lista do TODO: ↑↓ navegar, espaço concluir, `p` adiar (+1 dia), `e` editar; linha selecionada destacada.
 
 ## 2. Projetos + GitHub  *(prioridade #2 — FEITO no MVP)*
 

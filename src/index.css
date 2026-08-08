@@ -1659,3 +1659,8 @@ select:focus {
   overflow-y: auto;
   user-select: text;
 }
+
+.list-row.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}

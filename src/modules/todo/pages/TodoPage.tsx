@@ -4,6 +4,7 @@ import { useTodoStore } from '../store/todoStore'
 import { useProjectStore } from '../../projects/store/projectStore'
 import { TodoEditor } from '../components/TodoEditor'
 import { PRIORITIES, STATUSES, STATUS_LABELS, priorityDef, dueMeta } from '../constants'
+import { localDateStr } from '../../../utils/dates'
 
 type StatusFilter = 'all' | 'todo' | 'doing' | 'done'
 
@@ -15,6 +16,7 @@ export function TodoPage(): React.ReactElement {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [projectFilter, setProjectFilter] = useState<number | 'all'>('all')
   const [editing, setEditing] = useState<Todo | null>(null)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   useEffect(() => {
     refresh()
@@ -56,6 +58,46 @@ export function TodoPage(): React.ReactElement {
     update({ ...t, priority: next })
   }
 
+  function postpone(t: Todo): void {
+    const base = t.dueDate ? new Date(`${t.dueDate}T00:00:00`) : new Date()
+    base.setDate(base.getDate() + 1)
+    update({ ...t, dueDate: localDateStr(base) })
+  }
+
+  // Keyboard shortcuts on the list: ↑↓ select, Space toggle done, p postpone, e edit.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const tag = (document.activeElement?.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+      if (editing) return
+      if (items.length === 0) return
+
+      const idx = items.findIndex((t) => t.id === selectedId)
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setSelectedId(items[Math.min(items.length - 1, idx < 0 ? 0 : idx + 1)].id)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setSelectedId(items[Math.max(0, idx < 0 ? 0 : idx - 1)].id)
+      } else if (idx >= 0) {
+        const t = items[idx]
+        if (e.key === ' ' || e.key === 'x') {
+          e.preventDefault()
+          setStatus(t.id, t.status === 'done' ? 'todo' : 'done')
+        } else if (e.key === 'p') {
+          e.preventDefault()
+          postpone(t)
+        } else if (e.key === 'e') {
+          e.preventDefault()
+          setEditing(t)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, selectedId, editing])
+
   return (
     <div className="module-page">
       <div className="module-header">
@@ -63,6 +105,9 @@ export function TodoPage(): React.ReactElement {
           <h2 style={{ fontSize: 18, fontWeight: 700 }}>✅ TODO</h2>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
             {items.length} {items.length === 1 ? 'tarefa' : 'tarefas'}
+            <span style={{ color: 'var(--text-muted)', marginLeft: 10 }}>
+              ↑↓ navegar · espaço concluir · p adiar · e editar
+            </span>
           </p>
         </div>
       </div>
@@ -117,7 +162,11 @@ export function TodoPage(): React.ReactElement {
           const due = dueMeta(t.dueDate, done)
           const proj = projectName(t.projectId)
           return (
-            <div key={t.id} className="list-row">
+            <div
+              key={t.id}
+              className={`list-row ${selectedId === t.id ? 'selected' : ''}`}
+              onClick={() => setSelectedId(t.id)}
+            >
               <input
                 type="checkbox"
                 checked={done}

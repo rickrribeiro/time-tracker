@@ -91,6 +91,7 @@ select:focus {
   padding: 0 16px 20px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .logo-icon {
@@ -177,6 +178,7 @@ select:focus {
   padding: 12px 16px 4px;
   border-top: 1px solid var(--border);
   margin-top: 8px;
+  flex-shrink: 0;
 }
 
 .shortcut-hint {
@@ -187,6 +189,19 @@ select:focus {
 
 .sidebar-footer {
   padding: 0 8px;
+  flex-shrink: 0;
+}
+
+/* Thin, subtle scrollbar for the nav list (many items) */
+.nav-list::-webkit-scrollbar {
+  width: 6px;
+}
+.nav-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+.nav-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .sidebar-footer .export-btn {

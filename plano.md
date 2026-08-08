@@ -169,4 +169,4 @@ Restante / melhorias:
 - [x] Sistema de migração leve baseado em `PRAGMA user_version` no `db.ts` (array `MIGRATIONS`, cada uma idempotente). O `ALTER` de `secondaryTagId` virou a migração v1.
 - [x] Persistir configurações na tabela `settings`; tokens sensíveis (`github_token`) **cifrados com `safeStorage`** (helpers em `services/secrets.ts`, com fallback texto e retrocompatibilidade).
 - [ ] Mover time-tracker existente para `src/modules/timetracker/` quando o WIP estabilizar (opcional).
-- [ ] Overflow/scroll da sidebar já tratado; revisar responsividade com muitos itens.
+- [x] Sidebar responsiva com muitos itens: logo/atalhos/rodapé com `flex-shrink:0` (só a `nav-list` rola) + scrollbar fina estilizada.

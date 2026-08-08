@@ -31,6 +31,18 @@ function labelNames(labels: GithubApiIssue['labels']): string[] {
   return labels.map((l) => (typeof l === 'string' ? l : l.name)).filter(Boolean)
 }
 
+/** Extract the rel="next" URL from a GitHub `Link` response header. */
+function parseNextLink(linkHeader: string | null): string | null {
+  if (!linkHeader) return null
+  for (const part of linkHeader.split(',')) {
+    const m = part.match(/<([^>]+)>\s*;\s*rel="next"/)
+    if (m) return m[1]
+  }
+  return null
+}
+
+const MAX_PAGES = 10 // safety cap: up to ~1000 issues per sync
+
 function mapIssue(i: GithubApiIssue): DbGithubIssue {
   return {
     id: i.id,
@@ -59,27 +71,33 @@ export async function syncGithubIssues(): Promise<number> {
     throw new Error('GitHub token não configurado. Vá em Configurações e adicione um token.')
   }
 
-  const lastSync = await getSetting('github_last_sync')
-  const full = !lastSync
-  let url = `${GITHUB_API}/issues?filter=assigned&state=all&per_page=100&sort=updated`
-  if (!full) url += `&since=${encodeURIComponent(lastSync as string)}`
-
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'RickOS'
-    }
-  })
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    if (res.status === 401) throw new Error('Token inválido ou expirado (401).')
-    throw new Error(`GitHub API falhou (${res.status}). ${body.slice(0, 140)}`)
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'RickOS'
   }
 
-  const data = (await res.json()) as GithubApiIssue[]
+  const lastSync = await getSetting('github_last_sync')
+  const full = !lastSync
+  let url: string | null = `${GITHUB_API}/issues?filter=assigned&state=all&per_page=100&sort=updated`
+  if (!full) url += `&since=${encodeURIComponent(lastSync as string)}`
+
+  // Follow the Link: rel="next" header to paginate past 100 issues.
+  const data: GithubApiIssue[] = []
+  let pages = 0
+  while (url && pages < MAX_PAGES) {
+    const res = await fetch(url, { headers })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      if (res.status === 401) throw new Error('Token inválido ou expirado (401).')
+      throw new Error(`GitHub API falhou (${res.status}). ${body.slice(0, 140)}`)
+    }
+    data.push(...((await res.json()) as GithubApiIssue[]))
+    url = parseNextLink(res.headers.get('link'))
+    pages++
+  }
+
   const issues = data
     // the /issues endpoint can include PRs; the search fields differ — keep true issues only
     .filter((i) => typeof i.number === 'number' && typeof i.id === 'number')

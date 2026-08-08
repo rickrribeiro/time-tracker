@@ -665,6 +665,17 @@ async function replaceGithubIssues(issues) {
     );
   }
 }
+async function upsertGithubIssues(issues) {
+  const db2 = await getDb();
+  for (const i of issues) {
+    run(
+      db2,
+      `INSERT OR REPLACE INTO github_issues (id, number, title, state, repo, url, labels, milestone, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [i.id, i.number, i.title, i.state, i.repo, i.url, i.labels, i.milestone, i.updatedAt]
+    );
+  }
+}
 async function getUpcomingEvents(fromISO, limit) {
   const db2 = await getDb();
   return getAll(
@@ -863,26 +874,17 @@ function repoFromIssue(issue) {
 function labelNames(labels) {
   return labels.map((l) => typeof l === "string" ? l : l.name).filter(Boolean);
 }
-async function syncGithubIssues() {
-  const token = decodeSecret(await getSetting("github_token"));
-  if (!token) {
-    throw new Error("GitHub token não configurado. Vá em Configurações e adicione um token.");
+function parseNextLink(linkHeader) {
+  if (!linkHeader) return null;
+  for (const part of linkHeader.split(",")) {
+    const m = part.match(/<([^>]+)>\s*;\s*rel="next"/);
+    if (m) return m[1];
   }
-  const res = await fetch(`${GITHUB_API}/issues?filter=assigned&state=all&per_page=100&sort=updated`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "RickOS"
-    }
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    if (res.status === 401) throw new Error("Token inválido ou expirado (401).");
-    throw new Error(`GitHub API falhou (${res.status}). ${body.slice(0, 140)}`);
-  }
-  const data = await res.json();
-  const issues = data.filter((i) => typeof i.number === "number" && typeof i.id === "number").map((i) => ({
+  return null;
+}
+const MAX_PAGES = 10;
+function mapIssue(i) {
+  return {
     id: i.id,
     number: i.number,
     title: i.title,
@@ -892,8 +894,40 @@ async function syncGithubIssues() {
     labels: JSON.stringify(labelNames(i.labels ?? [])),
     milestone: i.milestone?.title ?? null,
     updatedAt: i.updated_at ?? null
-  }));
-  await replaceGithubIssues(issues);
+  };
+}
+async function syncGithubIssues() {
+  const token = decodeSecret(await getSetting("github_token"));
+  if (!token) {
+    throw new Error("GitHub token não configurado. Vá em Configurações e adicione um token.");
+  }
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "RickOS"
+  };
+  const lastSync = await getSetting("github_last_sync");
+  const full = !lastSync;
+  let url = `${GITHUB_API}/issues?filter=assigned&state=all&per_page=100&sort=updated`;
+  if (!full) url += `&since=${encodeURIComponent(lastSync)}`;
+  const data = [];
+  let pages = 0;
+  while (url && pages < MAX_PAGES) {
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      if (res.status === 401) throw new Error("Token inválido ou expirado (401).");
+      throw new Error(`GitHub API falhou (${res.status}). ${body.slice(0, 140)}`);
+    }
+    data.push(...await res.json());
+    url = parseNextLink(res.headers.get("link"));
+    pages++;
+  }
+  const issues = data.filter((i) => typeof i.number === "number" && typeof i.id === "number").map(mapIssue);
+  if (full) await replaceGithubIssues(issues);
+  else await upsertGithubIssues(issues);
+  await setSetting("github_last_sync", (/* @__PURE__ */ new Date()).toISOString());
   return issues.length;
 }
 const TIMEOUT_MS = 12e4;

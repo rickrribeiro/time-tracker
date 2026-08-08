@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { TaskWithTag } from '../../types'
+import { TaskWithTag } from '@/types'
 import { TimelineBlock } from './TimelineBlock'
 import { useTaskStore } from '../../store/taskStore'
 import { useTagStore } from '../../store/tagStore'
-import { localDateStr } from '../../utils/dates'
+import { localDateStr } from '@/utils/dates'
 
 const PIXELS_PER_MINUTE = 1.5
 const HOURS = Array.from({ length: 24 }, (_, i) => i)

@@ -1,9 +1,9 @@
 import React, { useEffect, useCallback } from 'react'
-import { useUIStore } from '../store/uiStore'
+import { useUIStore } from '@/store/uiStore'
 import { useTaskStore } from '../store/taskStore'
 import { useTagStore } from '../store/tagStore'
 import { Timeline } from '../components/Timeline/Timeline'
-import { localDateStr } from '../utils/dates'
+import { localDateStr } from '@/utils/dates'
 
 function formatDateDisplay(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00')

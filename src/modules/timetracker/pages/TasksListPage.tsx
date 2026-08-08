@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react'
-import { TaskWithTag } from '../types'
+import { TaskWithTag } from '@/types'
 import { useTagStore } from '../store/tagStore'
-import { useUIStore } from '../store/uiStore'
-import { localDateStr } from '../utils/dates'
+import { useUIStore } from '@/store/uiStore'
+import { localDateStr } from '@/utils/dates'
 
 function formatTime(iso: string): string {
   const d = new Date(iso)

@@ -1,5 +1,5 @@
 import React from 'react'
-import { useUIStore } from '../store/uiStore'
+import { useUIStore } from '@/store/uiStore'
 import { CalendarView } from '../components/Calendar/CalendarView'
 
 export function CalendarPage(): React.ReactElement {

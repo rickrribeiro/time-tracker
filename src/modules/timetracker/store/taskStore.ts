@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { Task, TaskWithTag } from '../types'
-import { localDayStartISO, localDayEndISO } from '../utils/dates'
+import { Task, TaskWithTag } from '@/types'
+import { localDayStartISO, localDayEndISO } from '@/utils/dates'
 
 interface TaskState {
   activeTask: TaskWithTag | null

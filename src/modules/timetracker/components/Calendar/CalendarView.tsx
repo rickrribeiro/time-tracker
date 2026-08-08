@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { DailyStats } from '../../types'
-import { localDateStr, localDayStartISO } from '../../utils/dates'
+import { DailyStats } from '@/types'
+import { localDateStr, localDayStartISO } from '@/utils/dates'
 
 interface Props {
   year: number

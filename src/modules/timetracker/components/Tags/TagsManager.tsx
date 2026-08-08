@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useTagStore } from '../../store/tagStore'
-import { Tag } from '../../types'
+import { Tag } from '@/types'
 
 const PRESET_COLORS = [
   '#6366f1', '#3b82f6', '#22c55e', '#f59e0b',

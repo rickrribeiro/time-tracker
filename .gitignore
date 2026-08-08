@@ -68,10 +68,16 @@ temp/
 # -----------------------------
 *.tsbuildinfo
 # Compiled output emitted next to sources by `tsc -b` (build uses electron-vite, not tsc emit)
+src/*.js
+src/*.d.ts
 src/**/*.js
 src/**/*.d.ts
+electron/*.js
+electron/*.d.ts
 electron/**/*.js
 electron/**/*.d.ts
+# keep hand-written ambient declarations
+!src/vite-env.d.ts
 
 # -----------------------------
 # Vite

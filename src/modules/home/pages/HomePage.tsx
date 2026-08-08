@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useTaskStore } from '../../../store/taskStore'
+import { useTaskStore } from '../../timetracker/store/taskStore'
 import { useTodoStore } from '../../todo/store/todoStore'
 import { useHabitStore } from '../../habits/store/habitStore'
 import { useGithubStore } from '../../projects/store/githubStore'

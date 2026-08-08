@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { DailyStats, TagStats } from '../../types'
-import { localDateStr, localDayStartISO, localDayEndISO } from '../../utils/dates'
+import { DailyStats, TagStats } from '@/types'
+import { localDateStr, localDayStartISO, localDayEndISO } from '@/utils/dates'
 
 type Period = 'day' | 'week' | 'month'
 

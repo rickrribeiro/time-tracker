@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { TaskWithTag } from '../../types'
+import { TaskWithTag } from '@/types'
 
 interface Props {
   task: TaskWithTag

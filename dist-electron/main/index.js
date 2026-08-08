@@ -769,6 +769,48 @@ async function deleteInvestment(id) {
   const db2 = await getDb();
   run(db2, "DELETE FROM investments WHERE id = ?", [id]);
 }
+async function getTrips() {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM trips ORDER BY startDate IS NULL, startDate ASC");
+}
+async function createTrip(origin, destination, startDate, endDate, budget, currency, status) {
+  const db2 = await getDb();
+  run(
+    db2,
+    "INSERT INTO trips (origin, destination, startDate, endDate, budget, currency, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [origin, destination, startDate, endDate, budget, currency, status]
+  );
+  return getOne(db2, "SELECT * FROM trips WHERE id = ?", [lastInsertId(db2)]);
+}
+async function updateTrip(id, origin, destination, startDate, endDate, budget, currency, status) {
+  const db2 = await getDb();
+  run(
+    db2,
+    "UPDATE trips SET origin = ?, destination = ?, startDate = ?, endDate = ?, budget = ?, currency = ?, status = ? WHERE id = ?",
+    [origin, destination, startDate, endDate, budget, currency, status, id]
+  );
+}
+async function deleteTrip(id) {
+  const db2 = await getDb();
+  run(db2, "DELETE FROM trips WHERE id = ?", [id]);
+}
+async function getFlightWatches() {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM flight_watches ORDER BY id DESC");
+}
+async function createFlightWatch(tripId, origin, destination, price, currency, lastChecked) {
+  const db2 = await getDb();
+  run(
+    db2,
+    "INSERT INTO flight_watches (tripId, origin, destination, price, currency, lastChecked) VALUES (?, ?, ?, ?, ?, ?)",
+    [tripId, origin, destination, price, currency, lastChecked]
+  );
+  return getOne(db2, "SELECT * FROM flight_watches WHERE id = ?", [lastInsertId(db2)]);
+}
+async function deleteFlightWatch(id) {
+  const db2 = await getDb();
+  run(db2, "DELETE FROM flight_watches WHERE id = ?", [id]);
+}
 const GITHUB_API = "https://api.github.com";
 function repoFromIssue(issue) {
   if (issue.repository?.full_name) return issue.repository.full_name;
@@ -988,6 +1030,22 @@ electron.ipcMain.handle("budgets:set", (_, categoryId, month, amount) => setBudg
 electron.ipcMain.handle("investments:getAll", () => getInvestments());
 electron.ipcMain.handle("investments:create", (_, name, type, amount, currency) => createInvestment(name, type, amount, currency));
 electron.ipcMain.handle("investments:delete", (_, id) => deleteInvestment(id));
+electron.ipcMain.handle("trips:getAll", () => getTrips());
+electron.ipcMain.handle(
+  "trips:create",
+  (_, origin, destination, startDate, endDate, budget, currency, status) => createTrip(origin, destination, startDate, endDate, budget, currency, status)
+);
+electron.ipcMain.handle(
+  "trips:update",
+  (_, id, origin, destination, startDate, endDate, budget, currency, status) => updateTrip(id, origin, destination, startDate, endDate, budget, currency, status)
+);
+electron.ipcMain.handle("trips:delete", (_, id) => deleteTrip(id));
+electron.ipcMain.handle("flights:getAll", () => getFlightWatches());
+electron.ipcMain.handle(
+  "flights:create",
+  (_, tripId, origin, destination, price, currency) => createFlightWatch(tripId, origin, destination, price, currency, (/* @__PURE__ */ new Date()).toISOString())
+);
+electron.ipcMain.handle("flights:delete", (_, id) => deleteFlightWatch(id));
 electron.ipcMain.handle("app:openExternal", (_, url) => electron.shell.openExternal(url));
 electron.ipcMain.handle("app:exportDb", async () => {
   saveDb();

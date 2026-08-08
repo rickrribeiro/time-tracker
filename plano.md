@@ -127,16 +127,21 @@ Restante / melhorias:
 - [ ] Editar transação inline (hoje: criar/excluir).
 - [ ] Sem Open Finance (mantido fora de escopo).
 
-## 7. Viagens  *(prioridade #7)*
+## 7. Viagens  *(prioridade #7 — FEITO no MVP)*
 
 **Fundação:** tabelas `trips`, `flight_watches` + mock JSON já existem.
 
-Próximos passos:
-- [ ] CRUD de viagem (origem, destino, datas, orçamento, status).
-- [ ] Monitoramento de passagens (por ora mock JSON; depois fonte real).
-- [ ] Recomendações por gosto a partir de `user-profile.md` (café, anime, vida noturna, ramen/izakaya, bairros caminháveis).
-- [ ] Checklist de documentos por viagem (passaporte, visto, vacina, seguro, hospedagem) — hoje é mock estático.
-- [ ] Destinos salvos.
+Feito:
+- [x] CRUD de viagem (origem, destino, datas, orçamento, status) + dias restantes.
+- [x] Monitoramento de passagens: CRUD real de `flight_watches` (trecho + menor preço + data).
+- [x] Recomendações a partir de `user-profile.md` (import `?raw`), casadas por interesse.
+- [x] Checklist de documentos (interativo, estado local).
+- [x] Destinos (derivados das viagens).
+
+Restante / melhorias:
+- [ ] Busca automática de preços de passagem (fonte real / API).
+- [ ] Persistir checklist de documentos por viagem.
+- [ ] Recomendações geradas por IA (ver #8).
 
 ## 8. IA local (Claude Code CLI)  *(prioridade #8)*
 

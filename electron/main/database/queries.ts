@@ -879,3 +879,95 @@ export async function deleteInvestment(id: number): Promise<void> {
   const db = await getDb()
   run(db, 'DELETE FROM investments WHERE id = ?', [id])
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Travel (trips, flight watches)
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface DbTrip {
+  id: number
+  origin: string | null
+  destination: string
+  startDate: string | null
+  endDate: string | null
+  budget: number | null
+  currency: string
+  status: string
+}
+export interface DbFlightWatch {
+  id: number
+  tripId: number | null
+  origin: string | null
+  destination: string | null
+  price: number | null
+  currency: string
+  lastChecked: string | null
+}
+
+export async function getTrips(): Promise<DbTrip[]> {
+  const db = await getDb()
+  return getAll<DbTrip>(db, 'SELECT * FROM trips ORDER BY startDate IS NULL, startDate ASC')
+}
+export async function createTrip(
+  origin: string | null,
+  destination: string,
+  startDate: string | null,
+  endDate: string | null,
+  budget: number | null,
+  currency: string,
+  status: string
+): Promise<DbTrip> {
+  const db = await getDb()
+  run(
+    db,
+    'INSERT INTO trips (origin, destination, startDate, endDate, budget, currency, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [origin, destination, startDate, endDate, budget, currency, status]
+  )
+  return getOne<DbTrip>(db, 'SELECT * FROM trips WHERE id = ?', [lastInsertId(db)])!
+}
+export async function updateTrip(
+  id: number,
+  origin: string | null,
+  destination: string,
+  startDate: string | null,
+  endDate: string | null,
+  budget: number | null,
+  currency: string,
+  status: string
+): Promise<void> {
+  const db = await getDb()
+  run(
+    db,
+    'UPDATE trips SET origin = ?, destination = ?, startDate = ?, endDate = ?, budget = ?, currency = ?, status = ? WHERE id = ?',
+    [origin, destination, startDate, endDate, budget, currency, status, id]
+  )
+}
+export async function deleteTrip(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM trips WHERE id = ?', [id])
+}
+
+export async function getFlightWatches(): Promise<DbFlightWatch[]> {
+  const db = await getDb()
+  return getAll<DbFlightWatch>(db, 'SELECT * FROM flight_watches ORDER BY id DESC')
+}
+export async function createFlightWatch(
+  tripId: number | null,
+  origin: string | null,
+  destination: string | null,
+  price: number | null,
+  currency: string,
+  lastChecked: string
+): Promise<DbFlightWatch> {
+  const db = await getDb()
+  run(
+    db,
+    'INSERT INTO flight_watches (tripId, origin, destination, price, currency, lastChecked) VALUES (?, ?, ?, ?, ?, ?)',
+    [tripId, origin, destination, price, currency, lastChecked]
+  )
+  return getOne<DbFlightWatch>(db, 'SELECT * FROM flight_watches WHERE id = ?', [lastInsertId(db)])!
+}
+export async function deleteFlightWatch(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM flight_watches WHERE id = ?', [id])
+}

@@ -98,6 +98,17 @@ const api = {
     create: (name, type, amount, currency) => electron.ipcRenderer.invoke("investments:create", name, type, amount, currency),
     delete: (id) => electron.ipcRenderer.invoke("investments:delete", id)
   },
+  trips: {
+    getAll: () => electron.ipcRenderer.invoke("trips:getAll"),
+    create: (origin, destination, startDate, endDate, budget, currency, status) => electron.ipcRenderer.invoke("trips:create", origin, destination, startDate, endDate, budget, currency, status),
+    update: (id, origin, destination, startDate, endDate, budget, currency, status) => electron.ipcRenderer.invoke("trips:update", id, origin, destination, startDate, endDate, budget, currency, status),
+    delete: (id) => electron.ipcRenderer.invoke("trips:delete", id)
+  },
+  flights: {
+    getAll: () => electron.ipcRenderer.invoke("flights:getAll"),
+    create: (tripId, origin, destination, price, currency) => electron.ipcRenderer.invoke("flights:create", tripId, origin, destination, price, currency),
+    delete: (id) => electron.ipcRenderer.invoke("flights:delete", id)
+  },
   // Events (main → renderer)
   on: {
     quickCapture: (cb) => {

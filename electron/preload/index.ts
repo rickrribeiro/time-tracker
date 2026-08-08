@@ -145,6 +145,20 @@ const api = {
     create: (name: string, type: string | null, amount: number, currency: string) => ipcRenderer.invoke('investments:create', name, type, amount, currency),
     delete: (id: number) => ipcRenderer.invoke('investments:delete', id)
   },
+  trips: {
+    getAll: () => ipcRenderer.invoke('trips:getAll'),
+    create: (origin: string | null, destination: string, startDate: string | null, endDate: string | null, budget: number | null, currency: string, status: string) =>
+      ipcRenderer.invoke('trips:create', origin, destination, startDate, endDate, budget, currency, status),
+    update: (id: number, origin: string | null, destination: string, startDate: string | null, endDate: string | null, budget: number | null, currency: string, status: string) =>
+      ipcRenderer.invoke('trips:update', id, origin, destination, startDate, endDate, budget, currency, status),
+    delete: (id: number) => ipcRenderer.invoke('trips:delete', id)
+  },
+  flights: {
+    getAll: () => ipcRenderer.invoke('flights:getAll'),
+    create: (tripId: number | null, origin: string | null, destination: string | null, price: number | null, currency: string) =>
+      ipcRenderer.invoke('flights:create', tripId, origin, destination, price, currency),
+    delete: (id: number) => ipcRenderer.invoke('flights:delete', id)
+  },
   // Events (main → renderer)
   on: {
     quickCapture: (cb: () => void) => {

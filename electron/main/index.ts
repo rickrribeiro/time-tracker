@@ -58,7 +58,14 @@ import {
   setBudget,
   getInvestments,
   createInvestment,
-  deleteInvestment
+  deleteInvestment,
+  getTrips,
+  createTrip,
+  updateTrip,
+  deleteTrip,
+  getFlightWatches,
+  createFlightWatch,
+  deleteFlightWatch
 } from './database/queries'
 import type { DbTransaction } from './database/queries'
 import { syncGithubIssues } from './services/github'
@@ -323,6 +330,23 @@ ipcMain.handle('budgets:set', (_, categoryId: number, month: string, amount: num
 ipcMain.handle('investments:getAll', () => getInvestments())
 ipcMain.handle('investments:create', (_, name: string, type: string | null, amount: number, currency: string) => createInvestment(name, type, amount, currency))
 ipcMain.handle('investments:delete', (_, id: number) => deleteInvestment(id))
+
+// ── IPC: Travel ───────────────────────────────────────────────────────────────
+
+ipcMain.handle('trips:getAll', () => getTrips())
+ipcMain.handle('trips:create', (_, origin: string | null, destination: string, startDate: string | null, endDate: string | null, budget: number | null, currency: string, status: string) =>
+  createTrip(origin, destination, startDate, endDate, budget, currency, status)
+)
+ipcMain.handle('trips:update', (_, id: number, origin: string | null, destination: string, startDate: string | null, endDate: string | null, budget: number | null, currency: string, status: string) =>
+  updateTrip(id, origin, destination, startDate, endDate, budget, currency, status)
+)
+ipcMain.handle('trips:delete', (_, id: number) => deleteTrip(id))
+
+ipcMain.handle('flights:getAll', () => getFlightWatches())
+ipcMain.handle('flights:create', (_, tripId: number | null, origin: string | null, destination: string | null, price: number | null, currency: string) =>
+  createFlightWatch(tripId, origin, destination, price, currency, new Date().toISOString())
+)
+ipcMain.handle('flights:delete', (_, id: number) => deleteFlightWatch(id))
 
 // ── IPC: App ──────────────────────────────────────────────────────────────────
 

@@ -135,6 +135,27 @@ export interface Investment {
   currency: string
 }
 
+export interface Trip {
+  id: number
+  origin: string | null
+  destination: string
+  startDate: string | null
+  endDate: string | null
+  budget: number | null
+  currency: string
+  status: string
+}
+
+export interface FlightWatch {
+  id: number
+  tripId: number | null
+  origin: string | null
+  destination: string | null
+  price: number | null
+  currency: string
+  lastChecked: string | null
+}
+
 export type Page =
   // Time Tracker (existente)
   | 'timeline'
@@ -296,6 +317,17 @@ declare global {
       investments: {
         getAll: () => Promise<Investment[]>
         create: (name: string, type: string | null, amount: number, currency: string) => Promise<Investment>
+        delete: (id: number) => Promise<void>
+      }
+      trips: {
+        getAll: () => Promise<Trip[]>
+        create: (origin: string | null, destination: string, startDate: string | null, endDate: string | null, budget: number | null, currency: string, status: string) => Promise<Trip>
+        update: (id: number, origin: string | null, destination: string, startDate: string | null, endDate: string | null, budget: number | null, currency: string, status: string) => Promise<void>
+        delete: (id: number) => Promise<void>
+      }
+      flights: {
+        getAll: () => Promise<FlightWatch[]>
+        create: (tripId: number | null, origin: string | null, destination: string | null, price: number | null, currency: string) => Promise<FlightWatch>
         delete: (id: number) => Promise<void>
       }
       on: {

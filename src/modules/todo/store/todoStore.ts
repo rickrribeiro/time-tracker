@@ -4,7 +4,7 @@ import { Todo } from '../../../types'
 interface TodoState {
   todos: Todo[]
   refresh: () => Promise<void>
-  capture: (title: string) => Promise<void>
+  capture: (title: string, notes?: string | null) => Promise<void>
   create: (title: string, status?: string) => Promise<void>
   setStatus: (id: number, status: string) => Promise<void>
   update: (todo: Todo) => Promise<void>
@@ -22,8 +22,8 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     set({ todos })
   },
 
-  capture: async (title) => {
-    await window.api.todos.create(title, null, 'inbox', 'quick-capture')
+  capture: async (title, notes = null) => {
+    await window.api.todos.create(title, notes, 'inbox', 'quick-capture')
     await get().refresh()
   },
 

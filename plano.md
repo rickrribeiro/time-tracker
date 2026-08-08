@@ -47,8 +47,8 @@ Feito:
 - [x] Filtros/busca (busca texto, status, projeto) + ordenação (done por último, prioridade, vencimento).
 
 Restante:
-- [ ] Refinar Quick Capture: parsing leve ("comprar passagem Osaka→Kumamoto" → sugerir viagem), notas rápidas. *(depende do módulo Viagens)*
-- [ ] Processar Inbox direto p/ Viagem ou Financeiro. *(depende desses módulos)*
+- [x] Refinar Quick Capture: parsing leve (`parse.ts` — `//` para nota rápida, `A→B` para trecho, sugestão viagem/financeiro/tarefa por palavra-chave/moeda) + hint ao vivo.
+- [ ] Processar Inbox direto p/ Viagem ou Financeiro.
 - [ ] Atalhos de teclado para completar/adiar direto na lista.
 
 ## 2. Projetos + GitHub  *(prioridade #2 — FEITO no MVP)*

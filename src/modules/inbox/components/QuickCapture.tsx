@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTodoStore } from '../../todo/store/todoStore'
+import { parseCapture, SUGGESTION_LABEL } from '../parse'
 
 /**
  * Global quick-capture modal. Opens on the main-process global shortcut
@@ -43,10 +44,15 @@ export function QuickCapture(): React.ReactElement | null {
 
   async function handleSubmit(): Promise<void> {
     const v = text.trim()
-    if (v) await capture(v)
+    if (v) {
+      const parsed = parseCapture(v)
+      await capture(parsed.title, parsed.notes)
+    }
     setText('')
     setOpen(false)
   }
+
+  const preview = text.trim() ? parseCapture(text) : null
 
   return (
     <div className="modal-overlay" onClick={() => setOpen(false)}>
@@ -55,12 +61,18 @@ export function QuickCapture(): React.ReactElement | null {
         <input
           ref={inputRef}
           type="text"
-          placeholder="Digite e Enter para jogar na Inbox…"
+          placeholder="Título… (use // para nota rápida, → para trecho de viagem)"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
           style={{ width: '100%', marginTop: 8 }}
         />
+        {preview && (
+          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+            <span>{SUGGESTION_LABEL[preview.suggestion]}</span>
+            {preview.notes && <span style={{ marginLeft: 8, color: 'var(--text-muted)' }}>📝 {preview.notes}</span>}
+          </div>
+        )}
         <div className="modal-actions">
           <button className="btn btn-secondary btn-sm" onClick={() => setOpen(false)}>
             Cancelar (Esc)

@@ -1,4 +1,5 @@
 import { getSetting, replaceGithubIssues, DbGithubIssue } from '../database/queries'
+import { decodeSecret } from './secrets'
 
 const GITHUB_API = 'https://api.github.com'
 
@@ -36,7 +37,7 @@ function labelNames(labels: GithubApiIssue['labels']): string[] {
  * Returns the number of issues synced.
  */
 export async function syncGithubIssues(): Promise<number> {
-  const token = await getSetting('github_token')
+  const token = decodeSecret(await getSetting('github_token'))
   if (!token) {
     throw new Error('GitHub token não configurado. Vá em Configurações e adicione um token.')
   }

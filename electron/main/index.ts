@@ -70,6 +70,7 @@ import {
 import type { DbTransaction } from './database/queries'
 import { syncGithubIssues } from './services/github'
 import { runClaude } from './services/claude'
+import { encodeSecret, decodeSecret } from './services/secrets'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -279,10 +280,15 @@ ipcMain.handle('habits:toggleEntry', (_, habitId: number, date: string, complete
 )
 
 // ── IPC: Settings ───────────────────────────────────────────────────────────
+// Sensitive values (tokens) are encrypted at rest via safeStorage — see services/secrets.
 
-ipcMain.handle('settings:get', (_, key: string) => getSetting(key))
-ipcMain.handle('settings:set', (_, key: string, value: string) => setSetting(key, value))
-ipcMain.handle('settings:getAll', () => getAllSettings())
+ipcMain.handle('settings:get', async (_, key: string) => decodeSecret(await getSetting(key)))
+ipcMain.handle('settings:set', (_, key: string, value: string) => setSetting(key, encodeSecret(key, value)))
+ipcMain.handle('settings:getAll', async () => {
+  const all = await getAllSettings()
+  for (const k of Object.keys(all)) all[k] = decodeSecret(all[k]) ?? ''
+  return all
+})
 
 // ── IPC: GitHub ───────────────────────────────────────────────────────────────
 

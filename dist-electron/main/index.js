@@ -193,6 +193,32 @@ const SCHEMA = `
 `;
 let db = null;
 let dbPath;
+const MIGRATIONS = [
+  {
+    version: 1,
+    label: "tasks.secondaryTagId",
+    run: (db2) => {
+      try {
+        db2.run("ALTER TABLE tasks ADD COLUMN secondaryTagId INTEGER REFERENCES tags(id) ON DELETE SET NULL;");
+      } catch {
+      }
+    }
+  }
+];
+function getUserVersion(database) {
+  const res = database.exec("PRAGMA user_version");
+  const v = res[0]?.values?.[0]?.[0];
+  return typeof v === "number" ? v : 0;
+}
+function runMigrations(database) {
+  const current = getUserVersion(database);
+  const target = MIGRATIONS.reduce((max, m) => Math.max(max, m.version), 0);
+  if (current >= target) return;
+  for (const m of MIGRATIONS) {
+    if (m.version > current) m.run(database);
+  }
+  database.run(`PRAGMA user_version = ${target}`);
+}
 async function getDb() {
   if (db) return db;
   dbPath = path.join(electron.app.getPath("userData"), "timetracker.db");
@@ -209,10 +235,7 @@ async function getDb() {
   }
   db.run("PRAGMA foreign_keys = ON;");
   db.run(SCHEMA);
-  try {
-    db.run("ALTER TABLE tasks ADD COLUMN secondaryTagId INTEGER REFERENCES tags(id) ON DELETE SET NULL;");
-  } catch (e) {
-  }
+  runMigrations(db);
   saveDb();
   return db;
 }
@@ -813,6 +836,21 @@ async function deleteFlightWatch(id) {
   const db2 = await getDb();
   run(db2, "DELETE FROM flight_watches WHERE id = ?", [id]);
 }
+const SENSITIVE_KEYS = /* @__PURE__ */ new Set(["github_token"]);
+const ENC_PREFIX = "enc:";
+function encodeSecret(key, value) {
+  if (!SENSITIVE_KEYS.has(key) || !value) return value;
+  if (!electron.safeStorage.isEncryptionAvailable()) return value;
+  return ENC_PREFIX + electron.safeStorage.encryptString(value).toString("base64");
+}
+function decodeSecret(value) {
+  if (value == null || !value.startsWith(ENC_PREFIX)) return value;
+  try {
+    return electron.safeStorage.decryptString(Buffer.from(value.slice(ENC_PREFIX.length), "base64"));
+  } catch {
+    return "";
+  }
+}
 const GITHUB_API = "https://api.github.com";
 function repoFromIssue(issue) {
   if (issue.repository?.full_name) return issue.repository.full_name;
@@ -826,7 +864,7 @@ function labelNames(labels) {
   return labels.map((l) => typeof l === "string" ? l : l.name).filter(Boolean);
 }
 async function syncGithubIssues() {
-  const token = await getSetting("github_token");
+  const token = decodeSecret(await getSetting("github_token"));
   if (!token) {
     throw new Error("GitHub token não configurado. Vá em Configurações e adicione um token.");
   }
@@ -1050,9 +1088,13 @@ electron.ipcMain.handle(
   "habits:toggleEntry",
   (_, habitId, date, completed) => toggleHabitEntry(habitId, date, completed)
 );
-electron.ipcMain.handle("settings:get", (_, key) => getSetting(key));
-electron.ipcMain.handle("settings:set", (_, key, value) => setSetting(key, value));
-electron.ipcMain.handle("settings:getAll", () => getAllSettings());
+electron.ipcMain.handle("settings:get", async (_, key) => decodeSecret(await getSetting(key)));
+electron.ipcMain.handle("settings:set", (_, key, value) => setSetting(key, encodeSecret(key, value)));
+electron.ipcMain.handle("settings:getAll", async () => {
+  const all = await getAllSettings();
+  for (const k of Object.keys(all)) all[k] = decodeSecret(all[k]) ?? "";
+  return all;
+});
 electron.ipcMain.handle("github:getIssues", () => getGithubIssues());
 electron.ipcMain.handle("github:sync", () => syncGithubIssues());
 electron.ipcMain.handle(

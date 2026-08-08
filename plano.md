@@ -72,15 +72,19 @@ Restante / melhorias:
 
 > ⚠️ Requer o usuário colar um **Personal Access Token (classic, escopo `repo`)** em Configurações para funcionar. Sem token, o Kanban mostra estado vazio com instruções.
 
-## 3. Dashboard "Hoje"  *(prioridade #3)*
+## 3. Dashboard "Hoje"  *(prioridade #3 — FEITO)*
 
 **Fundação:** HomePage com horas/tarefas/hábitos reais + cards mock.
 
-Próximos passos:
-- [ ] Seção **Hoje**: timer ativo, próxima reunião (calendário), top 3 tarefas, hábitos pendentes, inbox pendente.
-- [ ] Seção **Esta semana**: horas trabalhadas/estudadas, gastos, issues GitHub abertas (dados reais quando módulos existirem).
-- [ ] Seção **Próxima viagem**: destino, dias restantes, menor preço monitorado.
-- [ ] Substituir cards mock por dados reais conforme cada módulo entra.
+Feito:
+- [x] Seção **Hoje**: timer ativo (taskStore), top 3 tarefas (por prioridade), hábitos pendentes, inbox pendente.
+- [x] Seção **Esta semana**: horas trabalhadas (stats.daily), tarefas abertas, hábitos do dia, **issues GitHub abertas (real)**.
+- [x] Seção **Próxima viagem** (mock por enquanto).
+
+Restante (cablear quando os módulos entrarem):
+- [ ] Próxima reunião (depende do Calendário #5).
+- [ ] Gastos do mês (depende de Finanças #6).
+- [ ] Próxima viagem real (depende de Viagens #7).
 
 ## 4. Hábitos  *(prioridade #4)*
 

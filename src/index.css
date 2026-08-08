@@ -1507,3 +1507,20 @@ select:focus {
   gap: 4px;
   margin-top: 8px;
 }
+
+/* ── Home dashboard ──────────────────────────────────────────────────────────── */
+
+.dash-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.dash-heading {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin: 22px 0 10px;
+}

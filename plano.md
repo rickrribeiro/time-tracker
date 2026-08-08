@@ -82,9 +82,9 @@ Feito:
 - [x] Seção **Próxima viagem** (mock por enquanto).
 
 Restante (cablear quando os módulos entrarem):
-- [ ] Próxima reunião (depende do Calendário #5).
-- [ ] Gastos do mês (depende de Finanças #6).
-- [ ] Próxima viagem real (depende de Viagens #7).
+- [x] Próxima reunião — real (feito no #5, via `calendarStore`).
+- [x] Gastos do mês — real (soma de despesas do mês via `financeStore`, por moeda).
+- [x] Próxima viagem real — próxima trip (`tripStore`), dias restantes e menor preço monitorado; removido o mock `flights.json`.
 
 ## 4. Hábitos  *(prioridade #4 — FEITO)*
 

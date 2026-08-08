@@ -86,6 +86,15 @@ export interface GithubIssue {
   updatedAt: string | null
 }
 
+export interface CalendarEvent {
+  id: number
+  title: string
+  startTime: string
+  endTime: string | null
+  location: string | null
+  source: string // manual | google
+}
+
 export type Page =
   // Time Tracker (existente)
   | 'timeline'
@@ -215,6 +224,12 @@ declare global {
       github: {
         getIssues: () => Promise<GithubIssue[]>
         sync: () => Promise<number>
+      }
+      calendar: {
+        upcoming: (fromISO: string, limit: number) => Promise<CalendarEvent[]>
+        range: (startISO: string, endISO: string) => Promise<CalendarEvent[]>
+        create: (title: string, startTime: string, endTime: string | null, location: string | null) => Promise<CalendarEvent>
+        delete: (id: number) => Promise<void>
       }
       on: {
         quickCapture: (cb: () => void) => () => void

@@ -97,12 +97,17 @@ Feito:
 - [x] Hábitos padrão sugeridos (academia, japonês, meditar, dormir <00:00, sem álcool, revisar TODO).
 - [x] Editar hábito (nome, frequência, meta, ativo/inativo).
 
-## 5. Calendário (Google Calendar — leitura)  *(prioridade #5)*
+## 5. Calendário  *(prioridade #5 — base FEITA, OAuth adiado)*
 
-- [ ] OAuth Google (fluxo desktop) + guardar refresh token.
-- [ ] Listar próximos 7 dias; cache local.
-- [ ] Exibir reuniões no Dashboard e no calendário existente do tracker.
-- [ ] Sem editar eventos no MVP.
+Feito:
+- [x] Tabela `calendar_events` + CRUD (upcoming/range/create/delete) + IPC/preload/types + `calendarStore`.
+- [x] **Próximas reuniões** no Dashboard (adicionar/remover manualmente) + card "Próxima reunião" real.
+- [x] Row "Google Calendar (em breve)" nas Configurações.
+
+Restante:
+- [ ] **OAuth Google** (fluxo desktop) + refresh token — precisa de client ID/secret.
+- [ ] Sync automático dos próximos 7 dias (source='google').
+- [ ] Overlay de eventos no calendário mensal do time-tracker.
 
 ## 6. Finanças  *(prioridade #6)*
 

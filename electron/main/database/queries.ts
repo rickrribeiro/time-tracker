@@ -663,3 +663,53 @@ export async function replaceGithubIssues(issues: DbGithubIssue[]): Promise<void
     )
   }
 }
+
+// ── Calendar events ─────────────────────────────────────────────────────────────
+
+export interface DbCalendarEvent {
+  id: number
+  title: string
+  startTime: string
+  endTime: string | null
+  location: string | null
+  source: string
+}
+
+export async function getUpcomingEvents(fromISO: string, limit: number): Promise<DbCalendarEvent[]> {
+  const db = await getDb()
+  return getAll<DbCalendarEvent>(
+    db,
+    'SELECT * FROM calendar_events WHERE startTime >= ? ORDER BY startTime ASC LIMIT ?',
+    [fromISO, limit]
+  )
+}
+
+export async function getEventsForRange(startISO: string, endISO: string): Promise<DbCalendarEvent[]> {
+  const db = await getDb()
+  return getAll<DbCalendarEvent>(
+    db,
+    'SELECT * FROM calendar_events WHERE startTime >= ? AND startTime < ? ORDER BY startTime ASC',
+    [startISO, endISO]
+  )
+}
+
+export async function createCalendarEvent(
+  title: string,
+  startTime: string,
+  endTime: string | null,
+  location: string | null
+): Promise<DbCalendarEvent> {
+  const db = await getDb()
+  run(
+    db,
+    "INSERT INTO calendar_events (title, startTime, endTime, location, source) VALUES (?, ?, ?, ?, 'manual')",
+    [title, startTime, endTime, location]
+  )
+  const id = lastInsertId(db)
+  return getOne<DbCalendarEvent>(db, 'SELECT * FROM calendar_events WHERE id = ?', [id])!
+}
+
+export async function deleteCalendarEvent(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM calendar_events WHERE id = ?', [id])
+}

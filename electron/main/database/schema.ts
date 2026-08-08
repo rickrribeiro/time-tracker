@@ -145,4 +145,13 @@ export const SCHEMA = `
     milestone TEXT,
     updatedAt TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS calendar_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    startTime TEXT NOT NULL,         -- ISO
+    endTime TEXT,
+    location TEXT,
+    source TEXT NOT NULL DEFAULT 'manual'  -- manual | google
+  );
 `;

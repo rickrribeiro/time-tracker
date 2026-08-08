@@ -78,6 +78,17 @@ export function SettingsPage(): React.ReactElement {
           <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}>{error}</div>
         )}
       </div>
+
+      <div className="chart-section" style={{ maxWidth: 560, marginTop: 16 }}>
+        <div className="chart-title">📅 Google Calendar</div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 12px' }}>
+          A sincronização automática (OAuth) entra numa próxima sessão. Por enquanto, adicione seus
+          eventos manualmente em <strong>Dashboard → Próximas reuniões</strong>.
+        </p>
+        <button className="btn btn-secondary btn-sm" disabled title="Em breve">
+          Conectar Google Calendar (em breve)
+        </button>
+      </div>
     </div>
   )
 }

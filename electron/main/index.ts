@@ -37,7 +37,11 @@ import {
   getSetting,
   setSetting,
   getAllSettings,
-  getGithubIssues
+  getGithubIssues,
+  getUpcomingEvents,
+  getEventsForRange,
+  createCalendarEvent,
+  deleteCalendarEvent
 } from './database/queries'
 import { syncGithubIssues } from './services/github'
 
@@ -258,6 +262,21 @@ ipcMain.handle('settings:getAll', () => getAllSettings())
 
 ipcMain.handle('github:getIssues', () => getGithubIssues())
 ipcMain.handle('github:sync', () => syncGithubIssues())
+
+// ── IPC: Calendar ─────────────────────────────────────────────────────────────
+
+ipcMain.handle('calendar:upcoming', (_, fromISO: string, limit: number) =>
+  getUpcomingEvents(fromISO, limit)
+)
+ipcMain.handle('calendar:range', (_, startISO: string, endISO: string) =>
+  getEventsForRange(startISO, endISO)
+)
+ipcMain.handle(
+  'calendar:create',
+  (_, title: string, startTime: string, endTime: string | null, location: string | null) =>
+    createCalendarEvent(title, startTime, endTime, location)
+)
+ipcMain.handle('calendar:delete', (_, id: number) => deleteCalendarEvent(id))
 
 // ── IPC: App ──────────────────────────────────────────────────────────────────
 

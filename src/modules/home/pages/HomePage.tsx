@@ -3,6 +3,8 @@ import { useTaskStore } from '../../../store/taskStore'
 import { useTodoStore } from '../../todo/store/todoStore'
 import { useHabitStore } from '../../habits/store/habitStore'
 import { useGithubStore } from '../../projects/store/githubStore'
+import { useCalendarStore } from '../../calendar/store/calendarStore'
+import { UpcomingMeetings, fmtEventTime } from '../../calendar/components/UpcomingMeetings'
 import { priorityDef } from '../../todo/constants'
 import { localDateStr, localDayStartISO, localDayEndISO } from '../../../utils/dates'
 import flights from '../../travel/mock/flights.json'
@@ -18,6 +20,7 @@ export function HomePage(): React.ReactElement {
   const { todos, refresh: refreshTodos } = useTodoStore()
   const { habits, isDone, refresh: refreshHabits } = useHabitStore()
   const { issues, refresh: refreshIssues } = useGithubStore()
+  const { upcoming, refresh: refreshEvents } = useCalendarStore()
   const [weekMinutes, setWeekMinutes] = useState(0)
 
   useEffect(() => {
@@ -25,6 +28,7 @@ export function HomePage(): React.ReactElement {
     refreshTodos()
     refreshHabits()
     refreshIssues()
+    refreshEvents()
 
     const now = new Date()
     const monday = new Date(now)
@@ -72,6 +76,11 @@ export function HomePage(): React.ReactElement {
           ) : (
             <div className="empty-hint" style={{ padding: 12 }}>Nenhuma tarefa ativa.</div>
           )}
+          {upcoming[0] && (
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-secondary)' }}>
+              Próxima reunião: <strong>{upcoming[0].title}</strong> — {fmtEventTime(upcoming[0].startTime)}
+            </div>
+          )}
         </div>
 
         <div className="chart-section">
@@ -101,6 +110,11 @@ export function HomePage(): React.ReactElement {
             {habits.length === 0 && <div className="empty-hint">Nenhum hábito cadastrado.</div>}
           </div>
         </div>
+      </div>
+
+      {/* ── Próximas reuniões ── */}
+      <div style={{ marginTop: 12 }}>
+        <UpcomingMeetings />
       </div>
 
       {/* ── Esta semana ── */}

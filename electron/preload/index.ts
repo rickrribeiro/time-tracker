@@ -107,6 +107,14 @@ const api = {
     getIssues: () => ipcRenderer.invoke('github:getIssues'),
     sync: () => ipcRenderer.invoke('github:sync')
   },
+  // Calendar
+  calendar: {
+    upcoming: (fromISO: string, limit: number) => ipcRenderer.invoke('calendar:upcoming', fromISO, limit),
+    range: (startISO: string, endISO: string) => ipcRenderer.invoke('calendar:range', startISO, endISO),
+    create: (title: string, startTime: string, endTime: string | null, location: string | null) =>
+      ipcRenderer.invoke('calendar:create', title, startTime, endTime, location),
+    delete: (id: number) => ipcRenderer.invoke('calendar:delete', id)
+  },
   // Events (main → renderer)
   on: {
     quickCapture: (cb: () => void) => {

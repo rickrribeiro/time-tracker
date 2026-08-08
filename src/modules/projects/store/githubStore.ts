@@ -22,6 +22,13 @@ export function columnFor(issue: GithubIssue): BoardColumn {
   return 'backlog'
 }
 
+/** Extract "owner/name" from a GitHub repo URL (to match against issue.repo). */
+export function repoFromUrl(url: string | null): string | null {
+  if (!url) return null
+  const m = url.match(/github\.com[/:]([^/]+\/[^/#?]+?)(?:\.git)?\/?$/i)
+  return m ? m[1] : null
+}
+
 export function parseLabels(issue: GithubIssue): string[] {
   if (!issue.labels) return []
   try {

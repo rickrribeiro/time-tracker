@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { GithubIssue } from '../../../types'
-import { useGithubStore, columnFor, parseLabels, BoardColumn } from '../store/githubStore'
+import { useGithubStore, columnFor, parseLabels, repoFromUrl, BoardColumn } from '../store/githubStore'
+import { useProjectStore } from '../store/projectStore'
 
 const COLUMNS: { key: BoardColumn; label: string }[] = [
   { key: 'backlog', label: 'Backlog' },
@@ -36,10 +37,23 @@ function IssueCard({ issue }: { issue: GithubIssue }): React.ReactElement {
 
 export function IssuesPage(): React.ReactElement {
   const { issues, refresh, sync, syncing, error, lastCount } = useGithubStore()
+  const { projects, refresh: refreshProjects } = useProjectStore()
+  const [projectFilter, setProjectFilter] = useState<number | 'all'>('all')
 
   useEffect(() => {
     refresh()
+    refreshProjects()
   }, [])
+
+  // Projects that carry a resolvable GitHub repo can filter the board.
+  const linkable = projects
+    .map((p) => ({ p, repo: repoFromUrl(p.githubRepoUrl) }))
+    .filter((x) => x.repo)
+  const selectedRepo =
+    projectFilter === 'all' ? null : linkable.find((x) => x.p.id === projectFilter)?.repo ?? null
+  const visible = selectedRepo
+    ? issues.filter((i) => i.repo.toLowerCase() === selectedRepo.toLowerCase())
+    : issues
 
   const grouped: Record<BoardColumn, GithubIssue[]> = {
     backlog: [],
@@ -47,7 +61,7 @@ export function IssuesPage(): React.ReactElement {
     blocked: [],
     done: []
   }
-  for (const i of issues) grouped[columnFor(i)].push(i)
+  for (const i of visible) grouped[columnFor(i)].push(i)
 
   return (
     <div className="module-page">
@@ -58,9 +72,24 @@ export function IssuesPage(): React.ReactElement {
             Issues atribuídas a você no GitHub (somente leitura).
           </p>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={sync} disabled={syncing}>
-          {syncing ? 'Sincronizando…' : '🔄 Sincronizar'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {linkable.length > 0 && (
+            <select
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            >
+              <option value="all">Todos os projetos</option>
+              {linkable.map((x) => (
+                <option key={x.p.id} value={x.p.id}>
+                  {x.p.name} ({x.repo})
+                </option>
+              ))}
+            </select>
+          )}
+          <button className="btn btn-primary btn-sm" onClick={sync} disabled={syncing}>
+            {syncing ? 'Sincronizando…' : '🔄 Sincronizar'}
+          </button>
+        </div>
       </div>
 
       {error && <div className="empty-hint" style={{ color: 'var(--danger)' }}>{error}</div>}
@@ -72,7 +101,11 @@ export function IssuesPage(): React.ReactElement {
         </div>
       )}
 
-      {issues.length > 0 && (
+      {issues.length > 0 && visible.length === 0 && (
+        <div className="empty-hint">Nenhuma issue para o projeto selecionado.</div>
+      )}
+
+      {visible.length > 0 && (
         <div className="kanban-board">
           {COLUMNS.map((col) => (
             <div key={col.key} className="kanban-column">

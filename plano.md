@@ -67,7 +67,7 @@ Feito:
 Restante / melhorias:
 - [x] Sync **incremental** por `updated_at`: 1ª sync = full replace; seguintes passam `since=<último sync>` e fazem merge (upsert), preservando histórico. `github_last_sync` em settings.
 - [x] Guardar token com `safeStorage` do Electron (feito na seção Técnico/higiene — `services/secrets.ts`).
-- [ ] Vincular issues ↔ projeto (hoje o Kanban lista todas as issues atribuídas, não filtra por projeto).
+- [x] Vincular issues ↔ projeto: filtro do Kanban por projeto (casa `issue.repo` com o `githubRepoUrl` do projeto via `repoFromUrl`).
 - [ ] Paginação (>100 issues).
 
 > ⚠️ Requer o usuário colar um **Personal Access Token (classic, escopo `repo`)** em Configurações para funcionar. Sem token, o Kanban mostra estado vazio com instruções.

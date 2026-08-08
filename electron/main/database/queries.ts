@@ -551,6 +551,24 @@ export async function createHabit(
   return getOne<DbHabit>(db, 'SELECT * FROM habits WHERE id = ?', [id])!
 }
 
+export async function updateHabit(
+  id: number,
+  name: string,
+  frequency: string,
+  target: number,
+  active: number
+): Promise<DbHabit> {
+  const db = await getDb()
+  run(db, 'UPDATE habits SET name = ?, frequency = ?, target = ?, active = ? WHERE id = ?', [
+    name,
+    frequency,
+    target,
+    active,
+    id
+  ])
+  return getOne<DbHabit>(db, 'SELECT * FROM habits WHERE id = ?', [id])!
+}
+
 export async function deleteHabit(id: number): Promise<void> {
   const db = await getDb()
   run(db, 'DELETE FROM habits WHERE id = ?', [id])
@@ -559,6 +577,18 @@ export async function deleteHabit(id: number): Promise<void> {
 export async function getHabitEntries(date: string): Promise<DbHabitEntry[]> {
   const db = await getDb()
   return getAll<DbHabitEntry>(db, 'SELECT * FROM habit_entries WHERE date = ?', [date])
+}
+
+export async function getHabitEntriesForRange(
+  startDate: string,
+  endDate: string
+): Promise<DbHabitEntry[]> {
+  const db = await getDb()
+  return getAll<DbHabitEntry>(
+    db,
+    'SELECT * FROM habit_entries WHERE date >= ? AND date <= ? AND completed = 1',
+    [startDate, endDate]
+  )
 }
 
 export async function toggleHabitEntry(

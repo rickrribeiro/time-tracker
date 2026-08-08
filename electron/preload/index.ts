@@ -87,8 +87,12 @@ const api = {
     getAll: () => ipcRenderer.invoke('habits:getAll'),
     create: (name: string, frequency: string, target: number) =>
       ipcRenderer.invoke('habits:create', name, frequency, target),
+    update: (id: number, name: string, frequency: string, target: number, active: number) =>
+      ipcRenderer.invoke('habits:update', id, name, frequency, target, active),
     delete: (id: number) => ipcRenderer.invoke('habits:delete', id),
     getEntries: (date: string) => ipcRenderer.invoke('habits:getEntries', date),
+    getEntriesRange: (startDate: string, endDate: string) =>
+      ipcRenderer.invoke('habits:getEntriesRange', startDate, endDate),
     toggleEntry: (habitId: number, date: string, completed: number) =>
       ipcRenderer.invoke('habits:toggleEntry', habitId, date, completed)
   },

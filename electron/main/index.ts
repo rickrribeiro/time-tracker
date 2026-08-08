@@ -29,8 +29,10 @@ import {
   deleteProject,
   getHabits,
   createHabit,
+  updateHabit,
   deleteHabit,
   getHabitEntries,
+  getHabitEntriesForRange,
   toggleHabitEntry,
   getSetting,
   setSetting,
@@ -228,9 +230,19 @@ ipcMain.handle('habits:create', (_, name: string, frequency: string, target: num
   createHabit(name, frequency, target)
 )
 
+ipcMain.handle(
+  'habits:update',
+  (_, id: number, name: string, frequency: string, target: number, active: number) =>
+    updateHabit(id, name, frequency, target, active)
+)
+
 ipcMain.handle('habits:delete', (_, id: number) => deleteHabit(id))
 
 ipcMain.handle('habits:getEntries', (_, date: string) => getHabitEntries(date))
+
+ipcMain.handle('habits:getEntriesRange', (_, startDate: string, endDate: string) =>
+  getHabitEntriesForRange(startDate, endDate)
+)
 
 ipcMain.handle('habits:toggleEntry', (_, habitId: number, date: string, completed: number) =>
   toggleHabitEntry(habitId, date, completed)

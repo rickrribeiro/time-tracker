@@ -86,16 +86,16 @@ Restante (cablear quando os módulos entrarem):
 - [ ] Gastos do mês (depende de Finanças #6).
 - [ ] Próxima viagem real (depende de Viagens #7).
 
-## 4. Hábitos  *(prioridade #4)*
+## 4. Hábitos  *(prioridade #4 — FEITO)*
 
 **Fundação:** tabelas `habits`/`habit_entries` + CRUD + toggle diário já existem.
 
-Próximos passos:
-- [ ] Streak real (sequência de dias) e taxa semanal por hábito.
-- [ ] Frequência/target além de diário (semanal, X vezes por semana).
-- [ ] Grade semanal/mensal (heatmap por hábito).
-- [ ] Hábitos padrão sugeridos (academia, japonês, meditar, dormir <00:00, sem álcool, revisar TODO).
-- [ ] Editar hábito (nome, frequência, ativo/inativo).
+Feito:
+- [x] **Streak** (sequência de dias) e **taxa semanal** (x/7) por hábito — via `getHabitEntriesRange`.
+- [x] Frequência/target (diária/semanal + meta) editáveis.
+- [x] **Grade de 7 dias** (heatmap) por hábito.
+- [x] Hábitos padrão sugeridos (academia, japonês, meditar, dormir <00:00, sem álcool, revisar TODO).
+- [x] Editar hábito (nome, frequência, meta, ativo/inativo).
 
 ## 5. Calendário (Google Calendar — leitura)  *(prioridade #5)*
 

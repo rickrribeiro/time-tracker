@@ -201,8 +201,10 @@ declare global {
       habits: {
         getAll: () => Promise<Habit[]>
         create: (name: string, frequency: string, target: number) => Promise<Habit>
+        update: (id: number, name: string, frequency: string, target: number, active: number) => Promise<Habit>
         delete: (id: number) => Promise<void>
         getEntries: (date: string) => Promise<HabitEntry[]>
+        getEntriesRange: (startDate: string, endDate: string) => Promise<HabitEntry[]>
         toggleEntry: (habitId: number, date: string, completed: number) => Promise<void>
       }
       settings: {

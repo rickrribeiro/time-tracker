@@ -1,4 +1,4 @@
-import { getSetting, replaceGithubIssues, DbGithubIssue } from '../database/queries'
+import { getSetting, setSetting, replaceGithubIssues, upsertGithubIssues, DbGithubIssue } from '../database/queries'
 import { decodeSecret } from './secrets'
 
 const GITHUB_API = 'https://api.github.com'
@@ -31,10 +31,27 @@ function labelNames(labels: GithubApiIssue['labels']): string[] {
   return labels.map((l) => (typeof l === 'string' ? l : l.name)).filter(Boolean)
 }
 
+function mapIssue(i: GithubApiIssue): DbGithubIssue {
+  return {
+    id: i.id,
+    number: i.number,
+    title: i.title,
+    state: i.state,
+    repo: repoFromIssue(i),
+    url: i.html_url ?? null,
+    labels: JSON.stringify(labelNames(i.labels ?? [])),
+    milestone: i.milestone?.title ?? null,
+    updatedAt: i.updated_at ?? null
+  }
+}
+
 /**
- * Sync issues assigned to the authenticated user (open + closed, recent).
+ * Sync issues assigned to the authenticated user.
+ * Incremental: the first sync fetches everything (full replace); later syncs pass
+ * `since=<last sync>` and merge only the issues changed since then (upsert), keeping
+ * history. `github_last_sync` is stored in settings.
  * Reads the token from settings. Throws a clear error if unconfigured or on API failure.
- * Returns the number of issues synced.
+ * Returns the number of issues fetched this run.
  */
 export async function syncGithubIssues(): Promise<number> {
   const token = decodeSecret(await getSetting('github_token'))
@@ -42,7 +59,12 @@ export async function syncGithubIssues(): Promise<number> {
     throw new Error('GitHub token não configurado. Vá em Configurações e adicione um token.')
   }
 
-  const res = await fetch(`${GITHUB_API}/issues?filter=assigned&state=all&per_page=100&sort=updated`, {
+  const lastSync = await getSetting('github_last_sync')
+  const full = !lastSync
+  let url = `${GITHUB_API}/issues?filter=assigned&state=all&per_page=100&sort=updated`
+  if (!full) url += `&since=${encodeURIComponent(lastSync as string)}`
+
+  const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/vnd.github+json',
@@ -58,21 +80,14 @@ export async function syncGithubIssues(): Promise<number> {
   }
 
   const data = (await res.json()) as GithubApiIssue[]
-  const issues: DbGithubIssue[] = data
+  const issues = data
     // the /issues endpoint can include PRs; the search fields differ — keep true issues only
     .filter((i) => typeof i.number === 'number' && typeof i.id === 'number')
-    .map((i) => ({
-      id: i.id,
-      number: i.number,
-      title: i.title,
-      state: i.state,
-      repo: repoFromIssue(i),
-      url: i.html_url ?? null,
-      labels: JSON.stringify(labelNames(i.labels ?? [])),
-      milestone: i.milestone?.title ?? null,
-      updatedAt: i.updated_at ?? null
-    }))
+    .map(mapIssue)
 
-  await replaceGithubIssues(issues)
+  if (full) await replaceGithubIssues(issues)
+  else await upsertGithubIssues(issues)
+
+  await setSetting('github_last_sync', new Date().toISOString())
   return issues.length
 }

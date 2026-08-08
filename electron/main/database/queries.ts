@@ -664,6 +664,19 @@ export async function replaceGithubIssues(issues: DbGithubIssue[]): Promise<void
   }
 }
 
+/** Incremental merge: insert new issues and update changed ones (keyed on GitHub id). */
+export async function upsertGithubIssues(issues: DbGithubIssue[]): Promise<void> {
+  const db = await getDb()
+  for (const i of issues) {
+    run(
+      db,
+      `INSERT OR REPLACE INTO github_issues (id, number, title, state, repo, url, labels, milestone, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [i.id, i.number, i.title, i.state, i.repo, i.url, i.labels, i.milestone, i.updatedAt]
+    )
+  }
+}
+
 // ── Calendar events ─────────────────────────────────────────────────────────────
 
 export interface DbCalendarEvent {

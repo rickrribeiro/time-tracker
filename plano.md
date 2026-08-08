@@ -65,8 +65,8 @@ Feito:
 - [x] **Projetos** virou categoria própria no sidebar (Projetos + Issues).
 
 Restante / melhorias:
-- [ ] Sync **incremental** por `updated_at` (hoje é full-replace de até 100 issues).
-- [ ] Guardar token com `safeStorage` do Electron (hoje é texto no `.db` local).
+- [x] Sync **incremental** por `updated_at`: 1ª sync = full replace; seguintes passam `since=<último sync>` e fazem merge (upsert), preservando histórico. `github_last_sync` em settings.
+- [x] Guardar token com `safeStorage` do Electron (feito na seção Técnico/higiene — `services/secrets.ts`).
 - [ ] Vincular issues ↔ projeto (hoje o Kanban lista todas as issues atribuídas, não filtra por projeto).
 - [ ] Paginação (>100 issues).
 

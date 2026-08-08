@@ -7,6 +7,49 @@ import { SCHEMA } from './schema'
 let db: Database | null = null
 let dbPath: string
 
+/**
+ * Lightweight migration runner keyed on `PRAGMA user_version`.
+ * `SCHEMA` (CREATE TABLE IF NOT EXISTS) handles fresh databases; migrations
+ * below carry schema changes to tables that already exist in older databases.
+ * Each `run` must be idempotent (guarded) so re-runs are safe.
+ */
+interface Migration {
+  version: number
+  label: string
+  run: (db: Database) => void
+}
+
+const MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    label: 'tasks.secondaryTagId',
+    run: (db) => {
+      try {
+        db.run('ALTER TABLE tasks ADD COLUMN secondaryTagId INTEGER REFERENCES tags(id) ON DELETE SET NULL;')
+      } catch {
+        // column already exists
+      }
+    }
+  }
+]
+
+function getUserVersion(database: Database): number {
+  const res = database.exec('PRAGMA user_version')
+  const v = res[0]?.values?.[0]?.[0]
+  return typeof v === 'number' ? v : 0
+}
+
+function runMigrations(database: Database): void {
+  const current = getUserVersion(database)
+  const target = MIGRATIONS.reduce((max, m) => Math.max(max, m.version), 0)
+  if (current >= target) return
+  for (const m of MIGRATIONS) {
+    if (m.version > current) m.run(database)
+  }
+  // target is derived from our own literal array → safe to inline (PRAGMA can't bind params)
+  database.run(`PRAGMA user_version = ${target}`)
+}
+
 export async function getDb(): Promise<Database> {
   if (db) return db
 
@@ -29,13 +72,7 @@ export async function getDb(): Promise<Database> {
 
   db.run('PRAGMA foreign_keys = ON;')
   db.run(SCHEMA)
-
-  // Migration: Add secondaryTagId to tasks if it doesn't exist
-  try {
-    db.run('ALTER TABLE tasks ADD COLUMN secondaryTagId INTEGER REFERENCES tags(id) ON DELETE SET NULL;')
-  } catch (e) {
-    // Column likely already exists
-  }
+  runMigrations(db)
 
   saveDb()
 

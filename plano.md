@@ -166,7 +166,7 @@ Restante / melhorias:
 
 ## 🛠 Técnico / higiene
 
-- [ ] Sistema de migração leve (hoje é `CREATE TABLE IF NOT EXISTS` + `ALTER` em try/catch no `db.ts`) — avaliar quando colunas mudarem muito.
+- [x] Sistema de migração leve baseado em `PRAGMA user_version` no `db.ts` (array `MIGRATIONS`, cada uma idempotente). O `ALTER` de `secondaryTagId` virou a migração v1.
 - [ ] Persistir configurações (tokens GitHub/Google) — tabela `settings` ou arquivo em `userData`.
 - [ ] Mover time-tracker existente para `src/modules/timetracker/` quando o WIP estabilizar (opcional).
 - [ ] Overflow/scroll da sidebar já tratado; revisar responsividade com muitos itens.

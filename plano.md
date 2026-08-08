@@ -143,10 +143,17 @@ Restante / melhorias:
 - [ ] Persistir checklist de documentos por viagem.
 - [ ] Recomendações geradas por IA (ver #8).
 
-## 8. IA local (Claude Code CLI)  *(prioridade #8)*
+## 8. IA local (Claude Code CLI)  *(prioridade #8 — FEITO)*
 
-- [ ] `src/modules/ai/services/claude.ts` — executar `claude -p "..."` via `child_process` (nada em API paga direta).
-- [ ] Casos de uso: roteiro de viagem, checklist, resumo semanal, priorização de tarefas, revisão da inbox, planejamento da semana.
+Feito:
+- [x] `electron/main/services/claude.ts` — executa `claude -p "<prompt>"` via `spawn` (sem shell, sem injeção), PATH aumentado (acha `claude` em /opt/homebrew/bin etc.), timeout 120s, erro amigável se não instalado.
+- [x] IPC `ai:run` + `ai.run` no preload/types.
+- [x] Página **IA** com ações rápidas que usam dados reais do app: **Priorizar tarefas**, **Revisar inbox**, **Planejar a semana**, **Roteiro de viagem** + prompt livre e área de resposta.
+
+Restante / melhorias:
+- [ ] Streaming da resposta (hoje retorna tudo ao final).
+- [ ] Escolher modelo / `--model`.
+- [ ] Mais ações (resumo semanal com horas do tracker, checklist de viagem).
 
 ---
 

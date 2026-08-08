@@ -109,6 +109,10 @@ const api = {
     create: (tripId, origin, destination, price, currency) => electron.ipcRenderer.invoke("flights:create", tripId, origin, destination, price, currency),
     delete: (id) => electron.ipcRenderer.invoke("flights:delete", id)
   },
+  // AI (Claude CLI)
+  ai: {
+    run: (prompt) => electron.ipcRenderer.invoke("ai:run", prompt)
+  },
   // Events (main → renderer)
   on: {
     quickCapture: (cb) => {

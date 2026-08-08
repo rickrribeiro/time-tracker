@@ -25,6 +25,8 @@ const electron = require("electron");
 const path = require("path");
 const fs = require("fs");
 const initSqlJs = require("sql.js");
+const child_process = require("child_process");
+const os = require("os");
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -856,6 +858,65 @@ async function syncGithubIssues() {
   await replaceGithubIssues(issues);
   return issues.length;
 }
+const TIMEOUT_MS = 12e4;
+function buildPath() {
+  const home = os.homedir();
+  const extra = [
+    "/usr/local/bin",
+    "/opt/homebrew/bin",
+    "/usr/bin",
+    path.join(home, ".claude", "local"),
+    path.join(home, ".npm-global", "bin"),
+    path.join(home, ".local", "bin")
+  ];
+  return [process.env.PATH || "", ...extra].join(path.delimiter);
+}
+function runClaude(prompt) {
+  return new Promise((resolve, reject) => {
+    if (!prompt.trim()) {
+      reject(new Error("Prompt vazio."));
+      return;
+    }
+    const child = child_process.spawn("claude", ["-p", prompt], {
+      env: { ...process.env, PATH: buildPath() }
+    });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill("SIGKILL");
+      reject(new Error("Tempo esgotado (120s) executando o Claude CLI."));
+    }, TIMEOUT_MS);
+    child.stdout.on("data", (d) => stdout += d.toString());
+    child.stderr.on("data", (d) => stderr += d.toString());
+    child.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (err.code === "ENOENT") {
+        reject(
+          new Error(
+            "Claude CLI não encontrado. Instale o Claude Code e garanta que `claude` está no PATH."
+          )
+        );
+      } else {
+        reject(err);
+      }
+    });
+    child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve(stdout.trim());
+      } else {
+        reject(new Error(stderr.trim() || `Claude CLI saiu com código ${code}.`));
+      }
+    });
+  });
+}
 function createWindow() {
   const win = new electron.BrowserWindow({
     width: 1280,
@@ -1046,6 +1107,7 @@ electron.ipcMain.handle(
   (_, tripId, origin, destination, price, currency) => createFlightWatch(tripId, origin, destination, price, currency, (/* @__PURE__ */ new Date()).toISOString())
 );
 electron.ipcMain.handle("flights:delete", (_, id) => deleteFlightWatch(id));
+electron.ipcMain.handle("ai:run", (_, prompt) => runClaude(prompt));
 electron.ipcMain.handle("app:openExternal", (_, url) => electron.shell.openExternal(url));
 electron.ipcMain.handle("app:exportDb", async () => {
   saveDb();

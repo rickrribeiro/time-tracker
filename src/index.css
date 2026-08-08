@@ -1629,3 +1629,18 @@ select:focus {
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
 }
+
+/* ── AI output ───────────────────────────────────────────────────────────────── */
+
+.ai-output {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  max-height: 420px;
+  overflow-y: auto;
+  user-select: text;
+}

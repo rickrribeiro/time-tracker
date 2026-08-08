@@ -69,6 +69,7 @@ import {
 } from './database/queries'
 import type { DbTransaction } from './database/queries'
 import { syncGithubIssues } from './services/github'
+import { runClaude } from './services/claude'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -347,6 +348,10 @@ ipcMain.handle('flights:create', (_, tripId: number | null, origin: string | nul
   createFlightWatch(tripId, origin, destination, price, currency, new Date().toISOString())
 )
 ipcMain.handle('flights:delete', (_, id: number) => deleteFlightWatch(id))
+
+// ── IPC: AI (Claude CLI) ──────────────────────────────────────────────────────
+
+ipcMain.handle('ai:run', (_, prompt: string) => runClaude(prompt))
 
 // ── IPC: App ──────────────────────────────────────────────────────────────────
 

@@ -184,6 +184,8 @@ export type Page =
   | 'destinations'
   | 'documents'
   | 'recommendations'
+  // IA
+  | 'ai'
   // Configurações
   | 'settings'
 
@@ -329,6 +331,9 @@ declare global {
         getAll: () => Promise<FlightWatch[]>
         create: (tripId: number | null, origin: string | null, destination: string | null, price: number | null, currency: string) => Promise<FlightWatch>
         delete: (id: number) => Promise<void>
+      }
+      ai: {
+        run: (prompt: string) => Promise<string>
       }
       on: {
         quickCapture: (cb: () => void) => () => void

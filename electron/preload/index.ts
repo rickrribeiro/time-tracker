@@ -159,6 +159,10 @@ const api = {
       ipcRenderer.invoke('flights:create', tripId, origin, destination, price, currency),
     delete: (id: number) => ipcRenderer.invoke('flights:delete', id)
   },
+  // AI (Claude CLI)
+  ai: {
+    run: (prompt: string) => ipcRenderer.invoke('ai:run', prompt)
+  },
   // Events (main → renderer)
   on: {
     quickCapture: (cb: () => void) => {

@@ -54,11 +54,130 @@ const SCHEMA = `
     date TEXT PRIMARY KEY,
     isWorkDay INTEGER NOT NULL DEFAULT 0
   );
+
+  -- ── RickOS: Organização ──────────────────────────────────────────────
+  CREATE TABLE IF NOT EXISTS projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    githubRepoUrl TEXT,
+    color TEXT NOT NULL DEFAULT '#6366f1',
+    archived INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS todos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'inbox',   -- inbox | todo | doing | done
+    priority INTEGER NOT NULL DEFAULT 0,
+    dueDate TEXT,
+    projectId INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+    source TEXT NOT NULL DEFAULT 'manual',  -- manual | quick-capture | github
+    createdAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS habits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    frequency TEXT NOT NULL DEFAULT 'daily',
+    target INTEGER NOT NULL DEFAULT 1,
+    active INTEGER NOT NULL DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS habit_entries (
+    habitId INTEGER NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    completed INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (habitId, date)
+  );
+
+  -- ── RickOS: Finanças ─────────────────────────────────────────────────
+  CREATE TABLE IF NOT EXISTS accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'BRL',
+    balance REAL NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'expense',   -- income | expense
+    color TEXT NOT NULL DEFAULT '#6366f1'
+  );
+
+  CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    accountId INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+    categoryId INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+    amount REAL NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'BRL',
+    type TEXT NOT NULL DEFAULT 'expense',   -- income | expense
+    description TEXT,
+    date TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS budgets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    categoryId INTEGER REFERENCES categories(id) ON DELETE CASCADE,
+    month TEXT NOT NULL,
+    amount REAL NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS investments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT,
+    amount REAL NOT NULL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT 'BRL'
+  );
+
+  -- ── RickOS: Viagens ──────────────────────────────────────────────────
+  CREATE TABLE IF NOT EXISTS trips (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    origin TEXT,
+    destination TEXT NOT NULL,
+    startDate TEXT,
+    endDate TEXT,
+    budget REAL,
+    currency TEXT NOT NULL DEFAULT 'BRL',
+    status TEXT NOT NULL DEFAULT 'planned'
+  );
+
+  CREATE TABLE IF NOT EXISTS flight_watches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tripId INTEGER REFERENCES trips(id) ON DELETE CASCADE,
+    origin TEXT,
+    destination TEXT,
+    price REAL,
+    currency TEXT NOT NULL DEFAULT 'JPY',
+    lastChecked TEXT
+  );
+
+  -- ── RickOS: Settings & integrações ───────────────────────────────────
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS github_issues (
+    id INTEGER PRIMARY KEY,          -- GitHub's global issue id
+    number INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    state TEXT NOT NULL,             -- open | closed
+    repo TEXT NOT NULL,              -- owner/name
+    url TEXT,
+    labels TEXT,                     -- JSON array of label names
+    milestone TEXT,
+    updatedAt TEXT
+  );
 `;
 let db = null;
 let dbPath;
 async function getDb() {
-  if (db) return db;
+  if (db)
+    return db;
   dbPath = path.join(electron.app.getPath("userData"), "timetracker.db");
   const sqlJsModulePath = require.resolve("sql.js");
   const wasmPath = path.join(path.dirname(sqlJsModulePath), "sql-wasm.wasm");
@@ -81,7 +200,8 @@ async function getDb() {
   return db;
 }
 function saveDb() {
-  if (!db || !dbPath) return;
+  if (!db || !dbPath)
+    return;
   const data = db.export();
   fs.writeFileSync(dbPath, Buffer.from(data));
 }
@@ -94,7 +214,8 @@ function closeDb() {
 }
 function getOne(db2, sql, params = []) {
   const stmt = db2.prepare(sql);
-  if (params.length) stmt.bind(params);
+  if (params.length)
+    stmt.bind(params);
   if (stmt.step()) {
     const obj = stmt.getAsObject();
     stmt.free();
@@ -105,7 +226,8 @@ function getOne(db2, sql, params = []) {
 }
 function getAll(db2, sql, params = []) {
   const stmt = db2.prepare(sql);
-  if (params.length) stmt.bind(params);
+  if (params.length)
+    stmt.bind(params);
   const rows = [];
   while (stmt.step()) {
     rows.push(stmt.getAsObject());
@@ -165,30 +287,20 @@ const TASK_WITH_TAG_SQL = `
 `;
 async function getTasksForRange(startDate, endDate) {
   const db2 = await getDb();
-  return getAll(
-    db2,
-    `${TASK_WITH_TAG_SQL}
+  return getAll(db2, `${TASK_WITH_TAG_SQL}
      WHERE t.startTime >= ? AND t.startTime < ?
-     ORDER BY t.startTime ASC`,
-    [startDate, endDate]
-  );
+     ORDER BY t.startTime ASC`, [startDate, endDate]);
 }
 async function getAllTasks() {
   const db2 = await getDb();
-  return getAll(
-    db2,
-    `${TASK_WITH_TAG_SQL} ORDER BY t.startTime DESC`
-  );
+  return getAll(db2, `${TASK_WITH_TAG_SQL} ORDER BY t.startTime DESC`);
 }
 async function getActiveTask() {
   const db2 = await getDb();
-  return getOne(
-    db2,
-    `${TASK_WITH_TAG_SQL}
+  return getOne(db2, `${TASK_WITH_TAG_SQL}
      WHERE t.endTime IS NULL
      ORDER BY t.startTime DESC
-     LIMIT 1`
-  );
+     LIMIT 1`);
 }
 async function createTask(title, tagId, secondaryTagId, startTime, endTime = null) {
   const db2 = await getDb();
@@ -204,11 +316,7 @@ async function createTask(title, tagId, secondaryTagId, startTime, endTime = nul
 }
 async function updateTask(id, title, tagId, secondaryTagId, startTime, endTime) {
   const db2 = await getDb();
-  run(
-    db2,
-    "UPDATE tasks SET title = ?, tagId = ?, secondaryTagId = ?, startTime = ?, endTime = ? WHERE id = ?",
-    [title, tagId, secondaryTagId, startTime, endTime, id]
-  );
+  run(db2, "UPDATE tasks SET title = ?, tagId = ?, secondaryTagId = ?, startTime = ?, endTime = ? WHERE id = ?", [title, tagId, secondaryTagId, startTime, endTime, id]);
   return { id, title, tagId, secondaryTagId, startTime, endTime };
 }
 async function stopTask(id, endTime) {
@@ -223,69 +331,61 @@ async function stopAllActiveTasks(endTime) {
   const db2 = await getDb();
   run(db2, "UPDATE tasks SET endTime = ? WHERE endTime IS NULL", [endTime]);
 }
+function localDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 async function getDailyStats(startDate, endDate) {
   const db2 = await getDb();
-  return getAll(
-    db2,
-    `SELECT
-       substr(t.startTime, 1, 10) as date,
-       SUM(
-         CASE
-           WHEN t.endTime IS NOT NULL
-           THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
-           ELSE 0
-         END
-       ) as totalMinutes,
-       SUM(
-         CASE
-           WHEN tg.isProductive = 1 AND t.endTime IS NOT NULL
-           THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
-           ELSE 0
-         END
-       ) as productiveMinutes,
-       SUM(
-         CASE
-           WHEN tg.isProductive = 2 AND t.endTime IS NOT NULL
-           THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
-           ELSE 0
-         END
-       ) as semiProductiveMinutes,
-       SUM(
-         CASE
-           WHEN tg.isProductive = 3 AND t.endTime IS NOT NULL
-           THEN CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER)
-           ELSE 0
-         END
-       ) as productiveErosMinutes,
-       COALESCE(dc.isWorkDay, 0) as isWorkDay
+  const rows = getAll(db2, `SELECT t.startTime, t.endTime, tg.isProductive
      FROM tasks t
      LEFT JOIN tags tg ON t.tagId = tg.id
-     LEFT JOIN day_configs dc ON substr(t.startTime, 1, 10) = dc.date
-     WHERE t.startTime >= ? AND t.startTime < ?
-     GROUP BY substr(t.startTime, 1, 10)
-     
-     UNION ALL
-     
-     SELECT
-       date,
-       0 as totalMinutes,
-       0 as productiveMinutes,
-       0 as semiProductiveMinutes,
-       0 as productiveErosMinutes,
-       isWorkDay
-     FROM day_configs
-     WHERE date >= substr(?, 1, 10) AND date < substr(?, 1, 10)
-       AND date NOT IN (SELECT substr(startTime, 1, 10) FROM tasks WHERE startTime >= ? AND startTime < ?)
-
-     ORDER BY date ASC`,
-    [startDate, endDate, startDate, endDate, startDate, endDate]
-  );
+     WHERE t.startTime >= ? AND t.startTime < ?`, [startDate, endDate]);
+  const firstDay = localDateKey(new Date(startDate));
+  const lastDay = localDateKey(new Date(new Date(endDate).getTime() - 1));
+  const byDate = /* @__PURE__ */ new Map();
+  const bucket = (date) => {
+    let entry = byDate.get(date);
+    if (!entry) {
+      entry = {
+        date,
+        totalMinutes: 0,
+        productiveMinutes: 0,
+        semiProductiveMinutes: 0,
+        productiveErosMinutes: 0,
+        isWorkDay: 0
+      };
+      byDate.set(date, entry);
+    }
+    return entry;
+  };
+  for (const row of rows) {
+    const date = localDateKey(new Date(row.startTime));
+    if (date < firstDay || date > lastDay)
+      continue;
+    const entry = bucket(date);
+    if (!row.endTime)
+      continue;
+    const minutes = Math.trunc((new Date(row.endTime).getTime() - new Date(row.startTime).getTime()) / 6e4);
+    entry.totalMinutes += minutes;
+    if (row.isProductive === 1)
+      entry.productiveMinutes += minutes;
+    else if (row.isProductive === 2)
+      entry.semiProductiveMinutes += minutes;
+    else if (row.isProductive === 3)
+      entry.productiveErosMinutes += minutes;
+  }
+  const configs = getAll(db2, "SELECT date, isWorkDay FROM day_configs WHERE date >= ? AND date <= ?", [firstDay, lastDay]);
+  for (const config of configs) {
+    bucket(config.date).isWorkDay = config.isWorkDay;
+  }
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 async function getTagStats(startDate, endDate) {
   const db2 = await getDb();
-  return getAll(
-    db2,
-    `SELECT tagId, tagName, tagColor, isProductive, SUM(minutes) as totalMinutes
+  return getAll(db2, `SELECT tagId, tagName, tagColor, isProductive, SUM(minutes) as totalMinutes
      FROM (
        SELECT t.tagId, tg.name as tagName, tg.color as tagColor, tg.isProductive,
               CAST((julianday(t.endTime) - julianday(t.startTime)) * 24 * 60 AS INTEGER) as minutes
@@ -302,9 +402,7 @@ async function getTagStats(startDate, endDate) {
        WHERE t.endTime IS NOT NULL AND t.startTime >= ? AND t.startTime < ?
      )
      GROUP BY tagId
-     ORDER BY totalMinutes DESC`,
-    [startDate, endDate, startDate, endDate]
-  );
+     ORDER BY totalMinutes DESC`, [startDate, endDate, startDate, endDate]);
 }
 async function updateDayConfig(date, isWorkDay) {
   const db2 = await getDb();
@@ -314,16 +412,14 @@ async function fillGapsWithIdle(date) {
   const db2 = await getDb();
   const dayStart = `${date}T00:00:00.000Z`;
   const dayEnd = `${date}T23:59:59.999Z`;
-  const tasks = getAll(
-    db2,
-    `SELECT * FROM tasks WHERE startTime >= ? AND startTime <= ? ORDER BY startTime ASC`,
-    [dayStart, dayEnd]
-  );
-  if (tasks.length === 0) return;
+  const tasks = getAll(db2, `SELECT * FROM tasks WHERE startTime >= ? AND startTime <= ? ORDER BY startTime ASC`, [dayStart, dayEnd]);
+  if (tasks.length === 0)
+    return;
   for (let i = 0; i < tasks.length - 1; i++) {
     const current = tasks[i];
     const next = tasks[i + 1];
-    if (!current.endTime) continue;
+    if (!current.endTime)
+      continue;
     const gap = new Date(next.startTime).getTime() - new Date(current.endTime).getTime();
     if (gap > 6e4) {
       run(db2, "INSERT INTO tasks (title, tagId, startTime, endTime) VALUES (?, 1, ?, ?)", [
@@ -336,16 +432,14 @@ async function fillGapsWithIdle(date) {
   mergeConsecutiveSameTasksSync(db2);
 }
 function mergeConsecutiveSameTasksSync(db2) {
-  const tasks = getAll(
-    db2,
-    `SELECT * FROM tasks WHERE endTime IS NOT NULL ORDER BY startTime ASC`
-  );
+  const tasks = getAll(db2, `SELECT * FROM tasks WHERE endTime IS NOT NULL ORDER BY startTime ASC`);
   const toDelete = [];
   const toUpdate = [];
   for (let i = 0; i < tasks.length - 1; i++) {
     const current = tasks[i];
     const next = tasks[i + 1];
-    if (toDelete.includes(current.id)) continue;
+    if (toDelete.includes(current.id))
+      continue;
     if (current.title === next.title && current.tagId === next.tagId && current.endTime === next.startTime) {
       toUpdate.push({ id: current.id, endTime: next.endTime || current.endTime });
       toDelete.push(next.id);
@@ -357,6 +451,153 @@ function mergeConsecutiveSameTasksSync(db2) {
   for (const id of toDelete) {
     run(db2, "DELETE FROM tasks WHERE id = ?", [id]);
   }
+}
+async function getTodos(status) {
+  const db2 = await getDb();
+  if (status) {
+    return getAll(db2, "SELECT * FROM todos WHERE status = ? ORDER BY priority DESC, createdAt DESC", [status]);
+  }
+  return getAll(db2, "SELECT * FROM todos ORDER BY priority DESC, createdAt DESC");
+}
+async function createTodo(title, notes, status, source, priority = 0, dueDate = null, projectId = null) {
+  const db2 = await getDb();
+  const createdAt = (/* @__PURE__ */ new Date()).toISOString();
+  run(db2, "INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [title, notes, status, priority, dueDate, projectId, source, createdAt]);
+  const id = lastInsertId(db2);
+  return getOne(db2, "SELECT * FROM todos WHERE id = ?", [id]);
+}
+async function updateTodo(id, title, notes, status, priority, dueDate, projectId) {
+  const db2 = await getDb();
+  run(db2, "UPDATE todos SET title = ?, notes = ?, status = ?, priority = ?, dueDate = ?, projectId = ? WHERE id = ?", [title, notes, status, priority, dueDate, projectId, id]);
+  return getOne(db2, "SELECT * FROM todos WHERE id = ?", [id]);
+}
+async function deleteTodo(id) {
+  const db2 = await getDb();
+  run(db2, "DELETE FROM todos WHERE id = ?", [id]);
+}
+async function getProjects() {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM projects ORDER BY archived ASC, name ASC");
+}
+async function createProject(name, description, githubRepoUrl, color) {
+  const db2 = await getDb();
+  run(db2, "INSERT INTO projects (name, description, githubRepoUrl, color) VALUES (?, ?, ?, ?)", [name, description, githubRepoUrl, color]);
+  const id = lastInsertId(db2);
+  return getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
+}
+async function updateProject(id, name, description, githubRepoUrl, color, archived) {
+  const db2 = await getDb();
+  run(db2, "UPDATE projects SET name = ?, description = ?, githubRepoUrl = ?, color = ?, archived = ? WHERE id = ?", [name, description, githubRepoUrl, color, archived, id]);
+  return getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
+}
+async function deleteProject(id) {
+  const db2 = await getDb();
+  run(db2, "DELETE FROM projects WHERE id = ?", [id]);
+}
+async function getHabits() {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM habits ORDER BY id ASC");
+}
+async function createHabit(name, frequency, target) {
+  const db2 = await getDb();
+  run(db2, "INSERT INTO habits (name, frequency, target) VALUES (?, ?, ?)", [
+    name,
+    frequency,
+    target
+  ]);
+  const id = lastInsertId(db2);
+  return getOne(db2, "SELECT * FROM habits WHERE id = ?", [id]);
+}
+async function deleteHabit(id) {
+  const db2 = await getDb();
+  run(db2, "DELETE FROM habits WHERE id = ?", [id]);
+}
+async function getHabitEntries(date) {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM habit_entries WHERE date = ?", [date]);
+}
+async function toggleHabitEntry(habitId, date, completed) {
+  const db2 = await getDb();
+  run(db2, `INSERT INTO habit_entries (habitId, date, completed) VALUES (?, ?, ?)
+     ON CONFLICT(habitId, date) DO UPDATE SET completed = excluded.completed`, [habitId, date, completed]);
+}
+async function getSetting(key) {
+  const db2 = await getDb();
+  const row = getOne(db2, "SELECT value FROM settings WHERE key = ?", [key]);
+  return row ? row.value : null;
+}
+async function setSetting(key, value) {
+  const db2 = await getDb();
+  run(db2, `INSERT INTO settings (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [key, value]);
+}
+async function getAllSettings() {
+  const db2 = await getDb();
+  const rows = getAll(db2, "SELECT key, value FROM settings");
+  const out = {};
+  for (const r of rows)
+    out[r.key] = r.value;
+  return out;
+}
+async function getGithubIssues() {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM github_issues ORDER BY updatedAt DESC");
+}
+async function replaceGithubIssues(issues) {
+  const db2 = await getDb();
+  run(db2, "DELETE FROM github_issues");
+  for (const i of issues) {
+    run(db2, `INSERT INTO github_issues (id, number, title, state, repo, url, labels, milestone, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [i.id, i.number, i.title, i.state, i.repo, i.url, i.labels, i.milestone, i.updatedAt]);
+  }
+}
+const GITHUB_API = "https://api.github.com";
+function repoFromIssue(issue) {
+  if (issue.repository?.full_name)
+    return issue.repository.full_name;
+  if (issue.repository_url) {
+    const m = issue.repository_url.match(/repos\/(.+)$/);
+    if (m)
+      return m[1];
+  }
+  return "?";
+}
+function labelNames(labels) {
+  return labels.map((l) => typeof l === "string" ? l : l.name).filter(Boolean);
+}
+async function syncGithubIssues() {
+  const token = await getSetting("github_token");
+  if (!token) {
+    throw new Error("GitHub token não configurado. Vá em Configurações e adicione um token.");
+  }
+  const res = await fetch(`${GITHUB_API}/issues?filter=assigned&state=all&per_page=100&sort=updated`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "RickOS"
+    }
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    if (res.status === 401)
+      throw new Error("Token inválido ou expirado (401).");
+    throw new Error(`GitHub API falhou (${res.status}). ${body.slice(0, 140)}`);
+  }
+  const data = await res.json();
+  const issues = data.filter((i) => typeof i.number === "number" && typeof i.id === "number").map((i) => ({
+    id: i.id,
+    number: i.number,
+    title: i.title,
+    state: i.state,
+    repo: repoFromIssue(i),
+    url: i.html_url ?? null,
+    labels: JSON.stringify(labelNames(i.labels ?? [])),
+    milestone: i.milestone?.title ?? null,
+    updatedAt: i.updated_at ?? null
+  }));
+  await replaceGithubIssues(issues);
+  return issues.length;
 }
 function createWindow() {
   const win = new electron.BrowserWindow({
@@ -385,9 +626,20 @@ function createWindow() {
 }
 electron.app.whenReady().then(() => {
   createWindow();
+  electron.globalShortcut.register("CommandOrControl+Shift+Space", () => {
+    const win = electron.BrowserWindow.getAllWindows()[0];
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    win.webContents.send("quick-capture:open");
+  });
   electron.app.on("activate", () => {
     if (electron.BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+electron.app.on("will-quit", () => {
+  electron.globalShortcut.unregisterAll();
 });
 electron.app.on("window-all-closed", () => {
   closeDb();
@@ -441,6 +693,43 @@ electron.ipcMain.handle(
   "dayConfig:update",
   (_, date, isWorkDay) => updateDayConfig(date, isWorkDay)
 );
+electron.ipcMain.handle("todos:getAll", (_, status) => getTodos(status));
+electron.ipcMain.handle(
+  "todos:create",
+  (_, title, notes, status, source, priority, dueDate, projectId) => createTodo(title, notes, status, source, priority, dueDate, projectId)
+);
+electron.ipcMain.handle(
+  "todos:update",
+  (_, id, title, notes, status, priority, dueDate, projectId) => updateTodo(id, title, notes, status, priority, dueDate, projectId)
+);
+electron.ipcMain.handle("todos:delete", (_, id) => deleteTodo(id));
+electron.ipcMain.handle("projects:getAll", () => getProjects());
+electron.ipcMain.handle(
+  "projects:create",
+  (_, name, description, githubRepoUrl, color) => createProject(name, description, githubRepoUrl, color)
+);
+electron.ipcMain.handle(
+  "projects:update",
+  (_, id, name, description, githubRepoUrl, color, archived) => updateProject(id, name, description, githubRepoUrl, color, archived)
+);
+electron.ipcMain.handle("projects:delete", (_, id) => deleteProject(id));
+electron.ipcMain.handle("habits:getAll", () => getHabits());
+electron.ipcMain.handle(
+  "habits:create",
+  (_, name, frequency, target) => createHabit(name, frequency, target)
+);
+electron.ipcMain.handle("habits:delete", (_, id) => deleteHabit(id));
+electron.ipcMain.handle("habits:getEntries", (_, date) => getHabitEntries(date));
+electron.ipcMain.handle(
+  "habits:toggleEntry",
+  (_, habitId, date, completed) => toggleHabitEntry(habitId, date, completed)
+);
+electron.ipcMain.handle("settings:get", (_, key) => getSetting(key));
+electron.ipcMain.handle("settings:set", (_, key, value) => setSetting(key, value));
+electron.ipcMain.handle("settings:getAll", () => getAllSettings());
+electron.ipcMain.handle("github:getIssues", () => getGithubIssues());
+electron.ipcMain.handle("github:sync", () => syncGithubIssues());
+electron.ipcMain.handle("app:openExternal", (_, url) => electron.shell.openExternal(url));
 electron.ipcMain.handle("app:exportDb", async () => {
   saveDb();
   const dbPath2 = path.join(electron.app.getPath("userData"), "timetracker.db");

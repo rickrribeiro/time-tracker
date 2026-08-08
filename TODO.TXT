@@ -1,3 +1,9 @@
 botar "semi productive" pra hk e velt
 colocar banco de horas. calcular 8 por dia util. ver como fazer com fériados
 colocar o saldo do dia no calendario ex: +3, -2, etc...
+
+VER APLICAÇÃO DE GABRIEL, ADICIONAR O FINANCEIRO AQUI TB - EXPORTAR LA DO SHEETS E IMPROTAR AQ (PROCESSO REVERSO TB)
+
+integrar com calendario 
+
+integrar com ia para sugestoes

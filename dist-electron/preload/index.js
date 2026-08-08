@@ -28,10 +28,52 @@ const api = {
   dayConfig: {
     update: (date, isWorkDay) => electron.ipcRenderer.invoke("dayConfig:update", date, isWorkDay)
   },
+  // Todos (Inbox + TODO)
+  todos: {
+    getAll: (status) => electron.ipcRenderer.invoke("todos:getAll", status),
+    create: (title, notes, status, source, priority = 0, dueDate = null, projectId = null) => electron.ipcRenderer.invoke("todos:create", title, notes, status, source, priority, dueDate, projectId),
+    update: (id, title, notes, status, priority, dueDate, projectId) => electron.ipcRenderer.invoke("todos:update", id, title, notes, status, priority, dueDate, projectId),
+    delete: (id) => electron.ipcRenderer.invoke("todos:delete", id)
+  },
+  // Projects
+  projects: {
+    getAll: () => electron.ipcRenderer.invoke("projects:getAll"),
+    create: (name, description, githubRepoUrl, color) => electron.ipcRenderer.invoke("projects:create", name, description, githubRepoUrl, color),
+    update: (id, name, description, githubRepoUrl, color, archived) => electron.ipcRenderer.invoke("projects:update", id, name, description, githubRepoUrl, color, archived),
+    delete: (id) => electron.ipcRenderer.invoke("projects:delete", id)
+  },
+  // Habits
+  habits: {
+    getAll: () => electron.ipcRenderer.invoke("habits:getAll"),
+    create: (name, frequency, target) => electron.ipcRenderer.invoke("habits:create", name, frequency, target),
+    delete: (id) => electron.ipcRenderer.invoke("habits:delete", id),
+    getEntries: (date) => electron.ipcRenderer.invoke("habits:getEntries", date),
+    toggleEntry: (habitId, date, completed) => electron.ipcRenderer.invoke("habits:toggleEntry", habitId, date, completed)
+  },
+  // Settings (key-value)
+  settings: {
+    get: (key) => electron.ipcRenderer.invoke("settings:get", key),
+    set: (key, value) => electron.ipcRenderer.invoke("settings:set", key, value),
+    getAll: () => electron.ipcRenderer.invoke("settings:getAll")
+  },
+  // GitHub
+  github: {
+    getIssues: () => electron.ipcRenderer.invoke("github:getIssues"),
+    sync: () => electron.ipcRenderer.invoke("github:sync")
+  },
+  // Events (main → renderer)
+  on: {
+    quickCapture: (cb) => {
+      const listener = () => cb();
+      electron.ipcRenderer.on("quick-capture:open", listener);
+      return () => electron.ipcRenderer.removeListener("quick-capture:open", listener);
+    }
+  },
   // App
   app: {
     exportDb: () => electron.ipcRenderer.invoke("app:exportDb"),
-    importDb: () => electron.ipcRenderer.invoke("app:importDb")
+    importDb: () => electron.ipcRenderer.invoke("app:importDb"),
+    openExternal: (url) => electron.ipcRenderer.invoke("app:openExternal", url)
   }
 };
 electron.contextBridge.exposeInMainWorld("api", api);

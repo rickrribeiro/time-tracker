@@ -1,0 +1,16 @@
+[
+  {
+    "origin": "Osaka",
+    "destination": "Kumamoto",
+    "price": 8200,
+    "currency": "JPY",
+    "lastChecked": "2026-08-08T10:00:00Z"
+  },
+  {
+    "origin": "São Paulo",
+    "destination": "Tokyo",
+    "price": 4800,
+    "currency": "BRL",
+    "lastChecked": "2026-08-08T10:00:00Z"
+  }
+]

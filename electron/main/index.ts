@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
 import { closeDb, saveDb } from './database/db'
@@ -18,8 +18,26 @@ import {
   getDailyStats,
   getTagStats,
   fillGapsWithIdle,
-  updateDayConfig
+  updateDayConfig,
+  getTodos,
+  createTodo,
+  updateTodo,
+  deleteTodo,
+  getProjects,
+  createProject,
+  updateProject,
+  deleteProject,
+  getHabits,
+  createHabit,
+  deleteHabit,
+  getHabitEntries,
+  toggleHabitEntry,
+  getSetting,
+  setSetting,
+  getAllSettings,
+  getGithubIssues
 } from './database/queries'
+import { syncGithubIssues } from './services/github'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -51,9 +69,24 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   createWindow()
+
+  // Global quick-capture: focus the window and open the capture modal
+  globalShortcut.register('CommandOrControl+Shift+Space', () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+    win.webContents.send('quick-capture:open')
+  })
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })
 
 app.on('window-all-closed', () => {
@@ -128,7 +161,95 @@ ipcMain.handle('dayConfig:update', (_, date: string, isWorkDay: number) =>
   updateDayConfig(date, isWorkDay)
 )
 
+// ── IPC: Todos (Inbox + TODO) ───────────────────────────────────────────────
+
+ipcMain.handle('todos:getAll', (_, status?: string) => getTodos(status))
+
+ipcMain.handle(
+  'todos:create',
+  (
+    _,
+    title: string,
+    notes: string | null,
+    status: string,
+    source: string,
+    priority: number,
+    dueDate: string | null,
+    projectId: number | null
+  ) => createTodo(title, notes, status, source, priority, dueDate, projectId)
+)
+
+ipcMain.handle(
+  'todos:update',
+  (
+    _,
+    id: number,
+    title: string,
+    notes: string | null,
+    status: string,
+    priority: number,
+    dueDate: string | null,
+    projectId: number | null
+  ) => updateTodo(id, title, notes, status, priority, dueDate, projectId)
+)
+
+ipcMain.handle('todos:delete', (_, id: number) => deleteTodo(id))
+
+// ── IPC: Projects ─────────────────────────────────────────────────────────────
+
+ipcMain.handle('projects:getAll', () => getProjects())
+
+ipcMain.handle(
+  'projects:create',
+  (_, name: string, description: string | null, githubRepoUrl: string | null, color: string) =>
+    createProject(name, description, githubRepoUrl, color)
+)
+
+ipcMain.handle(
+  'projects:update',
+  (
+    _,
+    id: number,
+    name: string,
+    description: string | null,
+    githubRepoUrl: string | null,
+    color: string,
+    archived: number
+  ) => updateProject(id, name, description, githubRepoUrl, color, archived)
+)
+
+ipcMain.handle('projects:delete', (_, id: number) => deleteProject(id))
+
+// ── IPC: Habits ───────────────────────────────────────────────────────────────
+
+ipcMain.handle('habits:getAll', () => getHabits())
+
+ipcMain.handle('habits:create', (_, name: string, frequency: string, target: number) =>
+  createHabit(name, frequency, target)
+)
+
+ipcMain.handle('habits:delete', (_, id: number) => deleteHabit(id))
+
+ipcMain.handle('habits:getEntries', (_, date: string) => getHabitEntries(date))
+
+ipcMain.handle('habits:toggleEntry', (_, habitId: number, date: string, completed: number) =>
+  toggleHabitEntry(habitId, date, completed)
+)
+
+// ── IPC: Settings ───────────────────────────────────────────────────────────
+
+ipcMain.handle('settings:get', (_, key: string) => getSetting(key))
+ipcMain.handle('settings:set', (_, key: string, value: string) => setSetting(key, value))
+ipcMain.handle('settings:getAll', () => getAllSettings())
+
+// ── IPC: GitHub ───────────────────────────────────────────────────────────────
+
+ipcMain.handle('github:getIssues', () => getGithubIssues())
+ipcMain.handle('github:sync', () => syncGithubIssues())
+
 // ── IPC: App ──────────────────────────────────────────────────────────────────
+
+ipcMain.handle('app:openExternal', (_, url: string) => shell.openExternal(url))
 
 ipcMain.handle('app:exportDb', async () => {
   saveDb()

@@ -8,20 +8,136 @@ import { CalendarPage } from './pages/CalendarPage'
 import { TagsPage } from './pages/TagsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { TasksListPage } from './pages/TasksListPage'
+import { HomePage } from './modules/home/pages/HomePage'
+import { InboxPage } from './modules/inbox/pages/InboxPage'
+import { TodoPage } from './modules/todo/pages/TodoPage'
+import { ProjectsPage } from './modules/projects/pages/ProjectsPage'
+import { IssuesPage } from './modules/projects/pages/IssuesPage'
+import { HabitsPage } from './modules/habits/pages/HabitsPage'
+import { QuickCapture } from './modules/inbox/components/QuickCapture'
+import {
+  FinanceDashboardPage,
+  TransactionsPage,
+  BudgetPage,
+  InvestmentsPage,
+  ReportsPage
+} from './modules/finance/pages'
+import {
+  TripsPage,
+  MonitoringPage,
+  DestinationsPage,
+  DocumentsPage,
+  RecommendationsPage
+} from './modules/travel/pages'
+import { SettingsPage } from './modules/settings/pages/SettingsPage'
 import { Page } from './types'
 
-const NAV_ITEMS: { id: Page; label: string; icon: string }[] = [
-  { id: 'timeline', label: 'Timeline', icon: '⏱' },
-  { id: 'calendar', label: 'Calendar', icon: '📅' },
-  { id: 'tasks', label: 'All Tasks', icon: '📋' },
-  { id: 'dashboard', label: 'Stats', icon: '📊' },
-  { id: 'tags', label: 'Tags', icon: '🏷' }
+interface NavItem {
+  id: Page
+  label: string
+  icon: string
+}
+
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  { label: '', items: [{ id: 'home', label: 'Dashboard', icon: '🏠' }] },
+  {
+    label: 'Time Tracker',
+    items: [
+      { id: 'timeline', label: 'Timeline', icon: '⏱' },
+      { id: 'calendar', label: 'Calendar', icon: '📅' },
+      { id: 'tasks', label: 'Tasks', icon: '📋' },
+      { id: 'tags', label: 'Tags', icon: '🏷' },
+      { id: 'dashboard', label: 'Stats', icon: '📊' }
+    ]
+  },
+  {
+    label: 'Organização',
+    items: [
+      { id: 'inbox', label: 'Inbox', icon: '📥' },
+      { id: 'todo', label: 'TODO', icon: '✅' },
+      { id: 'habits', label: 'Hábitos', icon: '🔥' }
+    ]
+  },
+  {
+    label: 'Projetos',
+    items: [
+      { id: 'projects', label: 'Projetos', icon: '🗂' },
+      { id: 'issues', label: 'Issues (Kanban)', icon: '📌' }
+    ]
+  },
+  {
+    label: 'Finanças',
+    items: [
+      { id: 'finance-dashboard', label: 'Dashboard', icon: '💰' },
+      { id: 'transactions', label: 'Transações', icon: '💸' },
+      { id: 'budget', label: 'Orçamento', icon: '📉' },
+      { id: 'investments', label: 'Investimentos', icon: '📈' },
+      { id: 'reports', label: 'Relatórios', icon: '🧾' }
+    ]
+  },
+  {
+    label: 'Viagens',
+    items: [
+      { id: 'trips', label: 'Próximas', icon: '✈️' },
+      { id: 'trip-monitoring', label: 'Monitoramento', icon: '🔔' },
+      { id: 'destinations', label: 'Destinos', icon: '🗺' },
+      { id: 'documents', label: 'Documentos', icon: '📄' },
+      { id: 'recommendations', label: 'Recomendações', icon: '⭐' }
+    ]
+  },
+  { label: '', items: [{ id: 'settings', label: 'Configurações', icon: '⚙️' }] }
 ]
 
+const PAGES: Record<Page, React.ComponentType> = {
+  timeline: TimelinePage,
+  calendar: CalendarPage,
+  tasks: TasksListPage,
+  dashboard: DashboardPage,
+  tags: TagsPage,
+  home: HomePage,
+  inbox: InboxPage,
+  todo: TodoPage,
+  projects: ProjectsPage,
+  issues: IssuesPage,
+  habits: HabitsPage,
+  'finance-dashboard': FinanceDashboardPage,
+  transactions: TransactionsPage,
+  budget: BudgetPage,
+  investments: InvestmentsPage,
+  reports: ReportsPage,
+  trips: TripsPage,
+  'trip-monitoring': MonitoringPage,
+  destinations: DestinationsPage,
+  documents: DocumentsPage,
+  recommendations: RecommendationsPage,
+  settings: SettingsPage
+}
+
+// Ctrl+1..4 quick nav to the most-used pages
+const QUICK_NAV: Page[] = ['home', 'timeline', 'inbox', 'projects']
+
+const COLLAPSED_KEY = 'rickos:collapsedGroups'
+
 export default function App(): React.ReactElement {
-  const { currentPage, setPage, selectedDate } = useUIStore()
-  const { refreshActive, startTask, stopActiveTask, activeTask } = useTaskStore()
+  const { currentPage, setPage } = useUIStore()
+  const { refreshActive, stopActiveTask, activeTask } = useTaskStore()
   const { refreshTags } = useTagStore()
+
+  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '{}')
+    } catch {
+      return {}
+    }
+  })
+
+  const toggleGroup = useCallback((label: string) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [label]: !prev[label] }
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     refreshTags()
@@ -30,17 +146,14 @@ export default function App(): React.ReactElement {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Ctrl+Space = stop active task
-      if (e.ctrlKey && e.code === 'Space') {
+      // Ctrl+Space = stop active task (ignore the Ctrl+Shift+Space quick-capture combo)
+      if (e.ctrlKey && !e.shiftKey && e.code === 'Space') {
         e.preventDefault()
-        if (activeTask) {
-          stopActiveTask()
-        }
+        if (activeTask) stopActiveTask()
       }
-      // Ctrl+1..4 = navigate pages
+      // Ctrl+1..4 = navigate to the most-used pages
       if (e.ctrlKey && e.key >= '1' && e.key <= '4') {
-        const pages: Page[] = ['timeline', 'calendar', 'dashboard', 'tags']
-        setPage(pages[parseInt(e.key) - 1])
+        setPage(QUICK_NAV[parseInt(e.key) - 1])
       }
     },
     [activeTask, stopActiveTask, setPage]
@@ -51,28 +164,53 @@ export default function App(): React.ReactElement {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
+  const PageComponent = PAGES[currentPage]
+
   return (
     <div className="app">
       <nav className="sidebar">
         <div className="sidebar-logo">
-          <span className="logo-icon">⏱</span>
-          <span className="logo-text">TimeTracker</span>
+          <span className="logo-icon">🧭</span>
+          <span className="logo-text">RickOS</span>
         </div>
-        <ul className="nav-list">
-          {NAV_ITEMS.map((item) => (
-            <li key={item.id}>
-              <button
-                className={`nav-btn ${currentPage === item.id ? 'active' : ''}`}
-                onClick={() => setPage(item.id)}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                <span className="nav-label">{item.label}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="nav-list">
+          {NAV_GROUPS.map((group, gi) => {
+            const collapsible = !!group.label
+            const isCollapsed = collapsible && collapsed[group.label]
+            return (
+              <div className="nav-group" key={group.label || `g${gi}`}>
+                {collapsible && (
+                  <button
+                    className="nav-group-label"
+                    onClick={() => toggleGroup(group.label)}
+                    aria-expanded={!isCollapsed}
+                  >
+                    <span className={`nav-group-chevron ${isCollapsed ? 'collapsed' : ''}`}>▾</span>
+                    <span>{group.label}</span>
+                  </button>
+                )}
+                {!isCollapsed && (
+                  <ul>
+                    {group.items.map((item) => (
+                      <li key={item.id}>
+                        <button
+                          className={`nav-btn ${currentPage === item.id ? 'active' : ''}`}
+                          onClick={() => setPage(item.id)}
+                        >
+                          <span className="nav-icon">{item.icon}</span>
+                          <span className="nav-label">{item.label}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )
+          })}
+        </div>
         <div className="sidebar-shortcuts">
           <div className="shortcut-hint">Ctrl+Space: Stop</div>
+          <div className="shortcut-hint">Ctrl+Shift+Space: Capture</div>
           <div className="shortcut-hint">Ctrl+1-4: Navigate</div>
         </div>
         <div className="sidebar-footer">
@@ -111,13 +249,11 @@ export default function App(): React.ReactElement {
       <main className="main-content">
         <ActiveTask />
         <div className="page-content">
-          {currentPage === 'timeline' && <TimelinePage />}
-          {currentPage === 'calendar' && <CalendarPage />}
-          {currentPage === 'dashboard' && <DashboardPage />}
-          {currentPage === 'tasks' && <TasksListPage />}
-          {currentPage === 'tags' && <TagsPage />}
+          <PageComponent />
         </div>
       </main>
+
+      <QuickCapture />
     </div>
   )
 }

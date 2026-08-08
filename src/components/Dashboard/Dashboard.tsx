@@ -96,6 +96,8 @@ export function Dashboard(): React.ReactElement {
   const prodPlusSemiPercent =
     totalMinutes > 0 ? Math.round((prodPlusSemiMinutes / totalMinutes) * 100) : 0
 
+  const activeDays = dailyStats.filter((d) => d.totalMinutes > 0).length
+
   const maxDayMinutes = Math.max(...dailyStats.map((d) => d.totalMinutes), 1)
   const maxTagMinutes = Math.max(...tagStats.map((t) => t.totalMinutes), 1)
 
@@ -103,7 +105,12 @@ export function Dashboard(): React.ReactElement {
     <div className="dashboard-page">
       <div className="dashboard-header">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <h2 className="dashboard-title">Statistics</h2>
+          <h2 className="dashboard-title">
+            Statistics{' '}
+            <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-muted)' }}>
+              (active days: {activeDays} {activeDays === 1 ? 'day' : 'days'})
+            </span>
+          </h2>
           <div className="period-navigation">
             <button className="date-nav-btn" onClick={handlePrev}>‹</button>
             <span className="current-range">{range.label}</span>
@@ -131,12 +138,12 @@ export function Dashboard(): React.ReactElement {
         <>
           <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
             <div className="stat-card">
-              <div className="stat-card-label">Total Tracked</div>
+              <div className="stat-card-label">Work + Personal Projects + Study</div>
               <div className="stat-card-value">{formatHoursShort(totalMinutes)}<span style={{ fontSize: 18, color: 'var(--text-muted)' }}>h</span></div>
               <div className="stat-card-sub">{formatHours(totalMinutes)}</div>
             </div>
             <div className="stat-card">
-              <div className="stat-card-label">Productive</div>
+              <div className="stat-card-label">Work</div>
               <div className="stat-card-value">{formatHoursShort(productiveMinutes)}<span style={{ fontSize: 18, color: 'var(--text-muted)' }}>h</span></div>
               <div className="stat-card-sub">{productivePercent}% of tracked time</div>
             </div>
@@ -147,7 +154,7 @@ export function Dashboard(): React.ReactElement {
             </div>
             <div className="stat-card">
               <div className="stat-card-label">Active Days</div>
-              <div className="stat-card-value">{dailyStats.filter((d) => d.totalMinutes > 0).length}</div>
+              <div className="stat-card-value">{activeDays}</div>
               <div className="stat-card-sub">{dailyStats.length} days in period</div>
             </div>
           </div>
@@ -184,9 +191,6 @@ export function Dashboard(): React.ReactElement {
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: '#22c55e', display: 'inline-block' }} /> Productive
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: '#fb7185', display: 'inline-block' }} /> ProductiveEros
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: '#a855f7', display: 'inline-block' }} /> Semi-productive

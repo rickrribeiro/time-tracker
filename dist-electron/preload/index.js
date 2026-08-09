@@ -122,6 +122,10 @@ const api = {
     search: (origin, destination, currency, date) => electron.ipcRenderer.invoke("flights:search", origin, destination, currency, date),
     refreshWatch: (id) => electron.ipcRenderer.invoke("flights:refreshWatch", id)
   },
+  tripDocs: {
+    get: (tripId) => electron.ipcRenderer.invoke("tripDocs:get", tripId),
+    set: (tripId, item, checked) => electron.ipcRenderer.invoke("tripDocs:set", tripId, item, checked)
+  },
   // AI (Claude CLI)
   ai: {
     run: (prompt, projectId, model) => electron.ipcRenderer.invoke("ai:run", prompt, projectId, model),

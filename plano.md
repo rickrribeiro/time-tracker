@@ -140,7 +140,7 @@ Feito:
 
 Restante / melhorias:
 - [x] Busca de preços de passagem via **Skyscanner (RapidAPI)**: `services/flights.ts` (auto-complete → search-one-way, extração de menor preço robusta a schema). Botão "🔎 Buscar preço" no add e "🔄 Atualizar preço" por trecho (usa a data de início da viagem). Chave/host em Configurações. Requer assinatura de uma API Skyscanner no RapidAPI.
-- [ ] Persistir checklist de documentos por viagem.
+- [x] Persistir checklist de documentos por viagem: tabela `trip_documents` (PK tripId+item, cascade); Documentos passa a ter seletor de viagem e estado persistido por viagem.
 - [ ] Recomendações geradas por IA (ver #8).
 
 ## 8. IA local (Claude Code CLI)  *(prioridade #8 — FEITO)*

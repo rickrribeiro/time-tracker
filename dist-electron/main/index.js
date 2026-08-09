@@ -167,6 +167,13 @@ const SCHEMA = `
     lastChecked TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS trip_documents (
+    tripId INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+    item TEXT NOT NULL,
+    checked INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (tripId, item)
+  );
+
   -- ── RickOS: Settings & integrações ───────────────────────────────────
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
@@ -875,6 +882,19 @@ async function updateFlightWatchPrice(id, price, lastChecked) {
   const db2 = await getDb();
   run(db2, "UPDATE flight_watches SET price = ?, lastChecked = ? WHERE id = ?", [price, lastChecked, id]);
 }
+async function getTripDocuments(tripId) {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM trip_documents WHERE tripId = ?", [tripId]);
+}
+async function setTripDocument(tripId, item, checked) {
+  const db2 = await getDb();
+  run(
+    db2,
+    `INSERT INTO trip_documents (tripId, item, checked) VALUES (?, ?, ?)
+     ON CONFLICT(tripId, item) DO UPDATE SET checked = excluded.checked`,
+    [tripId, item, checked]
+  );
+}
 const SENSITIVE_KEYS = /* @__PURE__ */ new Set([
   "github_token",
   "google_client_secret",
@@ -1546,6 +1566,11 @@ electron.ipcMain.handle(
   (_, origin, destination, currency, date) => searchFlightPrice(origin, destination, currency, date)
 );
 electron.ipcMain.handle("flights:refreshWatch", (_, id) => refreshWatchPrice(id));
+electron.ipcMain.handle("tripDocs:get", (_, tripId) => getTripDocuments(tripId));
+electron.ipcMain.handle(
+  "tripDocs:set",
+  (_, tripId, item, checked) => setTripDocument(tripId, item, checked)
+);
 async function resolveClaudeCommand(projectId) {
   if (projectId != null) {
     const projects = await getProjects();

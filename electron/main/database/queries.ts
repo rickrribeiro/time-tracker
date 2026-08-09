@@ -1011,3 +1011,26 @@ export async function updateFlightWatchPrice(
   const db = await getDb()
   run(db, 'UPDATE flight_watches SET price = ?, lastChecked = ? WHERE id = ?', [price, lastChecked, id])
 }
+
+// ── Trip documents (per-trip checklist) ─────────────────────────────────────────
+
+export interface DbTripDocument {
+  tripId: number
+  item: string
+  checked: number
+}
+
+export async function getTripDocuments(tripId: number): Promise<DbTripDocument[]> {
+  const db = await getDb()
+  return getAll<DbTripDocument>(db, 'SELECT * FROM trip_documents WHERE tripId = ?', [tripId])
+}
+
+export async function setTripDocument(tripId: number, item: string, checked: number): Promise<void> {
+  const db = await getDb()
+  run(
+    db,
+    `INSERT INTO trip_documents (tripId, item, checked) VALUES (?, ?, ?)
+     ON CONFLICT(tripId, item) DO UPDATE SET checked = excluded.checked`,
+    [tripId, item, checked]
+  )
+}

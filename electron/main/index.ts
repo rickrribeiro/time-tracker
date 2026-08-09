@@ -65,7 +65,9 @@ import {
   deleteTrip,
   getFlightWatches,
   createFlightWatch,
-  deleteFlightWatch
+  deleteFlightWatch,
+  getTripDocuments,
+  setTripDocument
 } from './database/queries'
 import type { DbTransaction } from './database/queries'
 import { syncGithubIssues } from './services/github'
@@ -374,6 +376,11 @@ ipcMain.handle('flights:search', (_, origin: string, destination: string, curren
   searchFlightPrice(origin, destination, currency, date)
 )
 ipcMain.handle('flights:refreshWatch', (_, id: number) => refreshWatchPrice(id))
+
+ipcMain.handle('tripDocs:get', (_, tripId: number) => getTripDocuments(tripId))
+ipcMain.handle('tripDocs:set', (_, tripId: number, item: string, checked: number) =>
+  setTripDocument(tripId, item, checked)
+)
 
 // ── IPC: AI (Claude CLI) ──────────────────────────────────────────────────────
 

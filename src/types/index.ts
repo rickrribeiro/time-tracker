@@ -157,6 +157,12 @@ export interface FlightWatch {
   lastChecked: string | null
 }
 
+export interface TripDocument {
+  tripId: number
+  item: string
+  checked: number
+}
+
 export type Page =
   // Time Tracker (existente)
   | 'timeline'
@@ -346,6 +352,10 @@ declare global {
         delete: (id: number) => Promise<void>
         search: (origin: string, destination: string, currency: string, date?: string | null) => Promise<number>
         refreshWatch: (id: number) => Promise<FlightWatch>
+      }
+      tripDocs: {
+        get: (tripId: number) => Promise<TripDocument[]>
+        set: (tripId: number, item: string, checked: number) => Promise<void>
       }
       ai: {
         run: (prompt: string, projectId?: number, model?: string) => Promise<string>

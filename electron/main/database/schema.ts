@@ -136,6 +136,13 @@ export const SCHEMA = `
     lastChecked TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS trip_documents (
+    tripId INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+    item TEXT NOT NULL,
+    checked INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (tripId, item)
+  );
+
   -- ── RickOS: Settings & integrações ───────────────────────────────────
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,

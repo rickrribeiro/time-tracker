@@ -174,6 +174,10 @@ const api = {
       ipcRenderer.invoke('flights:search', origin, destination, currency, date),
     refreshWatch: (id: number) => ipcRenderer.invoke('flights:refreshWatch', id)
   },
+  tripDocs: {
+    get: (tripId: number) => ipcRenderer.invoke('tripDocs:get', tripId),
+    set: (tripId: number, item: string, checked: number) => ipcRenderer.invoke('tripDocs:set', tripId, item, checked)
+  },
   // AI (Claude CLI)
   ai: {
     run: (prompt: string, projectId?: number, model?: string) => ipcRenderer.invoke('ai:run', prompt, projectId, model),

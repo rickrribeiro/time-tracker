@@ -1759,3 +1759,18 @@ select:focus {
   cursor: pointer;
 }
 .skill-check-row:hover { background: var(--bg-hover); border-radius: var(--radius-sm); }
+
+.runner-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(320px, 1.6fr);
+  gap: 16px;
+  align-items: start;
+}
+.runner-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+@media (max-width: 780px) {
+  .runner-grid { grid-template-columns: 1fr; }
+}

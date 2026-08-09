@@ -34,6 +34,7 @@ import { SettingsPage } from './modules/settings/pages/SettingsPage'
 import { AIPage } from './modules/ai/pages/AIPage'
 import { SkillsPage } from './modules/ai/pages/SkillsPage'
 import { AgentsPage } from './modules/ai/pages/AgentsPage'
+import { PromptRunnerPage } from './modules/ai/pages/PromptRunnerPage'
 import { Page } from './types'
 
 interface NavItem {
@@ -95,7 +96,8 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { id: 'ai', label: 'Assistente', icon: '🤖' },
       { id: 'ai-skills', label: 'Skills', icon: '🧩' },
-      { id: 'ai-agents', label: 'Agentes', icon: '🤝' }
+      { id: 'ai-agents', label: 'Agentes', icon: '🤝' },
+      { id: 'ai-runner', label: 'Prompt Runner', icon: '▶️' }
     ]
   },
   { label: '', items: [{ id: 'settings', label: 'Configurações', icon: '⚙️' }] }
@@ -127,6 +129,7 @@ const PAGES: Record<Page, React.ComponentType> = {
   ai: AIPage,
   'ai-skills': SkillsPage,
   'ai-agents': AgentsPage,
+  'ai-runner': PromptRunnerPage,
   settings: SettingsPage
 }
 

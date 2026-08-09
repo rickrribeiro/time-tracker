@@ -1224,6 +1224,7 @@ const SENSITIVE_KEYS = /* @__PURE__ */ new Set([
   "github_token",
   "google_client_secret",
   "google_refresh_token",
+  "pluggy_client_id",
   "pluggy_client_secret",
   "skyscanner_rapidapi_key"
 ]);
@@ -1627,18 +1628,31 @@ async function syncGoogleCalendar() {
 const PLUGGY_API = "https://api.pluggy.ai";
 const OUTROS_CATEGORY_ID = 6;
 async function apiKey() {
-  const clientId = await getSetting("pluggy_client_id") ?? "";
-  const clientSecret = decodeSecret(await getSetting("pluggy_client_secret")) ?? "";
+  const clientId = (decodeSecret(await getSetting("pluggy_client_id")) ?? "").trim();
+  const clientSecret = (decodeSecret(await getSetting("pluggy_client_secret")) ?? "").trim();
   if (!clientId || !clientSecret) {
     throw new Error("Configure o Client ID e o Client Secret do Pluggy em Configurações.");
   }
-  const res = await fetch(`${PLUGGY_API}/auth`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ clientId, clientSecret })
-  });
-  const json = await res.json();
-  if (!res.ok || !json.apiKey) throw new Error(json.message || `Falha ao autenticar no Pluggy (${res.status}).`);
+  let res;
+  try {
+    res = await fetch(`${PLUGGY_API}/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, clientSecret })
+    });
+  } catch (e) {
+    throw new Error(`Sem conexão com o Pluggy: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const body = await res.text().catch(() => "");
+  let json = {};
+  try {
+    json = JSON.parse(body);
+  } catch {
+  }
+  if (!res.ok || !json.apiKey) {
+    const detail = json.message || body.slice(0, 160) || res.statusText;
+    throw new Error(`Falha ao autenticar no Pluggy (${res.status}). ${detail}`);
+  }
   return json.apiKey;
 }
 async function get(path2, key) {
@@ -1654,6 +1668,9 @@ async function syncPluggy() {
   if (!itemId) throw new Error("Configure o Item ID do Pluggy (banco conectado) em Configurações.");
   const key = await apiKey();
   const accounts = (await get(`/accounts?itemId=${encodeURIComponent(itemId)}`, key)).results;
+  if (!accounts || accounts.length === 0) {
+    throw new Error("Nenhuma conta encontrada para esse Item ID. Verifique se o Item está conectado e pronto no Pluggy (e se o Item ID está correto).");
+  }
   const incoming = [];
   for (const acc of accounts) {
     const txs = (await get(`/transactions?accountId=${acc.id}&pageSize=500`, key)).results;

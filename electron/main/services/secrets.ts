@@ -5,6 +5,7 @@ export const SENSITIVE_KEYS = new Set([
   'github_token',
   'google_client_secret',
   'google_refresh_token',
+  'pluggy_client_id',
   'pluggy_client_secret',
   'skyscanner_rapidapi_key'
 ])

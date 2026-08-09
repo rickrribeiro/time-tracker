@@ -23,18 +23,32 @@ interface PluggyTransaction {
 }
 
 async function apiKey(): Promise<string> {
-  const clientId = (await getSetting('pluggy_client_id')) ?? ''
-  const clientSecret = decodeSecret(await getSetting('pluggy_client_secret')) ?? ''
+  const clientId = (decodeSecret(await getSetting('pluggy_client_id')) ?? '').trim()
+  const clientSecret = (decodeSecret(await getSetting('pluggy_client_secret')) ?? '').trim()
   if (!clientId || !clientSecret) {
     throw new Error('Configure o Client ID e o Client Secret do Pluggy em Configurações.')
   }
-  const res = await fetch(`${PLUGGY_API}/auth`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clientId, clientSecret })
-  })
-  const json = (await res.json()) as { apiKey?: string; message?: string }
-  if (!res.ok || !json.apiKey) throw new Error(json.message || `Falha ao autenticar no Pluggy (${res.status}).`)
+  let res: Response
+  try {
+    res = await fetch(`${PLUGGY_API}/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, clientSecret })
+    })
+  } catch (e) {
+    throw new Error(`Sem conexão com o Pluggy: ${e instanceof Error ? e.message : String(e)}`)
+  }
+  const body = await res.text().catch(() => '')
+  let json: { apiKey?: string; message?: string } = {}
+  try {
+    json = JSON.parse(body)
+  } catch {
+    // non-JSON response
+  }
+  if (!res.ok || !json.apiKey) {
+    const detail = json.message || body.slice(0, 160) || res.statusText
+    throw new Error(`Falha ao autenticar no Pluggy (${res.status}). ${detail}`)
+  }
   return json.apiKey
 }
 
@@ -60,6 +74,9 @@ export async function syncPluggy(): Promise<{ imported: number; skipped: number 
 
   const key = await apiKey()
   const accounts = (await get<{ results: PluggyAccount[] }>(`/accounts?itemId=${encodeURIComponent(itemId)}`, key)).results
+  if (!accounts || accounts.length === 0) {
+    throw new Error('Nenhuma conta encontrada para esse Item ID. Verifique se o Item está conectado e pronto no Pluggy (e se o Item ID está correto).')
+  }
 
   const incoming: Omit<DbTransaction, 'id'>[] = []
   for (const acc of accounts) {

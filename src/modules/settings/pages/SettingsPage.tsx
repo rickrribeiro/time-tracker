@@ -109,10 +109,15 @@ export function SettingsPage(): React.ReactElement {
     setTimeout(() => setClaudeSaved(false), 2000)
   }
 
-  async function syncPluggy(): Promise<void> {
+  async function savePluggy(): Promise<void> {
     await set('pluggy_client_id', pClientId.trim())
     await set('pluggy_client_secret', pClientSecret.trim())
     await set('pluggy_item_id', pItemId.trim())
+    setPMsg({ text: 'Credenciais salvas (criptografadas) ✓', ok: true })
+  }
+
+  async function syncPluggy(): Promise<void> {
+    await savePluggy()
     setPBusy(true)
     setPMsg(null)
     try {
@@ -325,11 +330,12 @@ export function SettingsPage(): React.ReactElement {
         <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 12px' }}>
           Conecte seu banco via <strong>Pluggy Connect</strong> (agregador de Open Finance). Cole o
           Client ID/Secret da sua conta Pluggy e o <strong>Item ID</strong> do banco já conectado. As
-          transações são importadas (deduplicadas por data+valor+descrição).
+          transações são importadas (deduplicadas por data+valor+descrição). As credenciais são
+          guardadas <strong>criptografadas</strong> no banco local (keychain do sistema).
         </p>
         <div className="editor-field">
           <label>Client ID</label>
-          <input type="text" value={pClientId} onChange={(e) => setPClientId(e.target.value)} />
+          <input type="password" value={pClientId} onChange={(e) => setPClientId(e.target.value)} />
         </div>
         <div className="editor-field">
           <label>Client Secret</label>
@@ -339,7 +345,14 @@ export function SettingsPage(): React.ReactElement {
           <label>Item ID (banco conectado)</label>
           <input type="text" value={pItemId} onChange={(e) => setPItemId(e.target.value)} />
         </div>
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={savePluggy}
+            disabled={pBusy || !pClientId.trim() || !pClientSecret.trim()}
+          >
+            💾 Salvar credenciais
+          </button>
           <button
             className="btn btn-primary btn-sm"
             onClick={syncPluggy}

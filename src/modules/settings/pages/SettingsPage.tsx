@@ -2,11 +2,18 @@ import React, { useEffect, useState } from 'react'
 import { useSettingsStore } from '../store/settingsStore'
 import { useGithubStore } from '../../projects/store/githubStore'
 import { useCalendarStore } from '../../calendar/store/calendarStore'
+import { useFinanceStore } from '../../finance/store/financeStore'
+
+const FX_CURRENCIES = ['BRL', 'USD', 'JPY', 'EUR']
 
 export function SettingsPage(): React.ReactElement {
   const { values, refresh, set } = useSettingsStore()
   const { sync, syncing, error, lastCount } = useGithubStore()
   const { refresh: refreshEvents } = useCalendarStore()
+  const { base, rates, refresh: refreshFinance, saveFxConfig } = useFinanceStore()
+  const [fxBase, setFxBase] = useState('BRL')
+  const [fxRates, setFxRates] = useState<Record<string, string>>({})
+  const [fxSaved, setFxSaved] = useState(false)
   const [token, setToken] = useState('')
   const [username, setUsername] = useState('')
   const [saved, setSaved] = useState(false)
@@ -20,8 +27,25 @@ export function SettingsPage(): React.ReactElement {
 
   useEffect(() => {
     refresh()
+    refreshFinance()
     window.api.google.status().then(setGConnected)
   }, [])
+
+  useEffect(() => {
+    setFxBase(base)
+    setFxRates(Object.fromEntries(Object.entries(rates).map(([k, v]) => [k, String(v)])))
+  }, [base, rates])
+
+  async function saveFx(): Promise<void> {
+    const parsed: Record<string, number> = {}
+    for (const [k, v] of Object.entries(fxRates)) {
+      const n = parseFloat(v)
+      if (!isNaN(n) && n > 0 && k !== fxBase) parsed[k] = n
+    }
+    await saveFxConfig(fxBase, parsed)
+    setFxSaved(true)
+    setTimeout(() => setFxSaved(false), 2000)
+  }
 
   useEffect(() => {
     setToken(values.github_token ?? '')
@@ -165,6 +189,36 @@ export function SettingsPage(): React.ReactElement {
         {gMsg && (
           <div style={{ fontSize: 12, color: gMsg.ok ? 'var(--success)' : 'var(--danger)', marginTop: 8 }}>{gMsg.text}</div>
         )}
+      </div>
+
+      <div className="chart-section" style={{ maxWidth: 560, marginTop: 16 }}>
+        <div className="chart-title">💱 Finanças — câmbio</div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 12px' }}>
+          Moeda base e taxas manuais (valor de <strong>1 unidade</strong> da moeda na base). Usado para
+          consolidar totais no Dashboard de Finanças.
+        </p>
+        <div className="editor-field">
+          <label>Moeda base</label>
+          <select value={fxBase} onChange={(e) => setFxBase(e.target.value)}>
+            {FX_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="editor-row" style={{ flexWrap: 'wrap' }}>
+          {FX_CURRENCIES.filter((c) => c !== fxBase).map((c) => (
+            <div className="editor-field" key={c}>
+              <label>1 {c} = ? {fxBase}</label>
+              <input
+                type="number"
+                placeholder="ex: 5.20"
+                value={fxRates[c] ?? ''}
+                onChange={(e) => setFxRates((r) => ({ ...r, [c]: e.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <button className="btn btn-primary btn-sm" onClick={saveFx}>{fxSaved ? '✓ Salvo' : 'Salvar câmbio'}</button>
+        </div>
       </div>
     </div>
   )

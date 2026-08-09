@@ -32,6 +32,27 @@ export function sumByCurrency(items: { currency: string; amount: number }[]): Re
   return out
 }
 
+/** Convert an amount to the base currency using manual rates (rate = value of 1 unit in base). */
+export function convertToBase(
+  amount: number,
+  currency: string,
+  base: string,
+  rates: Record<string, number>
+): number {
+  if (currency === base) return amount
+  const r = rates[currency]
+  return r != null ? amount * r : amount // missing rate → assume 1:1 (configure em Configurações)
+}
+
+/** Sum items converted to the base currency. */
+export function sumInBase(
+  items: { currency: string; amount: number }[],
+  base: string,
+  rates: Record<string, number>
+): number {
+  return items.reduce((s, t) => s + convertToBase(t.amount, t.currency, base, rates), 0)
+}
+
 export interface ParsedCsvRow {
   date: string
   description: string

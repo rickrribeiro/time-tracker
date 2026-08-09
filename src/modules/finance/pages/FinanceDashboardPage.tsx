@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react'
 import { useFinanceStore } from '../store/financeStore'
 import { MonthNav } from '../components/MonthNav'
-import { formatMoney, sumByCurrency, shiftMonth, monthLabel } from '../util'
+import { formatMoney, sumByCurrency, sumInBase, shiftMonth, monthLabel } from '../util'
 
 export function FinanceDashboardPage(): React.ReactElement {
-  const { accounts, transactions, allTransactions, budgets, month, refresh, categoryName, categoryColor } =
+  const { accounts, transactions, allTransactions, budgets, month, base, rates, refresh, categoryName, categoryColor } =
     useFinanceStore()
 
   useEffect(() => {
@@ -43,6 +43,11 @@ export function FinanceDashboardPage(): React.ReactElement {
   const budgetTotal = budgets.reduce((s, b) => s + b.amount, 0)
   const spentTotal = expense.reduce((s, t) => s + t.amount, 0)
 
+  // Converted to base currency (manual rates)
+  const incomeBase = sumInBase(income, base, rates)
+  const expenseBase = sumInBase(expense, base, rates)
+  const netBase = incomeBase - expenseBase
+
   const money = (rec: Record<string, number>): string =>
     Object.keys(rec).length ? Object.entries(rec).map(([c, v]) => formatMoney(v, c)).join(' · ') : formatMoney(0)
 
@@ -77,6 +82,13 @@ export function FinanceDashboardPage(): React.ReactElement {
               {spentTotal > budgetTotal ? '⚠ acima da meta' : `${Math.round((spentTotal / budgetTotal) * 100)}% usado`}
             </div>
           )}
+        </div>
+        <div className="stat-card">
+          <div className="stat-card-label">Saldo do mês em {base}</div>
+          <div className="stat-card-value" style={{ fontSize: 16, color: netBase >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+            {formatMoney(netBase, base)}
+          </div>
+          <div className="stat-card-sub">receitas {formatMoney(incomeBase, base)} − gastos {formatMoney(expenseBase, base)}</div>
         </div>
       </div>
 

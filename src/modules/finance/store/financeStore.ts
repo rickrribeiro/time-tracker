@@ -10,9 +10,12 @@ interface FinanceState {
   allTransactions: Transaction[] // for reports / evolution
   budgets: Budget[] // for `month`
   investments: Investment[]
+  base: string
+  rates: Record<string, number>
 
   setMonth: (m: string) => void
   refresh: () => Promise<void>
+  saveFxConfig: (base: string, rates: Record<string, number>) => Promise<void>
 
   addAccount: (name: string, currency: string, balance: number) => Promise<void>
   removeAccount: (id: number) => Promise<void>
@@ -38,6 +41,8 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
   allTransactions: [],
   budgets: [],
   investments: [],
+  base: 'BRL',
+  rates: {},
 
   setMonth: (m) => {
     set({ month: m })
@@ -46,15 +51,30 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
 
   refresh: async () => {
     const month = get().month
-    const [accounts, categories, transactions, allTransactions, budgets, investments] = await Promise.all([
-      window.api.accounts.getAll(),
-      window.api.categories.getAll(),
-      window.api.transactions.getAll(month),
-      window.api.transactions.getAll(),
-      window.api.budgets.getForMonth(month),
-      window.api.investments.getAll()
-    ])
-    set({ accounts, categories, transactions, allTransactions, budgets, investments })
+    const [accounts, categories, transactions, allTransactions, budgets, investments, base, ratesRaw] =
+      await Promise.all([
+        window.api.accounts.getAll(),
+        window.api.categories.getAll(),
+        window.api.transactions.getAll(month),
+        window.api.transactions.getAll(),
+        window.api.budgets.getForMonth(month),
+        window.api.investments.getAll(),
+        window.api.settings.get('finance_base'),
+        window.api.settings.get('finance_rates')
+      ])
+    let rates: Record<string, number> = {}
+    try {
+      rates = ratesRaw ? JSON.parse(ratesRaw) : {}
+    } catch {
+      rates = {}
+    }
+    set({ accounts, categories, transactions, allTransactions, budgets, investments, base: base || 'BRL', rates })
+  },
+
+  saveFxConfig: async (base, rates) => {
+    await window.api.settings.set('finance_base', base)
+    await window.api.settings.set('finance_rates', JSON.stringify(rates))
+    set({ base, rates })
   },
 
   addAccount: async (name, currency, balance) => {

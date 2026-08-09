@@ -4,6 +4,7 @@ import { useHabitStore } from '../../habits/store/habitStore'
 import { useCalendarStore } from '../../calendar/store/calendarStore'
 import { useTripStore } from '../../travel/store/tripStore'
 import { localDateStr, localDayStartISO, localDayEndISO } from '../../../utils/dates'
+import { DEFAULT_KNOWLEDGE, knowledgeBullets } from '../../knowledge/constants'
 
 interface QuickAction {
   key: string
@@ -17,6 +18,7 @@ interface Ctx {
   events: ReturnType<typeof useCalendarStore.getState>['upcoming']
   nextTrip: ReturnType<typeof useTripStore.getState>['trips'][number] | undefined
   weekHours: string
+  profile: string
 }
 
 const list = (items: string[]): string => items.map((t) => `- ${t}`).join('\n') || '(nenhum)'
@@ -59,8 +61,8 @@ const ACTIONS: QuickAction[] = [
       c.nextTrip
         ? `Crie um roteiro para uma viagem a ${c.nextTrip.destination}${
             c.nextTrip.startDate ? ` (a partir de ${c.nextTrip.startDate})` : ''
-          }. Considere meu perfil: gosto de café, anime, ramen/izakaya, vida noturna e bairros caminháveis.`
-        : 'Sugira um destino de viagem para alguém que gosta de café, anime, ramen/izakaya, vida noturna e bairros caminháveis.'
+          }. Considere meu perfil: ${c.profile}.`
+        : `Sugira um destino de viagem para alguém com este perfil: ${c.profile}.`
   },
   {
     key: 'weekly',
@@ -96,6 +98,7 @@ export function AIPage(): React.ReactElement {
   const [error, setError] = useState('')
   const [model, setModel] = useState('')
   const [weekMinutes, setWeekMinutes] = useState(0)
+  const [kb, setKb] = useState(DEFAULT_KNOWLEDGE)
 
   useEffect(() => {
     rT()
@@ -103,6 +106,7 @@ export function AIPage(): React.ReactElement {
     rC()
     rTr()
     window.api.settings.get('claude_model').then((m) => setModel(m ?? ''))
+    window.api.settings.get('knowledge_base').then((v) => setKb(v && v.trim() ? v : DEFAULT_KNOWLEDGE))
 
     const now = new Date()
     const monday = new Date(now)
@@ -126,7 +130,8 @@ export function AIPage(): React.ReactElement {
     habitNames: habits.map((h) => h.name),
     events: upcoming,
     nextTrip: trips[0],
-    weekHours: fmtHours(weekMinutes)
+    weekHours: fmtHours(weekMinutes),
+    profile: knowledgeBullets(kb).join(', ') || 'sem perfil definido (edite a Base de Conhecimento)'
   }
 
   async function run(text: string): Promise<void> {

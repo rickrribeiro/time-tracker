@@ -1,5 +1,5 @@
-import React from 'react'
-import profileRaw from '../user-profile.md?raw'
+import React, { useEffect, useState } from 'react'
+import { DEFAULT_KNOWLEDGE, knowledgeBullets } from '../../knowledge/constants'
 
 interface Rec {
   keyword: string
@@ -18,15 +18,14 @@ const CATALOG: Rec[] = [
   { keyword: 'remotamente', items: ['Cafés com boa Wi-Fi', 'Coworkings em Shibuya'] }
 ]
 
-function profileBullets(md: string): string[] {
-  return md
-    .split(/\r?\n/)
-    .filter((l) => l.trim().startsWith('-'))
-    .map((l) => l.replace(/^-\s*/, '').trim())
-}
-
 export function RecommendationsPage(): React.ReactElement {
-  const bullets = profileBullets(profileRaw)
+  const [kb, setKb] = useState(DEFAULT_KNOWLEDGE)
+
+  useEffect(() => {
+    window.api.settings.get('knowledge_base').then((v) => setKb(v && v.trim() ? v : DEFAULT_KNOWLEDGE))
+  }, [])
+
+  const bullets = knowledgeBullets(kb)
   const matched = CATALOG.filter((c) => bullets.some((b) => b.toLowerCase().includes(c.keyword)))
 
   return (
@@ -35,7 +34,7 @@ export function RecommendationsPage(): React.ReactElement {
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700 }}>⭐ Recomendações</h2>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            Baseadas no seu perfil (<code>user-profile.md</code>). Geração por IA entra no módulo de IA.
+            Baseadas na sua <strong>Base de Conhecimento</strong> (edite em Organização). Geração por IA na página IA.
           </p>
         </div>
       </div>

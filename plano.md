@@ -141,6 +141,7 @@ Feito:
 Restante / melhorias:
 - [x] Busca de preços de passagem via **Skyscanner (RapidAPI)**: `services/flights.ts` (auto-complete → search-one-way, extração de menor preço robusta a schema). Botão "🔎 Buscar preço" no add e "🔄 Atualizar preço" por trecho (usa a data de início da viagem). Chave/host em Configurações. Requer assinatura de uma API Skyscanner no RapidAPI.
 - [x] Persistir checklist de documentos por viagem: tabela `trip_documents` (PK tripId+item, cascade); Documentos passa a ter seletor de viagem e estado persistido por viagem.
+- [x] **Base de Conhecimento** editável (Organização → 📚): substitui `user-profile.md`, guardada em `settings.knowledge_base`; Recomendações e a ação "Roteiro de viagem" da IA leem dela.
 - [x] Recomendações geradas por IA — coberto pela ação **Roteiro de viagem** na página IA (#8), que usa o perfil e a próxima viagem.
 
 ## 8. IA local (Claude Code CLI)  *(prioridade #8 — FEITO)*

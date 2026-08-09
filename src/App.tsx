@@ -14,6 +14,7 @@ import { TodoPage } from './modules/todo/pages/TodoPage'
 import { ProjectsPage } from './modules/projects/pages/ProjectsPage'
 import { IssuesPage } from './modules/projects/pages/IssuesPage'
 import { HabitsPage } from './modules/habits/pages/HabitsPage'
+import { KnowledgePage } from './modules/knowledge/pages/KnowledgePage'
 import { QuickCapture } from './modules/inbox/components/QuickCapture'
 import {
   FinanceDashboardPage,
@@ -56,7 +57,8 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { id: 'inbox', label: 'Inbox', icon: '📥' },
       { id: 'todo', label: 'TODO', icon: '✅' },
-      { id: 'habits', label: 'Hábitos', icon: '🔥' }
+      { id: 'habits', label: 'Hábitos', icon: '🔥' },
+      { id: 'knowledge', label: 'Base de Conhecimento', icon: '📚' }
     ]
   },
   {
@@ -102,6 +104,7 @@ const PAGES: Record<Page, React.ComponentType> = {
   projects: ProjectsPage,
   issues: IssuesPage,
   habits: HabitsPage,
+  knowledge: KnowledgePage,
   'finance-dashboard': FinanceDashboardPage,
   transactions: TransactionsPage,
   budget: BudgetPage,

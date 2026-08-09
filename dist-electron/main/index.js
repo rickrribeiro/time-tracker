@@ -163,7 +163,7 @@ const SCHEMA = `
     origin TEXT,
     destination TEXT,
     price REAL,
-    currency TEXT NOT NULL DEFAULT 'JPY',
+    currency TEXT NOT NULL DEFAULT 'BRL',
     lastChecked TEXT
   );
 
@@ -1596,6 +1596,7 @@ electron.ipcMain.handle("ai:runStream", async (event, prompt, projectId, model) 
 });
 electron.ipcMain.handle("app:openExternal", (_, url) => electron.shell.openExternal(url));
 electron.ipcMain.handle("app:exportDb", async () => {
+  await getDb();
   saveDb();
   const dbPath2 = path.join(electron.app.getPath("userData"), "timetracker.db");
   const options = {

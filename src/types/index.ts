@@ -176,6 +176,7 @@ export type Page =
   | 'inbox'
   | 'todo'
   | 'habits'
+  | 'knowledge'
   // Projetos
   | 'projects'
   | 'issues'

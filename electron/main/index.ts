@@ -236,8 +236,8 @@ ipcMain.handle('projects:getAll', () => getProjects())
 
 ipcMain.handle(
   'projects:create',
-  (_, name: string, description: string | null, githubRepoUrl: string | null, color: string) =>
-    createProject(name, description, githubRepoUrl, color)
+  (_, name: string, description: string | null, githubRepoUrl: string | null, color: string, claudeCommand: string | null) =>
+    createProject(name, description, githubRepoUrl, color, claudeCommand)
 )
 
 ipcMain.handle(
@@ -249,8 +249,9 @@ ipcMain.handle(
     description: string | null,
     githubRepoUrl: string | null,
     color: string,
-    archived: number
-  ) => updateProject(id, name, description, githubRepoUrl, color, archived)
+    archived: number,
+    claudeCommand: string | null
+  ) => updateProject(id, name, description, githubRepoUrl, color, archived, claudeCommand)
 )
 
 ipcMain.handle('projects:delete', (_, id: number) => deleteProject(id))
@@ -371,9 +372,18 @@ ipcMain.handle('flights:delete', (_, id: number) => deleteFlightWatch(id))
 
 // ── IPC: AI (Claude CLI) ──────────────────────────────────────────────────────
 
-ipcMain.handle('ai:run', async (_, prompt: string) => {
-  const command = (await getSetting('claude_command')) || 'claude'
-  return runClaude(prompt, command)
+/** Effective Claude command: per-project override → global setting → "claude". */
+async function resolveClaudeCommand(projectId?: number): Promise<string> {
+  if (projectId != null) {
+    const projects = await getProjects()
+    const p = projects.find((x) => x.id === projectId)
+    if (p?.claudeCommand && p.claudeCommand.trim()) return p.claudeCommand.trim()
+  }
+  return (await getSetting('claude_command')) || 'claude'
+}
+
+ipcMain.handle('ai:run', async (_, prompt: string, projectId?: number) => {
+  return runClaude(prompt, await resolveClaudeCommand(projectId))
 })
 
 // ── IPC: App ──────────────────────────────────────────────────────────────────

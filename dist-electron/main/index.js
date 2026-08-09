@@ -66,7 +66,8 @@ const SCHEMA = `
     description TEXT,
     githubRepoUrl TEXT,
     color TEXT NOT NULL DEFAULT '#6366f1',
-    archived INTEGER NOT NULL DEFAULT 0
+    archived INTEGER NOT NULL DEFAULT 0,
+    claudeCommand TEXT
   );
 
   CREATE TABLE IF NOT EXISTS todos (
@@ -202,6 +203,16 @@ const MIGRATIONS = [
     run: (db2) => {
       try {
         db2.run("ALTER TABLE tasks ADD COLUMN secondaryTagId INTEGER REFERENCES tags(id) ON DELETE SET NULL;");
+      } catch {
+      }
+    }
+  },
+  {
+    version: 2,
+    label: "projects.claudeCommand",
+    run: (db2) => {
+      try {
+        db2.run("ALTER TABLE projects ADD COLUMN claudeCommand TEXT;");
       } catch {
       }
     }
@@ -557,22 +568,22 @@ async function getProjects() {
   const db2 = await getDb();
   return getAll(db2, "SELECT * FROM projects ORDER BY archived ASC, name ASC");
 }
-async function createProject(name, description, githubRepoUrl, color) {
+async function createProject(name, description, githubRepoUrl, color, claudeCommand = null) {
   const db2 = await getDb();
   run(
     db2,
-    "INSERT INTO projects (name, description, githubRepoUrl, color) VALUES (?, ?, ?, ?)",
-    [name, description, githubRepoUrl, color]
+    "INSERT INTO projects (name, description, githubRepoUrl, color, claudeCommand) VALUES (?, ?, ?, ?, ?)",
+    [name, description, githubRepoUrl, color, claudeCommand]
   );
   const id = lastInsertId(db2);
   return getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
 }
-async function updateProject(id, name, description, githubRepoUrl, color, archived) {
+async function updateProject(id, name, description, githubRepoUrl, color, archived, claudeCommand = null) {
   const db2 = await getDb();
   run(
     db2,
-    "UPDATE projects SET name = ?, description = ?, githubRepoUrl = ?, color = ?, archived = ? WHERE id = ?",
-    [name, description, githubRepoUrl, color, archived, id]
+    "UPDATE projects SET name = ?, description = ?, githubRepoUrl = ?, color = ?, archived = ?, claudeCommand = ? WHERE id = ?",
+    [name, description, githubRepoUrl, color, archived, claudeCommand, id]
   );
   return getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
 }
@@ -1338,11 +1349,11 @@ electron.ipcMain.handle("todos:delete", (_, id) => deleteTodo(id));
 electron.ipcMain.handle("projects:getAll", () => getProjects());
 electron.ipcMain.handle(
   "projects:create",
-  (_, name, description, githubRepoUrl, color) => createProject(name, description, githubRepoUrl, color)
+  (_, name, description, githubRepoUrl, color, claudeCommand) => createProject(name, description, githubRepoUrl, color, claudeCommand)
 );
 electron.ipcMain.handle(
   "projects:update",
-  (_, id, name, description, githubRepoUrl, color, archived) => updateProject(id, name, description, githubRepoUrl, color, archived)
+  (_, id, name, description, githubRepoUrl, color, archived, claudeCommand) => updateProject(id, name, description, githubRepoUrl, color, archived, claudeCommand)
 );
 electron.ipcMain.handle("projects:delete", (_, id) => deleteProject(id));
 electron.ipcMain.handle("habits:getAll", () => getHabits());
@@ -1431,9 +1442,16 @@ electron.ipcMain.handle(
   (_, tripId, origin, destination, price, currency) => createFlightWatch(tripId, origin, destination, price, currency, (/* @__PURE__ */ new Date()).toISOString())
 );
 electron.ipcMain.handle("flights:delete", (_, id) => deleteFlightWatch(id));
-electron.ipcMain.handle("ai:run", async (_, prompt) => {
-  const command = await getSetting("claude_command") || "claude";
-  return runClaude(prompt, command);
+async function resolveClaudeCommand(projectId) {
+  if (projectId != null) {
+    const projects = await getProjects();
+    const p = projects.find((x) => x.id === projectId);
+    if (p?.claudeCommand && p.claudeCommand.trim()) return p.claudeCommand.trim();
+  }
+  return await getSetting("claude_command") || "claude";
+}
+electron.ipcMain.handle("ai:run", async (_, prompt, projectId) => {
+  return runClaude(prompt, await resolveClaudeCommand(projectId));
 });
 electron.ipcMain.handle("app:openExternal", (_, url) => electron.shell.openExternal(url));
 electron.ipcMain.handle("app:exportDb", async () => {

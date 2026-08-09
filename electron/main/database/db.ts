@@ -30,6 +30,17 @@ const MIGRATIONS: Migration[] = [
         // column already exists
       }
     }
+  },
+  {
+    version: 2,
+    label: 'projects.claudeCommand',
+    run: (db) => {
+      try {
+        db.run('ALTER TABLE projects ADD COLUMN claudeCommand TEXT;')
+      } catch {
+        // column already exists
+      }
+    }
   }
 ]
 

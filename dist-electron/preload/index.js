@@ -38,8 +38,8 @@ const api = {
   // Projects
   projects: {
     getAll: () => electron.ipcRenderer.invoke("projects:getAll"),
-    create: (name, description, githubRepoUrl, color) => electron.ipcRenderer.invoke("projects:create", name, description, githubRepoUrl, color),
-    update: (id, name, description, githubRepoUrl, color, archived) => electron.ipcRenderer.invoke("projects:update", id, name, description, githubRepoUrl, color, archived),
+    create: (name, description, githubRepoUrl, color, claudeCommand) => electron.ipcRenderer.invoke("projects:create", name, description, githubRepoUrl, color, claudeCommand),
+    update: (id, name, description, githubRepoUrl, color, archived, claudeCommand) => electron.ipcRenderer.invoke("projects:update", id, name, description, githubRepoUrl, color, archived, claudeCommand),
     delete: (id) => electron.ipcRenderer.invoke("projects:delete", id)
   },
   // Habits
@@ -122,7 +122,7 @@ const api = {
   },
   // AI (Claude CLI)
   ai: {
-    run: (prompt) => electron.ipcRenderer.invoke("ai:run", prompt)
+    run: (prompt, projectId) => electron.ipcRenderer.invoke("ai:run", prompt, projectId)
   },
   // Events (main → renderer)
   on: {

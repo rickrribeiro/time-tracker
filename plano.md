@@ -150,6 +150,7 @@ Feito:
 - [x] IPC `ai:run` + `ai.run` no preload/types.
 - [x] Página **IA** com ações rápidas que usam dados reais do app: **Priorizar tarefas**, **Revisar inbox**, **Planejar a semana**, **Roteiro de viagem** + prompt livre e área de resposta.
 - [x] **Comando configurável** (Configurações → IA, setting `claude_command`, padrão `claude`): suporta múltiplas assinaturas. Tenta o binário direto; se não existir no PATH (ex.: alias `claude-trabalho`), executa via shell interativo para resolver o alias. Prompt via env var (sem injeção).
+- [x] **Comando por projeto** (`projects.claudeCommand`, migração v2): campo opcional no projeto; `ai:run` resolve na ordem projeto → global → `claude`. Pronto para a futura integração de rodar issues por projeto.
 
 Restante / melhorias:
 - [ ] Streaming da resposta (hoje retorna tudo ao final).

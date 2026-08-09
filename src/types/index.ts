@@ -58,6 +58,7 @@ export interface Project {
   githubRepoUrl: string | null
   color: string
   archived: number
+  claudeCommand: string | null
 }
 
 export interface Habit {
@@ -258,7 +259,8 @@ declare global {
           name: string,
           description: string | null,
           githubRepoUrl: string | null,
-          color: string
+          color: string,
+          claudeCommand: string | null
         ) => Promise<Project>
         update: (
           id: number,
@@ -266,7 +268,8 @@ declare global {
           description: string | null,
           githubRepoUrl: string | null,
           color: string,
-          archived: number
+          archived: number,
+          claudeCommand: string | null
         ) => Promise<Project>
         delete: (id: number) => Promise<void>
       }
@@ -343,7 +346,7 @@ declare global {
         delete: (id: number) => Promise<void>
       }
       ai: {
-        run: (prompt: string) => Promise<string>
+        run: (prompt: string, projectId?: number) => Promise<string>
       }
       on: {
         quickCapture: (cb: () => void) => () => void

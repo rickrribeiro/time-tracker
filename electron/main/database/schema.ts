@@ -35,7 +35,8 @@ export const SCHEMA = `
     description TEXT,
     githubRepoUrl TEXT,
     color TEXT NOT NULL DEFAULT '#6366f1',
-    archived INTEGER NOT NULL DEFAULT 0
+    archived INTEGER NOT NULL DEFAULT 0,
+    claudeCommand TEXT
   );
 
   CREATE TABLE IF NOT EXISTS todos (

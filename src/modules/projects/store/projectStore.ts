@@ -4,7 +4,13 @@ import { Project } from '../../../types'
 interface ProjectState {
   projects: Project[]
   refresh: () => Promise<void>
-  create: (name: string, description: string | null, githubRepoUrl: string | null, color: string) => Promise<void>
+  create: (
+    name: string,
+    description: string | null,
+    githubRepoUrl: string | null,
+    color: string,
+    claudeCommand: string | null
+  ) => Promise<void>
   update: (project: Project) => Promise<void>
   remove: (id: number) => Promise<void>
 }
@@ -17,8 +23,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ projects })
   },
 
-  create: async (name, description, githubRepoUrl, color) => {
-    await window.api.projects.create(name, description, githubRepoUrl, color)
+  create: async (name, description, githubRepoUrl, color, claudeCommand) => {
+    await window.api.projects.create(name, description, githubRepoUrl, color, claudeCommand)
     await get().refresh()
   },
 
@@ -29,7 +35,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       project.description,
       project.githubRepoUrl,
       project.color,
-      project.archived
+      project.archived,
+      project.claudeCommand
     )
     await get().refresh()
   },

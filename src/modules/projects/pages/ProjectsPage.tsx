@@ -9,9 +9,10 @@ interface FormState {
   description: string
   githubRepoUrl: string
   color: string
+  claudeCommand: string
 }
 
-const emptyForm: FormState = { name: '', description: '', githubRepoUrl: '', color: '#6366f1' }
+const emptyForm: FormState = { name: '', description: '', githubRepoUrl: '', color: '#6366f1', claudeCommand: '' }
 
 export function ProjectsPage(): React.ReactElement {
   const { projects, refresh, create, update, remove } = useProjectStore()
@@ -35,7 +36,8 @@ export function ProjectsPage(): React.ReactElement {
       name: p.name,
       description: p.description ?? '',
       githubRepoUrl: p.githubRepoUrl ?? '',
-      color: p.color
+      color: p.color,
+      claudeCommand: p.claudeCommand ?? ''
     })
     setShowForm(true)
   }
@@ -48,10 +50,17 @@ export function ProjectsPage(): React.ReactElement {
         name: form.name.trim(),
         description: form.description.trim() || null,
         githubRepoUrl: form.githubRepoUrl.trim() || null,
-        color: form.color
+        color: form.color,
+        claudeCommand: form.claudeCommand.trim() || null
       })
     } else {
-      await create(form.name.trim(), form.description.trim() || null, form.githubRepoUrl.trim() || null, form.color)
+      await create(
+        form.name.trim(),
+        form.description.trim() || null,
+        form.githubRepoUrl.trim() || null,
+        form.color,
+        form.claudeCommand.trim() || null
+      )
     }
     setShowForm(false)
     setEditing(null)
@@ -81,6 +90,9 @@ export function ProjectsPage(): React.ReactElement {
           <div className="stat-card-sub" style={{ wordBreak: 'break-all' }}>
             {p.githubRepoUrl}
           </div>
+        )}
+        {p.claudeCommand && (
+          <div className="stat-card-sub">🤖 <code>{p.claudeCommand}</code></div>
         )}
         <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
           <button className="btn btn-secondary btn-sm" onClick={() => startEdit(p)}>
@@ -115,6 +127,7 @@ export function ProjectsPage(): React.ReactElement {
             <input placeholder="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
             <input placeholder="Descrição (opcional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             <input placeholder="GitHub repo URL (opcional)" value={form.githubRepoUrl} onChange={(e) => setForm({ ...form, githubRepoUrl: e.target.value })} />
+            <input placeholder="Comando do Claude (opcional — padrão global)" value={form.claudeCommand} onChange={(e) => setForm({ ...form, claudeCommand: e.target.value })} />
             <div style={{ display: 'flex', gap: 4 }}>
               {PRESET_COLORS.map((c) => (
                 <button

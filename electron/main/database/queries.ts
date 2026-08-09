@@ -399,6 +399,7 @@ export interface DbProject {
   githubRepoUrl: string | null
   color: string
   archived: number
+  claudeCommand: string | null
 }
 
 export interface DbTodo {
@@ -495,13 +496,14 @@ export async function createProject(
   name: string,
   description: string | null,
   githubRepoUrl: string | null,
-  color: string
+  color: string,
+  claudeCommand: string | null = null
 ): Promise<DbProject> {
   const db = await getDb()
   run(
     db,
-    'INSERT INTO projects (name, description, githubRepoUrl, color) VALUES (?, ?, ?, ?)',
-    [name, description, githubRepoUrl, color]
+    'INSERT INTO projects (name, description, githubRepoUrl, color, claudeCommand) VALUES (?, ?, ?, ?, ?)',
+    [name, description, githubRepoUrl, color, claudeCommand]
   )
   const id = lastInsertId(db)
   return getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])!
@@ -513,13 +515,14 @@ export async function updateProject(
   description: string | null,
   githubRepoUrl: string | null,
   color: string,
-  archived: number
+  archived: number,
+  claudeCommand: string | null = null
 ): Promise<DbProject> {
   const db = await getDb()
   run(
     db,
-    'UPDATE projects SET name = ?, description = ?, githubRepoUrl = ?, color = ?, archived = ? WHERE id = ?',
-    [name, description, githubRepoUrl, color, archived, id]
+    'UPDATE projects SET name = ?, description = ?, githubRepoUrl = ?, color = ?, archived = ?, claudeCommand = ? WHERE id = ?',
+    [name, description, githubRepoUrl, color, archived, claudeCommand, id]
   )
   return getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])!
 }

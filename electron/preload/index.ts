@@ -70,16 +70,17 @@ const api = {
   // Projects
   projects: {
     getAll: () => ipcRenderer.invoke('projects:getAll'),
-    create: (name: string, description: string | null, githubRepoUrl: string | null, color: string) =>
-      ipcRenderer.invoke('projects:create', name, description, githubRepoUrl, color),
+    create: (name: string, description: string | null, githubRepoUrl: string | null, color: string, claudeCommand: string | null) =>
+      ipcRenderer.invoke('projects:create', name, description, githubRepoUrl, color, claudeCommand),
     update: (
       id: number,
       name: string,
       description: string | null,
       githubRepoUrl: string | null,
       color: string,
-      archived: number
-    ) => ipcRenderer.invoke('projects:update', id, name, description, githubRepoUrl, color, archived),
+      archived: number,
+      claudeCommand: string | null
+    ) => ipcRenderer.invoke('projects:update', id, name, description, githubRepoUrl, color, archived, claudeCommand),
     delete: (id: number) => ipcRenderer.invoke('projects:delete', id)
   },
   // Habits
@@ -172,7 +173,7 @@ const api = {
   },
   // AI (Claude CLI)
   ai: {
-    run: (prompt: string) => ipcRenderer.invoke('ai:run', prompt)
+    run: (prompt: string, projectId?: number) => ipcRenderer.invoke('ai:run', prompt, projectId)
   },
   // Events (main → renderer)
   on: {

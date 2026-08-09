@@ -124,8 +124,8 @@ Feito:
 Restante / melhorias:
 - [ ] Parsers específicos por banco (Wise, cartões) e mapeamento de categorias na importação (hoje entra tudo em "Outros").
 - [ ] Conversão entre moedas (hoje soma por moeda separadamente).
-- [ ] Editar transação inline (hoje: criar/excluir).
-- [ ] Sem Open Finance (mantido fora de escopo).
+- [x] Editar transação (modal `TransactionEditor`: tipo, valor, moeda, categoria, conta, data, descrição).
+- [ ] Open Finance (via agregador Pluggy).
 
 ## 7. Viagens  *(prioridade #7 — FEITO no MVP)*
 

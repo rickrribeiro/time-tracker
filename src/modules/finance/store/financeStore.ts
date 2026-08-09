@@ -19,6 +19,7 @@ interface FinanceState {
   addCategory: (name: string, type: string, color: string) => Promise<void>
   removeCategory: (id: number) => Promise<void>
   addTransaction: (t: Omit<Transaction, 'id'>) => Promise<void>
+  updateTransaction: (t: Transaction) => Promise<void>
   removeTransaction: (id: number) => Promise<void>
   importTransactions: (rows: Omit<Transaction, 'id'>[]) => Promise<number>
   setBudget: (categoryId: number, amount: number) => Promise<void>
@@ -74,6 +75,10 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
   },
   addTransaction: async (t) => {
     await window.api.transactions.create(t.accountId, t.categoryId, t.amount, t.currency, t.type, t.description, t.date)
+    await get().refresh()
+  },
+  updateTransaction: async (t) => {
+    await window.api.transactions.update(t.id, t.accountId, t.categoryId, t.amount, t.currency, t.type, t.description, t.date)
     await get().refresh()
   },
   removeTransaction: async (id) => {

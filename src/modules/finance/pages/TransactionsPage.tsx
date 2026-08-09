@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Transaction } from '../../../types'
 import { useFinanceStore } from '../store/financeStore'
 import { MonthNav } from '../components/MonthNav'
+import { TransactionEditor } from '../components/TransactionEditor'
 import { formatMoney, parseBankCsv, transactionsToCsv } from '../util'
 import { localDateStr } from '../../../utils/dates'
 
@@ -28,6 +29,7 @@ export function TransactionsPage(): React.ReactElement {
   const [accountId, setAccountId] = useState<number | ''>('')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(localDateStr(new Date()))
+  const [editing, setEditing] = useState<Transaction | null>(null)
 
   useEffect(() => {
     refresh()
@@ -133,10 +135,13 @@ export function TransactionsPage(): React.ReactElement {
             <span style={{ fontWeight: 600, color: t.type === 'income' ? 'var(--success)' : 'var(--danger)', minWidth: 90, textAlign: 'right' }}>
               {t.type === 'income' ? '+' : '−'}{formatMoney(t.amount, t.currency)}
             </span>
+            <button className="btn btn-secondary btn-sm" onClick={() => setEditing(t)}>Editar</button>
             <button className="btn btn-danger btn-sm" onClick={() => removeTransaction(t.id)}>✕</button>
           </div>
         ))}
       </div>
+
+      {editing && <TransactionEditor tx={editing} onClose={() => setEditing(null)} />}
     </div>
   )
 }

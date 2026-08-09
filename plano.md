@@ -162,7 +162,6 @@ Restante / melhorias:
 ## 🧾 Dívidas / itens do TODO.TXT antigo
 
 - [ ] Banco de horas: 8h por dia útil, tratar feriados; mostrar saldo do dia no calendário (ex.: +3, -2). *(WIP em `day_configs`/`Dashboard.tsx`/`queries.ts`)*
-- [ ] "Semi productive" para hk e velt.
 - [x] Integrar com calendário — feito no #5 (Google Calendar OAuth + eventos manuais + overlay no calendário mensal).
 - [x] Integrar IA para sugestões — feito no #8 (página IA com ações que usam dados do app + comando por projeto/modelo).
 

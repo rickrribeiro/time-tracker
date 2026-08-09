@@ -1,14 +1,12 @@
-botar "semi productive" pra hk e velt
-colocar banco de horas. calcular 8 por dia util. ver como fazer com fériados
-colocar o saldo do dia no calendario ex: +3, -2, etc...
-
 VER APLICAÇÃO DE GABRIEL, ADICIONAR O FINANCEIRO AQUI TB - EXPORTAR LA DO SHEETS E IMPROTAR AQ (PROCESSO REVERSO TB)
-
-integrar com calendario 
-
-integrar com ia para sugestoes
 
 fazer lista de agentes e skills
 ter a base de conhecimento dos projetos, ter uma base de conhecimento minha pessoal
 
-os documentos da viagem devem ser buscados se brasileiro precisa
+
+proximas tarefas: 
+- colocar banco de horas total do mes/semana/dia nos stats. Utilizar como base do calculo a mesma forma que ta no banco de horas do calendar
+- ao inves de usar o "user-profile.md", é melhor isso ser editavel dentro do app, criar uma seção chamada base de conhecimento.
+- quero confirmar se o exportDB ta exportando o banco inteiro com todas as tabelas novas, se não tiver, faça exportar
+
+

@@ -386,6 +386,16 @@ ipcMain.handle('ai:run', async (_, prompt: string, projectId?: number) => {
   return runClaude(prompt, await resolveClaudeCommand(projectId))
 })
 
+// Streaming variant: emits 'ai:chunk' events as output arrives; resolves with full text.
+ipcMain.handle('ai:runStream', async (event, prompt: string, projectId?: number) => {
+  const command = await resolveClaudeCommand(projectId)
+  return runClaude(prompt, command, {
+    onChunk: (text) => {
+      if (!event.sender.isDestroyed()) event.sender.send('ai:chunk', text)
+    }
+  })
+})
+
 // ── IPC: App ──────────────────────────────────────────────────────────────────
 
 ipcMain.handle('app:openExternal', (_, url: string) => shell.openExternal(url))

@@ -153,7 +153,7 @@ Feito:
 - [x] **Comando por projeto** (`projects.claudeCommand`, migração v2): campo opcional no projeto; `ai:run` resolve na ordem projeto → global → `claude`. Pronto para a futura integração de rodar issues por projeto.
 
 Restante / melhorias:
-- [ ] Streaming da resposta (hoje retorna tudo ao final).
+- [x] Streaming da resposta: serviço emite chunks (`onChunk`), IPC `ai:runStream` envia eventos `ai:chunk`; a página IA mostra o texto ao vivo.
 - [ ] Escolher modelo / `--model`.
 - [ ] Mais ações (resumo semanal com horas do tracker, checklist de viagem).
 

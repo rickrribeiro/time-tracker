@@ -173,7 +173,13 @@ const api = {
   },
   // AI (Claude CLI)
   ai: {
-    run: (prompt: string, projectId?: number) => ipcRenderer.invoke('ai:run', prompt, projectId)
+    run: (prompt: string, projectId?: number) => ipcRenderer.invoke('ai:run', prompt, projectId),
+    runStream: (prompt: string, projectId?: number) => ipcRenderer.invoke('ai:runStream', prompt, projectId),
+    onChunk: (cb: (text: string) => void) => {
+      const listener = (_e: unknown, text: string): void => cb(text)
+      ipcRenderer.on('ai:chunk', listener)
+      return () => ipcRenderer.removeListener('ai:chunk', listener)
+    }
   },
   // Events (main → renderer)
   on: {

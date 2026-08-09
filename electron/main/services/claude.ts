@@ -22,14 +22,19 @@ interface SpawnErr extends Error {
   code?: string
 }
 
+export interface RunOptions {
+  onChunk?: (text: string) => void
+}
+
 /**
  * Run one attempt. When `viaShell` is false, spawn the binary directly (clean, fast).
  * When true, run through an interactive login shell so shell aliases resolve
  * (e.g. `claude-trabalho='CLAUDE_CONFIG_DIR=~/.claude-trabalho claude'`). The prompt
  * is passed through the RICKOS_PROMPT env var (never interpolated into the command
- * string) so it can't break out — no shell injection.
+ * string) so it can't break out — no shell injection. `opts.onChunk` receives stdout
+ * incrementally for streaming.
  */
-function attempt(bin: string, prompt: string, viaShell: boolean): Promise<string> {
+function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOptions = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     const env = { ...process.env, PATH: buildPath() }
     let child
@@ -53,7 +58,11 @@ function attempt(bin: string, prompt: string, viaShell: boolean): Promise<string
       reject(new Error('Tempo esgotado (120s) executando o Claude CLI.'))
     }, TIMEOUT_MS)
 
-    child.stdout.on('data', (d) => (stdout += d.toString()))
+    child.stdout.on('data', (d) => {
+      const text = d.toString()
+      stdout += text
+      opts.onChunk?.(text)
+    })
     child.stderr.on('data', (d) => (stderr += d.toString()))
 
     child.on('error', (err: SpawnErr) => {
@@ -80,7 +89,7 @@ function attempt(bin: string, prompt: string, viaShell: boolean): Promise<string
  * command isn't a binary on PATH (ENOENT — typical for a shell alias), retries through
  * an interactive login shell so aliases resolve.
  */
-export async function runClaude(prompt: string, command = 'claude'): Promise<string> {
+export async function runClaude(prompt: string, command = 'claude', opts: RunOptions = {}): Promise<string> {
   const bin = (command || '').trim() || 'claude'
   if (!/^[A-Za-z0-9_./-]+$/.test(bin)) {
     throw new Error(`Comando inválido: "${bin}". Use apenas letras, números, ., _, - ou /.`)
@@ -88,12 +97,12 @@ export async function runClaude(prompt: string, command = 'claude'): Promise<str
   if (!prompt.trim()) throw new Error('Prompt vazio.')
 
   try {
-    return await attempt(bin, prompt, false)
+    return await attempt(bin, prompt, false, opts)
   } catch (err) {
     if ((err as SpawnErr)?.code === 'ENOENT') {
       // Not a binary on PATH — likely a shell alias; retry via interactive shell.
       try {
-        return await attempt(bin, prompt, true)
+        return await attempt(bin, prompt, true, opts)
       } catch (err2) {
         if ((err2 as SpawnErr)?.code === 'ENOENT') {
           throw new Error(

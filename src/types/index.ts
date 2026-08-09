@@ -347,6 +347,8 @@ declare global {
       }
       ai: {
         run: (prompt: string, projectId?: number) => Promise<string>
+        runStream: (prompt: string, projectId?: number) => Promise<string>
+        onChunk: (cb: (text: string) => void) => () => void
       }
       on: {
         quickCapture: (cb: () => void) => () => void

@@ -74,6 +74,9 @@ export function AIPage(): React.ReactElement {
     rH()
     rC()
     rTr()
+    // Stream tokens into the output as they arrive.
+    const off = window.api.ai.onChunk((text) => setOutput((o) => o + text))
+    return off
   }, [])
 
   const ctx: Ctx = {
@@ -89,8 +92,8 @@ export function AIPage(): React.ReactElement {
     setError('')
     setOutput('')
     try {
-      const result = await window.api.ai.run(text)
-      setOutput(result)
+      const result = await window.api.ai.runStream(text)
+      setOutput(result) // canonical final (trimmed), replaces the streamed buffer
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {

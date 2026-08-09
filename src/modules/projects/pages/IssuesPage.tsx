@@ -10,6 +10,42 @@ const COLUMNS: { key: BoardColumn; label: string }[] = [
   { key: 'done', label: 'Concluído' }
 ]
 
+type DoneFilter = 'today' | 'week' | 'month' | 'thisMonth' | 'lastMonth' | 'all'
+
+const DONE_FILTERS: { key: DoneFilter; label: string }[] = [
+  { key: 'today', label: 'Hoje' },
+  { key: 'week', label: '1 semana' },
+  { key: 'month', label: '1 mês' },
+  { key: 'thisMonth', label: 'Esse mês' },
+  { key: 'lastMonth', label: 'Mês passado' },
+  { key: 'all', label: 'Total' }
+]
+
+/** Whether a done issue's updatedAt falls within the selected window (proxy for "when done"). */
+function doneWithin(iso: string | null, f: DoneFilter): boolean {
+  if (f === 'all') return true
+  if (!iso) return false
+  const d = new Date(iso)
+  const now = new Date()
+  switch (f) {
+    case 'today': {
+      const start = new Date()
+      start.setHours(0, 0, 0, 0)
+      return d >= start
+    }
+    case 'week':
+      return d >= new Date(now.getTime() - 7 * 86400000)
+    case 'month':
+      return d >= new Date(now.getTime() - 30 * 86400000)
+    case 'thisMonth':
+      return d >= new Date(now.getFullYear(), now.getMonth(), 1)
+    case 'lastMonth':
+      return d >= new Date(now.getFullYear(), now.getMonth() - 1, 1) && d < new Date(now.getFullYear(), now.getMonth(), 1)
+    default:
+      return true
+  }
+}
+
 interface CardProps {
   issue: GithubIssue
   pushing: boolean
@@ -64,6 +100,7 @@ export function IssuesPage(): React.ReactElement {
     useGithubStore()
   const { projects, refresh: refreshProjects } = useProjectStore()
   const [projectFilter, setProjectFilter] = useState<number | 'all'>('all')
+  const [doneFilter, setDoneFilter] = useState<DoneFilter>('week')
 
   // Add-issue form
   const [showForm, setShowForm] = useState(false)
@@ -89,7 +126,12 @@ export function IssuesPage(): React.ReactElement {
     : issues
 
   const grouped: Record<BoardColumn, GithubIssue[]> = { backlog: [], 'in-progress': [], blocked: [], done: [] }
-  for (const i of visible) grouped[columnFor(i)].push(i)
+  for (const i of visible) {
+    const col = columnFor(i)
+    // the time filter applies only to the Done column (by updatedAt ≈ when it was closed)
+    if (col === 'done' && !doneWithin(i.updatedAt, doneFilter)) continue
+    grouped[col].push(i)
+  }
 
   async function handleAdd(): Promise<void> {
     if (!repo.trim() || !title.trim()) return
@@ -137,6 +179,11 @@ export function IssuesPage(): React.ReactElement {
               ))}
             </select>
           )}
+          <select value={doneFilter} onChange={(e) => setDoneFilter(e.target.value as DoneFilter)} title="Período das concluídas">
+            {DONE_FILTERS.map((f) => (
+              <option key={f.key} value={f.key}>Concluídas: {f.label}</option>
+            ))}
+          </select>
           <button className="btn btn-secondary btn-sm" onClick={() => setShowForm((s) => !s)}>
             {showForm ? 'Fechar' : '+ Nova issue'}
           </button>

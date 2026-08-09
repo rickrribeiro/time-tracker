@@ -346,8 +346,8 @@ declare global {
         delete: (id: number) => Promise<void>
       }
       ai: {
-        run: (prompt: string, projectId?: number) => Promise<string>
-        runStream: (prompt: string, projectId?: number) => Promise<string>
+        run: (prompt: string, projectId?: number, model?: string) => Promise<string>
+        runStream: (prompt: string, projectId?: number, model?: string) => Promise<string>
         onChunk: (cb: (text: string) => void) => () => void
       }
       on: {

@@ -68,16 +68,23 @@ export function AIPage(): React.ReactElement {
   const [output, setOutput] = useState('')
   const [running, setRunning] = useState(false)
   const [error, setError] = useState('')
+  const [model, setModel] = useState('')
 
   useEffect(() => {
     rT()
     rH()
     rC()
     rTr()
+    window.api.settings.get('claude_model').then((m) => setModel(m ?? ''))
     // Stream tokens into the output as they arrive.
     const off = window.api.ai.onChunk((text) => setOutput((o) => o + text))
     return off
   }, [])
+
+  function changeModel(m: string): void {
+    setModel(m)
+    window.api.settings.set('claude_model', m)
+  }
 
   const ctx: Ctx = {
     todos,
@@ -92,7 +99,7 @@ export function AIPage(): React.ReactElement {
     setError('')
     setOutput('')
     try {
-      const result = await window.api.ai.runStream(text)
+      const result = await window.api.ai.runStream(text, undefined, model)
       setOutput(result) // canonical final (trimmed), replaces the streamed buffer
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -136,10 +143,17 @@ export function AIPage(): React.ReactElement {
         onChange={(e) => setPrompt(e.target.value)}
         style={{ width: '100%', resize: 'vertical' }}
       />
-      <div style={{ marginTop: 8 }}>
+      <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
         <button className="btn btn-primary" disabled={running || !prompt.trim()} onClick={() => run(prompt)}>
           {running ? 'Executando…' : 'Executar'}
         </button>
+        <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Modelo:</label>
+        <select value={model} onChange={(e) => changeModel(e.target.value)} disabled={running}>
+          <option value="">Padrão</option>
+          <option value="sonnet">Sonnet</option>
+          <option value="opus">Opus</option>
+          <option value="haiku">Haiku</option>
+        </select>
       </div>
 
       {error && (

@@ -382,14 +382,20 @@ async function resolveClaudeCommand(projectId?: number): Promise<string> {
   return (await getSetting('claude_command')) || 'claude'
 }
 
-ipcMain.handle('ai:run', async (_, prompt: string, projectId?: number) => {
-  return runClaude(prompt, await resolveClaudeCommand(projectId))
+/** Effective model: explicit arg → global setting → '' (CLI default). */
+async function resolveModel(model?: string): Promise<string> {
+  return (model || (await getSetting('claude_model')) || '').trim()
+}
+
+ipcMain.handle('ai:run', async (_, prompt: string, projectId?: number, model?: string) => {
+  return runClaude(prompt, await resolveClaudeCommand(projectId), { model: await resolveModel(model) })
 })
 
 // Streaming variant: emits 'ai:chunk' events as output arrives; resolves with full text.
-ipcMain.handle('ai:runStream', async (event, prompt: string, projectId?: number) => {
+ipcMain.handle('ai:runStream', async (event, prompt: string, projectId?: number, model?: string) => {
   const command = await resolveClaudeCommand(projectId)
   return runClaude(prompt, command, {
+    model: await resolveModel(model),
     onChunk: (text) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:chunk', text)
     }

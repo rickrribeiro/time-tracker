@@ -24,6 +24,7 @@ interface SpawnErr extends Error {
 
 export interface RunOptions {
   onChunk?: (text: string) => void
+  model?: string
 }
 
 /**
@@ -37,14 +38,17 @@ export interface RunOptions {
 function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOptions = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     const env = { ...process.env, PATH: buildPath() }
+    const model = opts.model?.trim()
     let child
     if (viaShell) {
       const shell = process.env.SHELL || '/bin/zsh'
-      child = spawn(shell, ['-ilc', `${bin} -p "$RICKOS_PROMPT"`], {
-        env: { ...env, RICKOS_PROMPT: prompt }
+      const modelPart = model ? ' --model "$RICKOS_MODEL"' : ''
+      child = spawn(shell, ['-ilc', `${bin} -p "$RICKOS_PROMPT"${modelPart}`], {
+        env: { ...env, RICKOS_PROMPT: prompt, RICKOS_MODEL: model || '' }
       })
     } else {
-      child = spawn(bin, ['-p', prompt], { env })
+      const args = model ? ['--model', model, '-p', prompt] : ['-p', prompt]
+      child = spawn(bin, args, { env })
     }
 
     let stdout = ''

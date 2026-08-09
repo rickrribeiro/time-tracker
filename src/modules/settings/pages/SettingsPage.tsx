@@ -30,6 +30,11 @@ export function SettingsPage(): React.ReactElement {
   const [claudeCmd, setClaudeCmd] = useState('claude')
   const [claudeSaved, setClaudeSaved] = useState(false)
 
+  // Skyscanner (RapidAPI)
+  const [skyKey, setSkyKey] = useState('')
+  const [skyHost, setSkyHost] = useState('')
+  const [skySaved, setSkySaved] = useState(false)
+
   // Google Calendar
   const [gClientId, setGClientId] = useState('')
   const [gClientSecret, setGClientSecret] = useState('')
@@ -68,6 +73,8 @@ export function SettingsPage(): React.ReactElement {
     setPClientSecret(values.pluggy_client_secret ?? '')
     setPItemId(values.pluggy_item_id ?? '')
     setClaudeCmd(values.claude_command ?? 'claude')
+    setSkyKey(values.skyscanner_rapidapi_key ?? '')
+    setSkyHost(values.skyscanner_rapidapi_host ?? '')
   }, [
     values.github_token,
     values.github_username,
@@ -76,8 +83,17 @@ export function SettingsPage(): React.ReactElement {
     values.pluggy_client_id,
     values.pluggy_client_secret,
     values.pluggy_item_id,
-    values.claude_command
+    values.claude_command,
+    values.skyscanner_rapidapi_key,
+    values.skyscanner_rapidapi_host
   ])
+
+  async function saveSky(): Promise<void> {
+    await set('skyscanner_rapidapi_key', skyKey.trim())
+    await set('skyscanner_rapidapi_host', skyHost.trim())
+    setSkySaved(true)
+    setTimeout(() => setSkySaved(false), 2000)
+  }
 
   async function saveClaudeCmd(): Promise<void> {
     await set('claude_command', claudeCmd.trim() || 'claude')
@@ -319,6 +335,26 @@ export function SettingsPage(): React.ReactElement {
         </div>
         <div style={{ marginTop: 12 }}>
           <button className="btn btn-primary btn-sm" onClick={saveClaudeCmd}>{claudeSaved ? '✓ Salvo' : 'Salvar comando'}</button>
+        </div>
+      </div>
+
+      <div className="chart-section" style={{ maxWidth: 560, marginTop: 16 }}>
+        <div className="chart-title">✈️ Skyscanner (RapidAPI)</div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 12px' }}>
+          Busca de preços de passagens (o Skyscanner já agrega várias fontes). Assine uma API
+          Skyscanner no <strong>RapidAPI</strong> e cole a chave. O host é opcional (padrão
+          <code> sky-scanner3.p.rapidapi.com</code>) — ajuste se usar outro provedor.
+        </p>
+        <div className="editor-field">
+          <label>RapidAPI Key</label>
+          <input type="password" value={skyKey} onChange={(e) => setSkyKey(e.target.value)} />
+        </div>
+        <div className="editor-field">
+          <label>Host (opcional)</label>
+          <input type="text" placeholder="sky-scanner3.p.rapidapi.com" value={skyHost} onChange={(e) => setSkyHost(e.target.value)} />
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <button className="btn btn-primary btn-sm" onClick={saveSky}>{skySaved ? '✓ Salvo' : 'Salvar'}</button>
         </div>
       </div>
     </div>

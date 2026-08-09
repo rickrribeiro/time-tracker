@@ -169,7 +169,10 @@ const api = {
     getAll: () => ipcRenderer.invoke('flights:getAll'),
     create: (tripId: number | null, origin: string | null, destination: string | null, price: number | null, currency: string) =>
       ipcRenderer.invoke('flights:create', tripId, origin, destination, price, currency),
-    delete: (id: number) => ipcRenderer.invoke('flights:delete', id)
+    delete: (id: number) => ipcRenderer.invoke('flights:delete', id),
+    search: (origin: string, destination: string, currency: string, date?: string | null) =>
+      ipcRenderer.invoke('flights:search', origin, destination, currency, date),
+    refreshWatch: (id: number) => ipcRenderer.invoke('flights:refreshWatch', id)
   },
   // AI (Claude CLI)
   ai: {

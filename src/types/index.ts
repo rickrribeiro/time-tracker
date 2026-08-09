@@ -344,6 +344,8 @@ declare global {
         getAll: () => Promise<FlightWatch[]>
         create: (tripId: number | null, origin: string | null, destination: string | null, price: number | null, currency: string) => Promise<FlightWatch>
         delete: (id: number) => Promise<void>
+        search: (origin: string, destination: string, currency: string, date?: string | null) => Promise<number>
+        refreshWatch: (id: number) => Promise<FlightWatch>
       }
       ai: {
         run: (prompt: string, projectId?: number, model?: string) => Promise<string>

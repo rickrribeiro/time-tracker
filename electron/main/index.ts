@@ -72,6 +72,7 @@ import { syncGithubIssues } from './services/github'
 import { runClaude } from './services/claude'
 import { connectGoogle, googleConnected, disconnectGoogle, syncGoogleCalendar } from './services/google'
 import { syncPluggy, pluggyConfigured } from './services/pluggy'
+import { searchFlightPrice, refreshWatchPrice } from './services/flights'
 import { encodeSecret, decodeSecret } from './services/secrets'
 
 function createWindow(): void {
@@ -369,6 +370,10 @@ ipcMain.handle('flights:create', (_, tripId: number | null, origin: string | nul
   createFlightWatch(tripId, origin, destination, price, currency, new Date().toISOString())
 )
 ipcMain.handle('flights:delete', (_, id: number) => deleteFlightWatch(id))
+ipcMain.handle('flights:search', (_, origin: string, destination: string, currency: string, date?: string | null) =>
+  searchFlightPrice(origin, destination, currency, date)
+)
+ipcMain.handle('flights:refreshWatch', (_, id: number) => refreshWatchPrice(id))
 
 // ── IPC: AI (Claude CLI) ──────────────────────────────────────────────────────
 

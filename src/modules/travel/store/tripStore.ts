@@ -10,6 +10,7 @@ interface TripState {
   removeTrip: (id: number) => Promise<void>
   addWatch: (tripId: number | null, origin: string | null, destination: string | null, price: number | null, currency: string) => Promise<void>
   removeWatch: (id: number) => Promise<void>
+  refreshWatchPrice: (id: number) => Promise<void>
 }
 
 export const useTripStore = create<TripState>((set, get) => ({
@@ -39,6 +40,10 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
   removeWatch: async (id) => {
     await window.api.flights.delete(id)
+    await get().refresh()
+  },
+  refreshWatchPrice: async (id) => {
+    await window.api.flights.refreshWatch(id)
     await get().refresh()
   }
 }))

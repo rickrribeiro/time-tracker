@@ -139,7 +139,7 @@ Feito:
 - [x] Destinos (derivados das viagens).
 
 Restante / melhorias:
-- [ ] Busca automática de preços de passagem (fonte real / API).
+- [x] Busca de preços de passagem via **Skyscanner (RapidAPI)**: `services/flights.ts` (auto-complete → search-one-way, extração de menor preço robusta a schema). Botão "🔎 Buscar preço" no add e "🔄 Atualizar preço" por trecho (usa a data de início da viagem). Chave/host em Configurações. Requer assinatura de uma API Skyscanner no RapidAPI.
 - [ ] Persistir checklist de documentos por viagem.
 - [ ] Recomendações geradas por IA (ver #8).
 

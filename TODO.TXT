@@ -7,3 +7,6 @@ VER APLICAÇÃO DE GABRIEL, ADICIONAR O FINANCEIRO AQUI TB - EXPORTAR LA DO SHEE
 integrar com calendario 
 
 integrar com ia para sugestoes
+
+fazer lista de agentes e skills
+ter a base de conhecimento dos projetos, ter uma base de conhecimento minha pessoal

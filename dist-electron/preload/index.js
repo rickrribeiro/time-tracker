@@ -118,7 +118,9 @@ const api = {
   flights: {
     getAll: () => electron.ipcRenderer.invoke("flights:getAll"),
     create: (tripId, origin, destination, price, currency) => electron.ipcRenderer.invoke("flights:create", tripId, origin, destination, price, currency),
-    delete: (id) => electron.ipcRenderer.invoke("flights:delete", id)
+    delete: (id) => electron.ipcRenderer.invoke("flights:delete", id),
+    search: (origin, destination, currency, date) => electron.ipcRenderer.invoke("flights:search", origin, destination, currency, date),
+    refreshWatch: (id) => electron.ipcRenderer.invoke("flights:refreshWatch", id)
   },
   // AI (Claude CLI)
   ai: {

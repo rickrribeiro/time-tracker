@@ -1002,3 +1002,12 @@ export async function deleteFlightWatch(id: number): Promise<void> {
   const db = await getDb()
   run(db, 'DELETE FROM flight_watches WHERE id = ?', [id])
 }
+
+export async function updateFlightWatchPrice(
+  id: number,
+  price: number,
+  lastChecked: string
+): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE flight_watches SET price = ?, lastChecked = ? WHERE id = ?', [price, lastChecked, id])
+}

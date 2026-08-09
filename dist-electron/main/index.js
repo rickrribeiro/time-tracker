@@ -871,11 +871,16 @@ async function deleteFlightWatch(id) {
   const db2 = await getDb();
   run(db2, "DELETE FROM flight_watches WHERE id = ?", [id]);
 }
+async function updateFlightWatchPrice(id, price, lastChecked) {
+  const db2 = await getDb();
+  run(db2, "UPDATE flight_watches SET price = ?, lastChecked = ? WHERE id = ?", [price, lastChecked, id]);
+}
 const SENSITIVE_KEYS = /* @__PURE__ */ new Set([
   "github_token",
   "google_client_secret",
   "google_refresh_token",
-  "pluggy_client_secret"
+  "pluggy_client_secret",
+  "skyscanner_rapidapi_key"
 ]);
 const ENC_PREFIX = "enc:";
 function encodeSecret(key, value) {
@@ -930,7 +935,7 @@ async function syncGithubIssues() {
   if (!token) {
     throw new Error("GitHub token não configurado. Vá em Configurações e adicione um token.");
   }
-  const headers = {
+  const headers2 = {
     Authorization: `Bearer ${token}`,
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
@@ -943,7 +948,7 @@ async function syncGithubIssues() {
   const data = [];
   let pages = 0;
   while (url && pages < MAX_PAGES) {
-    const res = await fetch(url, { headers });
+    const res = await fetch(url, { headers: headers2 });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       if (res.status === 401) throw new Error("Token inválido ou expirado (401).");
@@ -1249,6 +1254,93 @@ async function syncPluggy() {
 async function pluggyConfigured() {
   return !!await getSetting("pluggy_client_id") && !!await getSetting("pluggy_item_id");
 }
+const DEFAULT_HOST = "sky-scanner3.p.rapidapi.com";
+async function cfg() {
+  const key = decodeSecret(await getSetting("skyscanner_rapidapi_key")) ?? "";
+  const host = await getSetting("skyscanner_rapidapi_host") || DEFAULT_HOST;
+  if (!key) throw new Error("Configure a RapidAPI Key do Skyscanner em Configurações.");
+  return { key, host };
+}
+function headers(key, host) {
+  return { "X-RapidAPI-Key": key, "X-RapidAPI-Host": host };
+}
+function defaultDate() {
+  const d = /* @__PURE__ */ new Date();
+  d.setDate(d.getDate() + 30);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+async function resolvePlace(query, key, host) {
+  const res = await fetch(`https://${host}/flights/auto-complete?query=${encodeURIComponent(query)}`, {
+    headers: headers(key, host)
+  });
+  if (!res.ok) throw new Error(`auto-complete falhou (${res.status}).`);
+  const json = await res.json();
+  const first = (json.data ?? [])[0];
+  if (!first) throw new Error(`Local não encontrado: "${query}".`);
+  const nav = first.navigation ?? {};
+  const rel = nav.relevantFlightParams ?? {};
+  const entityId = rel.entityId ?? nav.entityId ?? first.entityId;
+  const skyId = rel.skyId ?? first.skyId;
+  if (!entityId) throw new Error(`Não consegui resolver o ID de "${query}".`);
+  return { skyId, entityId };
+}
+function deepMinPrice(obj) {
+  let min = Infinity;
+  const walk = (o) => {
+    if (!o || typeof o !== "object") return;
+    if (Array.isArray(o)) {
+      o.forEach(walk);
+      return;
+    }
+    for (const [k, v] of Object.entries(o)) {
+      if (k === "price" && v && typeof v === "object" && typeof v.raw === "number") {
+        const raw = v.raw;
+        if (raw > 0) min = Math.min(min, raw);
+      } else if (k === "price" && typeof v === "number" && v > 0) {
+        min = Math.min(min, v);
+      } else {
+        walk(v);
+      }
+    }
+  };
+  walk(obj);
+  return isFinite(min) ? Math.round(min * 100) / 100 : null;
+}
+async function searchFlightPrice(origin, destination, currency = "BRL", date) {
+  const { key, host } = await cfg();
+  const dep = date || defaultDate();
+  const from = await resolvePlace(origin, key, host);
+  const to = await resolvePlace(destination, key, host);
+  const params = new URLSearchParams({
+    fromEntityId: from.entityId,
+    toEntityId: to.entityId,
+    departDate: dep,
+    currency
+  });
+  const res = await fetch(`https://${host}/flights/search-one-way?${params.toString()}`, {
+    headers: headers(key, host)
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Busca de voos falhou (${res.status}). ${body.slice(0, 120)}`);
+  }
+  const min = deepMinPrice(await res.json());
+  if (min == null) throw new Error("Nenhum preço encontrado para essa rota/data.");
+  return min;
+}
+async function refreshWatchPrice(id) {
+  const w = (await getFlightWatches()).find((x) => x.id === id);
+  if (!w) throw new Error("Trecho não encontrado.");
+  if (!w.origin || !w.destination) throw new Error("O trecho precisa de origem e destino para buscar.");
+  let date = null;
+  if (w.tripId != null) {
+    const trip = (await getTrips()).find((t) => t.id === w.tripId);
+    date = trip?.startDate ?? null;
+  }
+  const price = await searchFlightPrice(w.origin, w.destination, w.currency, date);
+  await updateFlightWatchPrice(id, price, (/* @__PURE__ */ new Date()).toISOString());
+  return (await getFlightWatches()).find((x) => x.id === id);
+}
 function createWindow() {
   const win = new electron.BrowserWindow({
     width: 1280,
@@ -1449,6 +1541,11 @@ electron.ipcMain.handle(
   (_, tripId, origin, destination, price, currency) => createFlightWatch(tripId, origin, destination, price, currency, (/* @__PURE__ */ new Date()).toISOString())
 );
 electron.ipcMain.handle("flights:delete", (_, id) => deleteFlightWatch(id));
+electron.ipcMain.handle(
+  "flights:search",
+  (_, origin, destination, currency, date) => searchFlightPrice(origin, destination, currency, date)
+);
+electron.ipcMain.handle("flights:refreshWatch", (_, id) => refreshWatchPrice(id));
 async function resolveClaudeCommand(projectId) {
   if (projectId != null) {
     const projects = await getProjects();

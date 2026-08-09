@@ -44,10 +44,11 @@ interface NavItem {
   icon: string
 }
 
-const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
   { label: '', items: [{ id: 'home', label: 'Dashboard', icon: '🏠' }] },
   {
     label: 'Time Tracker',
+    groupIcon: '⏱',
     items: [
       { id: 'timeline', label: 'Timeline', icon: '⏱' },
       { id: 'calendar', label: 'Calendar', icon: '📅' },
@@ -58,6 +59,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
   {
     label: 'Organização',
+    groupIcon: '🗂',
     items: [
       { id: 'inbox', label: 'Inbox', icon: '📥' },
       { id: 'todo', label: 'TODO', icon: '✅' },
@@ -67,6 +69,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
   {
     label: 'Projetos',
+    groupIcon: '📁',
     items: [
       { id: 'projects', label: 'Projetos', icon: '🗂' },
       { id: 'issues', label: 'Issues (Kanban)', icon: '📌' }
@@ -74,6 +77,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
   {
     label: 'Finanças',
+    groupIcon: '💰',
     items: [
       { id: 'finance-dashboard', label: 'Dashboard', icon: '💰' },
       { id: 'transactions', label: 'Transações', icon: '💸' },
@@ -84,6 +88,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
   {
     label: 'Viagens',
+    groupIcon: '✈️',
     items: [
       { id: 'trips', label: 'Próximas', icon: '✈️' },
       { id: 'trip-monitoring', label: 'Monitoramento', icon: '🔔' },
@@ -94,6 +99,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
   {
     label: 'IA',
+    groupIcon: '🤖',
     items: [
       { id: 'ai', label: 'Assistente', icon: '🤖' },
       { id: 'ai-skills', label: 'Skills', icon: '🧩' },
@@ -209,6 +215,7 @@ export default function App(): React.ReactElement {
                     aria-expanded={!isCollapsed}
                   >
                     <span className={`nav-group-chevron ${isCollapsed ? 'collapsed' : ''}`}>▾</span>
+                    {group.groupIcon && <span className="nav-group-icon">{group.groupIcon}</span>}
                     <span>{group.label}</span>
                   </button>
                 )}
@@ -220,7 +227,7 @@ export default function App(): React.ReactElement {
                           className={`nav-btn ${currentPage === item.id ? 'active' : ''}`}
                           onClick={() => setPage(item.id)}
                         >
-                          <span className="nav-icon">{item.icon}</span>
+                          {!group.label && <span className="nav-icon">{item.icon}</span>}
                           <span className="nav-label">{item.label}</span>
                         </button>
                       </li>

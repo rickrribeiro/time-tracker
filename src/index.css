@@ -122,12 +122,10 @@ select:focus {
 .nav-group-label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  font-size: 11.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-secondary);
   padding: 12px 12px 5px;
   transition: color 0.15s;
@@ -1774,4 +1772,14 @@ select:focus {
 }
 @media (max-width: 780px) {
   .runner-grid { grid-template-columns: 1fr; }
+}
+
+/* teste: emoji no título do grupo, itens agrupados sem ícone e indentados */
+.nav-group-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+.nav-group-label + ul .nav-btn {
+  padding: 6px 12px 6px 22px;
+  font-size: 12.5px;
 }

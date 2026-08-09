@@ -101,6 +101,7 @@ export function Dashboard(): React.ReactElement {
   // Banco de horas: mesmo cálculo do calendário — horas produtivas menos 8h por dia útil marcado.
   const workDays = dailyStats.filter((d) => d.isWorkDay === 1).length
   const bankMinutes = productiveMinutes - workDays * 8 * 60
+  const semiBankMinutes = prodPlusSemiMinutes - workDays * 8 * 60
 
   const maxDayMinutes = Math.max(...dailyStats.map((d) => d.totalMinutes), 1)
   const maxTagMinutes = Math.max(...tagStats.map((t) => t.totalMinutes), 1)
@@ -141,14 +142,7 @@ export function Dashboard(): React.ReactElement {
       ) : (
         <>
           <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
-            <div className="stat-card">
-              <div className="stat-card-label">Banco de Horas</div>
-              <div className="stat-card-value" style={{ color: bankMinutes < 0 ? 'var(--danger)' : 'var(--success)' }}>
-                {bankMinutes < 0 ? '−' : '+'}{formatHoursShort(Math.abs(bankMinutes))}
-                <span style={{ fontSize: 18, color: 'var(--text-muted)' }}>h</span>
-              </div>
-              <div className="stat-card-sub">{workDays} {workDays === 1 ? 'dia útil' : 'dias úteis'} × 8h</div>
-            </div>
+            
             <div className="stat-card">
               <div className="stat-card-label">Work + Personal Projects + Study</div>
               <div className="stat-card-value">{formatHoursShort(totalMinutes)}<span style={{ fontSize: 18, color: 'var(--text-muted)' }}>h</span></div>
@@ -168,6 +162,17 @@ export function Dashboard(): React.ReactElement {
               <div className="stat-card-label">Active Days</div>
               <div className="stat-card-value">{activeDays}</div>
               <div className="stat-card-sub">{dailyStats.length} days in period</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-label">Banco de Horas</div>
+              <div className="stat-card-value" style={{ color: bankMinutes < 0 ? 'var(--danger)' : 'var(--success)' }}>
+                {bankMinutes < 0 ? '−' : '+'}{formatHoursShort(Math.abs(bankMinutes))}
+                <span style={{ fontSize: 18, color: 'var(--text-muted)' }}>h</span>
+              </div>
+              <div className="stat-card-sub">{workDays} {workDays === 1 ? 'dia útil' : 'dias úteis'} × 8h</div>
+              <div className="stat-card-sub">Semi: {semiBankMinutes < 0 ? '−' : '+'}{formatHoursShort(Math.abs(semiBankMinutes))}</div>
+
+              
             </div>
           </div>
 

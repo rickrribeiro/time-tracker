@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { DailyStats } from '@/types'
 import { localDateStr, localDayStartISO } from '@/utils/dates'
+import { useHabitStore } from '../../../habits/store/habitStore'
 
 interface Props {
   year: number
@@ -63,6 +64,17 @@ export function CalendarView({
   useEffect(() => {
     refreshStats()
   }, [year, month])
+
+  // Today's habits (always "today", independent of the month being viewed)
+  const { habits, isDone, refresh: refreshHabits } = useHabitStore()
+  useEffect(() => {
+    refreshHabits()
+  }, [])
+  const activeHabits = habits.filter((h) => h.active === 1)
+  const habitsTotal = activeHabits.length
+  const habitsDone = activeHabits.filter((h) => isDone(h.id)).length
+  const habitsAllDone = habitsTotal > 0 && habitsDone === habitsTotal
+  const habitsPending = activeHabits.filter((h) => !isDone(h.id)).map((h) => h.name)
 
   const toggleWorkDay = async (date: string, current: number) => {
     const next = current === 1 ? 0 : 1
@@ -161,6 +173,18 @@ export function CalendarView({
                   {!cell.otherMonth && eventDays[cell.date] > 0 && (
                     <span className="cal-event-badge" title={`${eventDays[cell.date]} evento(s)`}>
                       📅 {eventDays[cell.date]}
+                    </span>
+                  )}
+                  {cell.date === today && habitsTotal > 0 && (
+                    <span
+                      className={`cal-habit-badge ${habitsAllDone ? 'done' : ''}`}
+                      title={
+                        habitsAllDone
+                          ? 'Todos os hábitos de hoje concluídos ✅'
+                          : `Hábitos pendentes: ${habitsPending.join(', ')}`
+                      }
+                    >
+                      {habitsAllDone ? '✅' : '🔥'} {habitsDone}/{habitsTotal}
                     </span>
                   )}
                   {!cell.otherMonth && (

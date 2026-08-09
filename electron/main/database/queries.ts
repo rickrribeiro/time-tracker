@@ -727,6 +727,21 @@ export async function deleteCalendarEvent(id: number): Promise<void> {
   run(db, 'DELETE FROM calendar_events WHERE id = ?', [id])
 }
 
+/** Replace all Google-sourced events (leaves manual events untouched). */
+export async function replaceGoogleEvents(
+  events: { title: string; startTime: string; endTime: string | null; location: string | null }[]
+): Promise<void> {
+  const db = await getDb()
+  run(db, "DELETE FROM calendar_events WHERE source = 'google'")
+  for (const e of events) {
+    run(
+      db,
+      "INSERT INTO calendar_events (title, startTime, endTime, location, source) VALUES (?, ?, ?, ?, 'google')",
+      [e.title, e.startTime, e.endTime, e.location]
+    )
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Finance (accounts, categories, transactions, budgets, investments)
 // ══════════════════════════════════════════════════════════════════════════════

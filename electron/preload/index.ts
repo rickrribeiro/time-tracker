@@ -115,6 +115,13 @@ const api = {
       ipcRenderer.invoke('calendar:create', title, startTime, endTime, location),
     delete: (id: number) => ipcRenderer.invoke('calendar:delete', id)
   },
+  // Google Calendar (OAuth)
+  google: {
+    connect: () => ipcRenderer.invoke('google:connect'),
+    status: () => ipcRenderer.invoke('google:status'),
+    disconnect: () => ipcRenderer.invoke('google:disconnect'),
+    sync: () => ipcRenderer.invoke('google:sync')
+  },
   // Finance
   accounts: {
     getAll: () => ipcRenderer.invoke('accounts:getAll'),

@@ -294,6 +294,12 @@ declare global {
         create: (title: string, startTime: string, endTime: string | null, location: string | null) => Promise<CalendarEvent>
         delete: (id: number) => Promise<void>
       }
+      google: {
+        connect: () => Promise<boolean>
+        status: () => Promise<boolean>
+        disconnect: () => Promise<void>
+        sync: () => Promise<number>
+      }
       accounts: {
         getAll: () => Promise<Account[]>
         create: (name: string, currency: string, balance: number) => Promise<Account>

@@ -1,7 +1,12 @@
 import { safeStorage } from 'electron'
 
 /** Setting keys encrypted at rest with the OS keychain via Electron safeStorage. */
-export const SENSITIVE_KEYS = new Set(['github_token'])
+export const SENSITIVE_KEYS = new Set([
+  'github_token',
+  'google_client_secret',
+  'google_refresh_token',
+  'pluggy_client_secret'
+])
 const ENC_PREFIX = 'enc:'
 
 export function encodeSecret(key: string, value: string): string {

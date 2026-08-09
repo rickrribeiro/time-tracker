@@ -70,6 +70,7 @@ import {
 import type { DbTransaction } from './database/queries'
 import { syncGithubIssues } from './services/github'
 import { runClaude } from './services/claude'
+import { connectGoogle, googleConnected, disconnectGoogle, syncGoogleCalendar } from './services/google'
 import { encodeSecret, decodeSecret } from './services/secrets'
 
 function createWindow(): void {
@@ -309,6 +310,13 @@ ipcMain.handle(
     createCalendarEvent(title, startTime, endTime, location)
 )
 ipcMain.handle('calendar:delete', (_, id: number) => deleteCalendarEvent(id))
+
+// ── IPC: Google Calendar ──────────────────────────────────────────────────────
+
+ipcMain.handle('google:connect', () => connectGoogle())
+ipcMain.handle('google:status', () => googleConnected())
+ipcMain.handle('google:disconnect', () => disconnectGoogle())
+ipcMain.handle('google:sync', () => syncGoogleCalendar())
 
 // ── IPC: Finance ──────────────────────────────────────────────────────────────
 

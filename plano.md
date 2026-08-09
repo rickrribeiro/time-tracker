@@ -105,8 +105,8 @@ Feito:
 - [x] Row "Google Calendar (em breve)" nas Configurações.
 
 Restante:
-- [ ] **OAuth Google** (fluxo desktop) + refresh token — precisa de client ID/secret.
-- [ ] Sync automático dos próximos 7 dias (source='google').
+- [x] **OAuth Google** (fluxo desktop loopback + PKCE em `services/google.ts`) + refresh token cifrado; UI em Configurações (Client ID/Secret, Conectar, Sincronizar, Desconectar).
+- [x] Sync dos próximos 7 dias (`calendar.readonly`) → `calendar_events` source='google' (replace só dos google, preserva manuais).
 - [ ] Overlay de eventos no calendário mensal do time-tracker.
 
 ## 6. Finanças  *(prioridade #6 — FEITO no MVP)*

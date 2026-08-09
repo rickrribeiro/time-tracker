@@ -70,6 +70,13 @@ const api = {
     create: (title, startTime, endTime, location) => electron.ipcRenderer.invoke("calendar:create", title, startTime, endTime, location),
     delete: (id) => electron.ipcRenderer.invoke("calendar:delete", id)
   },
+  // Google Calendar (OAuth)
+  google: {
+    connect: () => electron.ipcRenderer.invoke("google:connect"),
+    status: () => electron.ipcRenderer.invoke("google:status"),
+    disconnect: () => electron.ipcRenderer.invoke("google:disconnect"),
+    sync: () => electron.ipcRenderer.invoke("google:sync")
+  },
   // Finance
   accounts: {
     getAll: () => electron.ipcRenderer.invoke("accounts:getAll"),

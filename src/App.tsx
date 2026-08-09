@@ -33,6 +33,7 @@ import {
 import { SettingsPage } from './modules/settings/pages/SettingsPage'
 import { AIPage } from './modules/ai/pages/AIPage'
 import { SkillsPage } from './modules/ai/pages/SkillsPage'
+import { AgentsPage } from './modules/ai/pages/AgentsPage'
 import { Page } from './types'
 
 interface NavItem {
@@ -93,7 +94,8 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'IA',
     items: [
       { id: 'ai', label: 'Assistente', icon: '🤖' },
-      { id: 'ai-skills', label: 'Skills', icon: '🧩' }
+      { id: 'ai-skills', label: 'Skills', icon: '🧩' },
+      { id: 'ai-agents', label: 'Agentes', icon: '🤝' }
     ]
   },
   { label: '', items: [{ id: 'settings', label: 'Configurações', icon: '⚙️' }] }
@@ -124,6 +126,7 @@ const PAGES: Record<Page, React.ComponentType> = {
   recommendations: RecommendationsPage,
   ai: AIPage,
   'ai-skills': SkillsPage,
+  'ai-agents': AgentsPage,
   settings: SettingsPage
 }
 

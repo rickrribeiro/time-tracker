@@ -1742,3 +1742,20 @@ select:focus {
   color: var(--accent-hover);
   white-space: nowrap;
 }
+
+.skill-checklist {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  overflow-y: auto;
+  background: var(--bg-tertiary);
+}
+.skill-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.skill-check-row:hover { background: var(--bg-hover); border-radius: var(--radius-sm); }

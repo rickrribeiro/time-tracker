@@ -32,6 +32,7 @@ import {
 } from './modules/travel/pages'
 import { SettingsPage } from './modules/settings/pages/SettingsPage'
 import { AIPage } from './modules/ai/pages/AIPage'
+import { SkillsPage } from './modules/ai/pages/SkillsPage'
 import { Page } from './types'
 
 interface NavItem {
@@ -88,7 +89,13 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { id: 'recommendations', label: 'Recomendações', icon: '⭐' }
     ]
   },
-  { label: '', items: [{ id: 'ai', label: 'IA', icon: '🤖' }] },
+  {
+    label: 'IA',
+    items: [
+      { id: 'ai', label: 'Assistente', icon: '🤖' },
+      { id: 'ai-skills', label: 'Skills', icon: '🧩' }
+    ]
+  },
   { label: '', items: [{ id: 'settings', label: 'Configurações', icon: '⚙️' }] }
 ]
 
@@ -116,6 +123,7 @@ const PAGES: Record<Page, React.ComponentType> = {
   documents: DocumentsPage,
   recommendations: RecommendationsPage,
   ai: AIPage,
+  'ai-skills': SkillsPage,
   settings: SettingsPage
 }
 

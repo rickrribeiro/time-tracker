@@ -232,6 +232,7 @@ export type Page =
   | 'recommendations'
   // IA
   | 'ai'
+  | 'ai-skills'
   // Configurações
   | 'settings'
 

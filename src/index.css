@@ -1705,3 +1705,40 @@ select:focus {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* ── IA library ──────────────────────────────────────────────────────────────── */
+
+.tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+}
+
+.star-btn {
+  color: var(--warning);
+  font-size: 14px;
+}
+
+.badge-hot {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.15);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.cat-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--accent-hover);
+  white-space: nowrap;
+}

@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react'
 import { useTripStore } from '../store/tripStore'
 import { formatMoney } from '../../finance/util'
 
-const CURRENCIES = ['JPY', 'BRL', 'USD', 'EUR']
+const CURRENCIES = ['BRL', 'JPY', 'USD', 'EUR']
 
 export function MonitoringPage(): React.ReactElement {
   const { watches, trips, refresh, addWatch, removeWatch, refreshWatchPrice } = useTripStore()
   const [origin, setOrigin] = useState('')
   const [destination, setDestination] = useState('')
   const [price, setPrice] = useState('')
-  const [currency, setCurrency] = useState('JPY')
+  const [currency, setCurrency] = useState('BRL')
   const [tripId, setTripId] = useState<number | ''>('')
   const [searching, setSearching] = useState(false)
   const [busyId, setBusyId] = useState<number | null>(null)

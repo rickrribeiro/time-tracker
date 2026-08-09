@@ -132,7 +132,7 @@ export const SCHEMA = `
     origin TEXT,
     destination TEXT,
     price REAL,
-    currency TEXT NOT NULL DEFAULT 'JPY',
+    currency TEXT NOT NULL DEFAULT 'BRL',
     lastChecked TEXT
   );
 

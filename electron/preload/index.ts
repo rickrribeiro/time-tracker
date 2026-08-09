@@ -106,7 +106,11 @@ const api = {
   // GitHub
   github: {
     getIssues: () => ipcRenderer.invoke('github:getIssues'),
-    sync: () => ipcRenderer.invoke('github:sync')
+    sync: () => ipcRenderer.invoke('github:sync'),
+    createLocal: (repo: string, title: string, body: string | null) =>
+      ipcRenderer.invoke('github:createLocal', repo, title, body),
+    deleteIssue: (id: number) => ipcRenderer.invoke('github:deleteIssue', id),
+    createOnGithub: (id: number) => ipcRenderer.invoke('github:createOnGithub', id)
   },
   // Calendar
   calendar: {

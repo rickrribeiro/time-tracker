@@ -38,6 +38,8 @@ import {
   setSetting,
   getAllSettings,
   getGithubIssues,
+  createLocalIssue,
+  deleteGithubIssue,
   getUpcomingEvents,
   getEventsForRange,
   createCalendarEvent,
@@ -70,7 +72,7 @@ import {
   setTripDocument
 } from './database/queries'
 import type { DbTransaction } from './database/queries'
-import { syncGithubIssues } from './services/github'
+import { syncGithubIssues, createIssueViaClaude } from './services/github'
 import { runClaude } from './services/claude'
 import { connectGoogle, googleConnected, disconnectGoogle, syncGoogleCalendar } from './services/google'
 import { syncPluggy, pluggyConfigured } from './services/pluggy'
@@ -300,6 +302,11 @@ ipcMain.handle('settings:getAll', async () => {
 
 ipcMain.handle('github:getIssues', () => getGithubIssues())
 ipcMain.handle('github:sync', () => syncGithubIssues())
+ipcMain.handle('github:createLocal', (_, repo: string, title: string, body: string | null) =>
+  createLocalIssue(repo, title, body)
+)
+ipcMain.handle('github:deleteIssue', (_, id: number) => deleteGithubIssue(id))
+ipcMain.handle('github:createOnGithub', (_, id: number) => createIssueViaClaude(id))
 
 // ── IPC: Calendar ─────────────────────────────────────────────────────────────
 

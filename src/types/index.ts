@@ -85,6 +85,8 @@ export interface GithubIssue {
   labels: string | null // JSON array of label names
   milestone: string | null
   updatedAt: string | null
+  local: number // 1 = criada no app (ainda pode não estar no GitHub)
+  body: string | null
 }
 
 export interface CalendarEvent {
@@ -297,6 +299,9 @@ declare global {
       github: {
         getIssues: () => Promise<GithubIssue[]>
         sync: () => Promise<number>
+        createLocal: (repo: string, title: string, body: string | null) => Promise<GithubIssue>
+        deleteIssue: (id: number) => Promise<void>
+        createOnGithub: (id: number) => Promise<GithubIssue>
       }
       calendar: {
         upcoming: (fromISO: string, limit: number) => Promise<CalendarEvent[]>

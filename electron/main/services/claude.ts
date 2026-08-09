@@ -25,6 +25,13 @@ interface SpawnErr extends Error {
 export interface RunOptions {
   onChunk?: (text: string) => void
   model?: string
+  /** Extra CLI flags before `-p` (controlled by the app, e.g. ['--allowedTools', 'Bash(gh:*)']). */
+  extraArgs?: string[]
+}
+
+/** Single-quote a token for safe inclusion in the interactive-shell command string. */
+function shquote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`
 }
 
 /**
@@ -39,15 +46,17 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
   return new Promise((resolve, reject) => {
     const env = { ...process.env, PATH: buildPath() }
     const model = opts.model?.trim()
+    const extra = opts.extraArgs ?? []
     let child
     if (viaShell) {
       const shell = process.env.SHELL || '/bin/zsh'
       const modelPart = model ? ' --model "$RICKOS_MODEL"' : ''
-      child = spawn(shell, ['-ilc', `${bin} -p "$RICKOS_PROMPT"${modelPart}`], {
+      const extraPart = extra.length ? ' ' + extra.map(shquote).join(' ') : ''
+      child = spawn(shell, ['-ilc', `${bin}${extraPart}${modelPart} -p "$RICKOS_PROMPT"`], {
         env: { ...env, RICKOS_PROMPT: prompt, RICKOS_MODEL: model || '' }
       })
     } else {
-      const args = model ? ['--model', model, '-p', prompt] : ['-p', prompt]
+      const args = [...extra, ...(model ? ['--model', model] : []), '-p', prompt]
       child = spawn(bin, args, { env })
     }
 

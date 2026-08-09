@@ -150,15 +150,17 @@ export const SCHEMA = `
   );
 
   CREATE TABLE IF NOT EXISTS github_issues (
-    id INTEGER PRIMARY KEY,          -- GitHub's global issue id
+    id INTEGER PRIMARY KEY,          -- GitHub's global issue id (negative for local-only)
     number INTEGER NOT NULL,
     title TEXT NOT NULL,
     state TEXT NOT NULL,             -- open | closed
     repo TEXT NOT NULL,              -- owner/name
-    url TEXT,
+    url TEXT,                        -- NULL until it exists on GitHub
     labels TEXT,                     -- JSON array of label names
     milestone TEXT,
-    updatedAt TEXT
+    updatedAt TEXT,
+    local INTEGER NOT NULL DEFAULT 0, -- 1 = created in-app, survives sync
+    body TEXT                         -- description (used when creating on GitHub)
   );
 
   CREATE TABLE IF NOT EXISTS calendar_events (

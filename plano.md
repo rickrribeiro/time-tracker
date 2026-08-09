@@ -69,6 +69,7 @@ Restante / melhorias:
 - [x] Guardar token com `safeStorage` do Electron (feito na seção Técnico/higiene — `services/secrets.ts`).
 - [x] Vincular issues ↔ projeto: filtro do Kanban por projeto (casa `issue.repo` com o `githubRepoUrl` do projeto via `repoFromUrl`).
 - [x] Paginação (>100 issues): segue o header `Link: rel="next"` (cap de 10 páginas ≈ 1000 issues).
+- [x] **Issues locais** (criar manualmente, id negativo, sobrevivem ao sync) com badge **● GitHub / ○ Local**; botão **🐙 Criar no GitHub** roda o Claude Code (comando do projeto → global) com `gh issue create` e marca a issue como sincronizada ao achar a URL na saída.
 
 > ⚠️ Requer o usuário colar um **Personal Access Token (classic, escopo `repo`)** em Configurações para funcionar. Sem token, o Kanban mostra estado vazio com instruções.
 

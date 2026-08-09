@@ -10,6 +10,9 @@ interface GithubState {
   lastCount: number | null
   refresh: () => Promise<void>
   sync: () => Promise<void>
+  createLocal: (repo: string, title: string, body: string | null) => Promise<void>
+  removeIssue: (id: number) => Promise<void>
+  pushToGithub: (id: number) => Promise<void>
 }
 
 /** Map an issue to a Kanban column from its state + labels (read-only in MVP). */
@@ -58,5 +61,21 @@ export const useGithubStore = create<GithubState>((set) => ({
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e), syncing: false })
     }
+  },
+
+  createLocal: async (repo, title, body) => {
+    await window.api.github.createLocal(repo, title, body)
+    set({ issues: await window.api.github.getIssues() })
+  },
+
+  removeIssue: async (id) => {
+    await window.api.github.deleteIssue(id)
+    set({ issues: await window.api.github.getIssues() })
+  },
+
+  pushToGithub: async (id) => {
+    set({ error: null })
+    await window.api.github.createOnGithub(id) // may throw — caller handles
+    set({ issues: await window.api.github.getIssues() })
   }
 }))

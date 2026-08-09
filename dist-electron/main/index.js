@@ -181,15 +181,17 @@ const SCHEMA = `
   );
 
   CREATE TABLE IF NOT EXISTS github_issues (
-    id INTEGER PRIMARY KEY,          -- GitHub's global issue id
+    id INTEGER PRIMARY KEY,          -- GitHub's global issue id (negative for local-only)
     number INTEGER NOT NULL,
     title TEXT NOT NULL,
     state TEXT NOT NULL,             -- open | closed
     repo TEXT NOT NULL,              -- owner/name
-    url TEXT,
+    url TEXT,                        -- NULL until it exists on GitHub
     labels TEXT,                     -- JSON array of label names
     milestone TEXT,
-    updatedAt TEXT
+    updatedAt TEXT,
+    local INTEGER NOT NULL DEFAULT 0, -- 1 = created in-app, survives sync
+    body TEXT                         -- description (used when creating on GitHub)
   );
 
   CREATE TABLE IF NOT EXISTS calendar_events (
@@ -220,6 +222,20 @@ const MIGRATIONS = [
     run: (db2) => {
       try {
         db2.run("ALTER TABLE projects ADD COLUMN claudeCommand TEXT;");
+      } catch {
+      }
+    }
+  },
+  {
+    version: 3,
+    label: "github_issues.local + body",
+    run: (db2) => {
+      try {
+        db2.run("ALTER TABLE github_issues ADD COLUMN local INTEGER NOT NULL DEFAULT 0;");
+      } catch {
+      }
+      try {
+        db2.run("ALTER TABLE github_issues ADD COLUMN body TEXT;");
       } catch {
       }
     }
@@ -671,11 +687,31 @@ async function getAllSettings() {
 }
 async function getGithubIssues() {
   const db2 = await getDb();
-  return getAll(db2, "SELECT * FROM github_issues ORDER BY updatedAt DESC");
+  return getAll(db2, "SELECT * FROM github_issues ORDER BY local DESC, updatedAt DESC");
+}
+async function createLocalIssue(repo, title, body) {
+  const db2 = await getDb();
+  const minRow = getOne(db2, "SELECT MIN(id) as m FROM github_issues WHERE id < 0");
+  const id = (minRow?.m ?? 0) - 1;
+  run(
+    db2,
+    `INSERT INTO github_issues (id, number, title, state, repo, url, labels, milestone, updatedAt, local, body)
+     VALUES (?, 0, ?, 'open', ?, NULL, '[]', NULL, ?, 1, ?)`,
+    [id, title, repo, (/* @__PURE__ */ new Date()).toISOString(), body]
+  );
+  return getOne(db2, "SELECT * FROM github_issues WHERE id = ?", [id]);
+}
+async function markIssueOnGithub(id, url, number) {
+  const db2 = await getDb();
+  run(db2, "UPDATE github_issues SET url = ?, number = ? WHERE id = ?", [url, number, id]);
+}
+async function deleteGithubIssue(id) {
+  const db2 = await getDb();
+  run(db2, "DELETE FROM github_issues WHERE id = ?", [id]);
 }
 async function replaceGithubIssues(issues) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM github_issues");
+  run(db2, "DELETE FROM github_issues WHERE local = 0");
   for (const i of issues) {
     run(
       db2,
@@ -916,74 +952,6 @@ function decodeSecret(value) {
     return "";
   }
 }
-const GITHUB_API = "https://api.github.com";
-function repoFromIssue(issue) {
-  if (issue.repository?.full_name) return issue.repository.full_name;
-  if (issue.repository_url) {
-    const m = issue.repository_url.match(/repos\/(.+)$/);
-    if (m) return m[1];
-  }
-  return "?";
-}
-function labelNames(labels) {
-  return labels.map((l) => typeof l === "string" ? l : l.name).filter(Boolean);
-}
-function parseNextLink(linkHeader) {
-  if (!linkHeader) return null;
-  for (const part of linkHeader.split(",")) {
-    const m = part.match(/<([^>]+)>\s*;\s*rel="next"/);
-    if (m) return m[1];
-  }
-  return null;
-}
-const MAX_PAGES = 10;
-function mapIssue(i) {
-  return {
-    id: i.id,
-    number: i.number,
-    title: i.title,
-    state: i.state,
-    repo: repoFromIssue(i),
-    url: i.html_url ?? null,
-    labels: JSON.stringify(labelNames(i.labels ?? [])),
-    milestone: i.milestone?.title ?? null,
-    updatedAt: i.updated_at ?? null
-  };
-}
-async function syncGithubIssues() {
-  const token = decodeSecret(await getSetting("github_token"));
-  if (!token) {
-    throw new Error("GitHub token não configurado. Vá em Configurações e adicione um token.");
-  }
-  const headers2 = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "RickOS"
-  };
-  const lastSync = await getSetting("github_last_sync");
-  const full = !lastSync;
-  let url = `${GITHUB_API}/issues?filter=assigned&state=all&per_page=100&sort=updated`;
-  if (!full) url += `&since=${encodeURIComponent(lastSync)}`;
-  const data = [];
-  let pages = 0;
-  while (url && pages < MAX_PAGES) {
-    const res = await fetch(url, { headers: headers2 });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      if (res.status === 401) throw new Error("Token inválido ou expirado (401).");
-      throw new Error(`GitHub API falhou (${res.status}). ${body.slice(0, 140)}`);
-    }
-    data.push(...await res.json());
-    url = parseNextLink(res.headers.get("link"));
-    pages++;
-  }
-  const issues = data.filter((i) => typeof i.number === "number" && typeof i.id === "number").map(mapIssue);
-  if (full) await replaceGithubIssues(issues);
-  else await upsertGithubIssues(issues);
-  await setSetting("github_last_sync", (/* @__PURE__ */ new Date()).toISOString());
-  return issues.length;
-}
 const TIMEOUT_MS = 12e4;
 function buildPath() {
   const home = os.homedir();
@@ -997,19 +965,24 @@ function buildPath() {
   ];
   return [process.env.PATH || "", ...extra].join(path.delimiter);
 }
+function shquote(s) {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
 function attempt(bin, prompt, viaShell, opts = {}) {
   return new Promise((resolve, reject) => {
     const env = { ...process.env, PATH: buildPath() };
     const model = opts.model?.trim();
+    const extra = opts.extraArgs ?? [];
     let child;
     if (viaShell) {
       const shell = process.env.SHELL || "/bin/zsh";
       const modelPart = model ? ' --model "$RICKOS_MODEL"' : "";
-      child = child_process.spawn(shell, ["-ilc", `${bin} -p "$RICKOS_PROMPT"${modelPart}`], {
+      const extraPart = extra.length ? " " + extra.map(shquote).join(" ") : "";
+      child = child_process.spawn(shell, ["-ilc", `${bin}${extraPart}${modelPart} -p "$RICKOS_PROMPT"`], {
         env: { ...env, RICKOS_PROMPT: prompt, RICKOS_MODEL: model || "" }
       });
     } else {
-      const args = model ? ["--model", model, "-p", prompt] : ["-p", prompt];
+      const args = [...extra, ...model ? ["--model", model] : [], "-p", prompt];
       child = child_process.spawn(bin, args, { env });
     }
     let stdout = "";
@@ -1065,6 +1038,102 @@ async function runClaude(prompt, command = "claude", opts = {}) {
     }
     throw err;
   }
+}
+const GITHUB_API = "https://api.github.com";
+function repoFromIssue(issue) {
+  if (issue.repository?.full_name) return issue.repository.full_name;
+  if (issue.repository_url) {
+    const m = issue.repository_url.match(/repos\/(.+)$/);
+    if (m) return m[1];
+  }
+  return "?";
+}
+function labelNames(labels) {
+  return labels.map((l) => typeof l === "string" ? l : l.name).filter(Boolean);
+}
+function parseNextLink(linkHeader) {
+  if (!linkHeader) return null;
+  for (const part of linkHeader.split(",")) {
+    const m = part.match(/<([^>]+)>\s*;\s*rel="next"/);
+    if (m) return m[1];
+  }
+  return null;
+}
+const MAX_PAGES = 10;
+function mapIssue(i) {
+  return {
+    id: i.id,
+    number: i.number,
+    title: i.title,
+    state: i.state,
+    repo: repoFromIssue(i),
+    url: i.html_url ?? null,
+    labels: JSON.stringify(labelNames(i.labels ?? [])),
+    milestone: i.milestone?.title ?? null,
+    updatedAt: i.updated_at ?? null,
+    local: 0,
+    body: null
+  };
+}
+async function syncGithubIssues() {
+  const token = decodeSecret(await getSetting("github_token"));
+  if (!token) {
+    throw new Error("GitHub token não configurado. Vá em Configurações e adicione um token.");
+  }
+  const headers2 = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "RickOS"
+  };
+  const lastSync = await getSetting("github_last_sync");
+  const full = !lastSync;
+  let url = `${GITHUB_API}/issues?filter=assigned&state=all&per_page=100&sort=updated`;
+  if (!full) url += `&since=${encodeURIComponent(lastSync)}`;
+  const data = [];
+  let pages = 0;
+  while (url && pages < MAX_PAGES) {
+    const res = await fetch(url, { headers: headers2 });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      if (res.status === 401) throw new Error("Token inválido ou expirado (401).");
+      throw new Error(`GitHub API falhou (${res.status}). ${body.slice(0, 140)}`);
+    }
+    data.push(...await res.json());
+    url = parseNextLink(res.headers.get("link"));
+    pages++;
+  }
+  const issues = data.filter((i) => typeof i.number === "number" && typeof i.id === "number").map(mapIssue);
+  if (full) await replaceGithubIssues(issues);
+  else await upsertGithubIssues(issues);
+  await setSetting("github_last_sync", (/* @__PURE__ */ new Date()).toISOString());
+  return issues.length;
+}
+function repoFromUrl(url) {
+  if (!url) return null;
+  const m = url.match(/github\.com[/:]([^/]+\/[^/#?]+?)(?:\.git)?\/?$/i);
+  return m ? m[1] : null;
+}
+async function claudeCommandForRepo(repo) {
+  const projects = await getProjects();
+  const match = projects.find((p) => repoFromUrl(p.githubRepoUrl)?.toLowerCase() === repo.toLowerCase());
+  if (match?.claudeCommand && match.claudeCommand.trim()) return match.claudeCommand.trim();
+  return await getSetting("claude_command") || "claude";
+}
+async function createIssueViaClaude(id) {
+  const issue = (await getGithubIssues()).find((i) => i.id === id);
+  if (!issue) throw new Error("Issue não encontrada.");
+  if (issue.url) throw new Error("Essa issue já está no GitHub.");
+  const command = await claudeCommandForRepo(issue.repo);
+  const body = (issue.body ?? "").replace(/`/g, "'");
+  const prompt = `Crie uma issue no GitHub no repositório ${issue.repo} usando o gh CLI (gh issue create --repo ${issue.repo} --title <título> --body <corpo>). Título: "${issue.title}". Corpo: "${body || issue.title}". Ao final, imprima APENAS a URL da issue criada (ex.: https://github.com/${issue.repo}/issues/N).`;
+  const out = await runClaude(prompt, command, { extraArgs: ["--allowedTools", "Bash(gh:*)"] });
+  const m = out.match(/https?:\/\/github\.com\/[^\s"')]+\/issues\/(\d+)/);
+  if (!m) {
+    throw new Error(`Não consegui confirmar a criação (sem URL na resposta). Saída: ${out.slice(0, 200)}`);
+  }
+  await markIssueOnGithub(id, m[0], Number(m[1]));
+  return (await getGithubIssues()).find((i) => i.id === id);
 }
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
@@ -1503,6 +1572,12 @@ electron.ipcMain.handle("settings:getAll", async () => {
 });
 electron.ipcMain.handle("github:getIssues", () => getGithubIssues());
 electron.ipcMain.handle("github:sync", () => syncGithubIssues());
+electron.ipcMain.handle(
+  "github:createLocal",
+  (_, repo, title, body) => createLocalIssue(repo, title, body)
+);
+electron.ipcMain.handle("github:deleteIssue", (_, id) => deleteGithubIssue(id));
+electron.ipcMain.handle("github:createOnGithub", (_, id) => createIssueViaClaude(id));
 electron.ipcMain.handle(
   "calendar:upcoming",
   (_, fromISO, limit) => getUpcomingEvents(fromISO, limit)

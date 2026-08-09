@@ -10,18 +10,32 @@ const COLUMNS: { key: BoardColumn; label: string }[] = [
   { key: 'done', label: 'Concluído' }
 ]
 
-function IssueCard({ issue }: { issue: GithubIssue }): React.ReactElement {
+interface CardProps {
+  issue: GithubIssue
+  pushing: boolean
+  onPush: (id: number) => void
+  onDelete: (id: number) => void
+}
+
+function IssueCard({ issue, pushing, onPush, onDelete }: CardProps): React.ReactElement {
   const labels = parseLabels(issue)
+  const onGithub = !!issue.url
   return (
     <div className="kanban-card">
-      <div className="kanban-card-repo">{issue.repo}</div>
+      <div className="kanban-card-repo">
+        {issue.repo}
+        <span className={`issue-origin ${onGithub ? 'gh' : 'local'}`}>{onGithub ? '● GitHub' : '○ Local'}</span>
+      </div>
       <button
         className="kanban-card-title"
         onClick={() => issue.url && window.api.app.openExternal(issue.url)}
-        title="Abrir no GitHub"
+        title={onGithub ? 'Abrir no GitHub' : 'Issue local (ainda não está no GitHub)'}
+        style={{ cursor: onGithub ? 'pointer' : 'default' }}
       >
-        #{issue.number} {issue.title}
+        {onGithub ? `#${issue.number} ` : ''}
+        {issue.title}
       </button>
+      {issue.body && <div className="kanban-card-body">{issue.body}</div>}
       {labels.length > 0 && (
         <div className="kanban-card-labels">
           {labels.map((l) => (
@@ -31,37 +45,73 @@ function IssueCard({ issue }: { issue: GithubIssue }): React.ReactElement {
           ))}
         </div>
       )}
+      {!onGithub && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <button className="btn btn-primary btn-sm" onClick={() => onPush(issue.id)} disabled={pushing}>
+            {pushing ? 'Criando…' : '🐙 Criar no GitHub'}
+          </button>
+          <button className="btn btn-danger btn-sm" onClick={() => onDelete(issue.id)} disabled={pushing}>
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   )
 }
 
 export function IssuesPage(): React.ReactElement {
-  const { issues, refresh, sync, syncing, error, lastCount } = useGithubStore()
+  const { issues, refresh, sync, syncing, error, lastCount, createLocal, removeIssue, pushToGithub } =
+    useGithubStore()
   const { projects, refresh: refreshProjects } = useProjectStore()
   const [projectFilter, setProjectFilter] = useState<number | 'all'>('all')
+
+  // Add-issue form
+  const [showForm, setShowForm] = useState(false)
+  const [repo, setRepo] = useState('')
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+
+  const [pushingId, setPushingId] = useState<number | null>(null)
+  const [pushError, setPushError] = useState('')
 
   useEffect(() => {
     refresh()
     refreshProjects()
   }, [])
 
-  // Projects that carry a resolvable GitHub repo can filter the board.
   const linkable = projects
     .map((p) => ({ p, repo: repoFromUrl(p.githubRepoUrl) }))
-    .filter((x) => x.repo)
+    .filter((x): x is { p: typeof x.p; repo: string } => !!x.repo)
   const selectedRepo =
     projectFilter === 'all' ? null : linkable.find((x) => x.p.id === projectFilter)?.repo ?? null
   const visible = selectedRepo
     ? issues.filter((i) => i.repo.toLowerCase() === selectedRepo.toLowerCase())
     : issues
 
-  const grouped: Record<BoardColumn, GithubIssue[]> = {
-    backlog: [],
-    'in-progress': [],
-    blocked: [],
-    done: []
-  }
+  const grouped: Record<BoardColumn, GithubIssue[]> = { backlog: [], 'in-progress': [], blocked: [], done: [] }
   for (const i of visible) grouped[columnFor(i)].push(i)
+
+  async function handleAdd(): Promise<void> {
+    if (!repo.trim() || !title.trim()) return
+    await createLocal(repo.trim(), title.trim(), body.trim() || null)
+    setTitle('')
+    setBody('')
+    setShowForm(false)
+  }
+
+  async function handlePush(id: number): Promise<void> {
+    setPushingId(id)
+    setPushError('')
+    try {
+      await pushToGithub(id)
+    } catch (e) {
+      setPushError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPushingId(null)
+    }
+  }
+
+  const localCount = issues.filter((i) => !i.url).length
 
   return (
     <div className="module-page">
@@ -69,7 +119,8 @@ export function IssuesPage(): React.ReactElement {
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700 }}>📌 Issues (Kanban)</h2>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            Issues atribuídas a você no GitHub (somente leitura).
+            Issues do GitHub + issues locais ({localCount} local{localCount === 1 ? '' : 'is'}). Crie
+            local e depois envie ao GitHub via Claude Code.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -86,18 +137,46 @@ export function IssuesPage(): React.ReactElement {
               ))}
             </select>
           )}
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowForm((s) => !s)}>
+            {showForm ? 'Fechar' : '+ Nova issue'}
+          </button>
           <button className="btn btn-primary btn-sm" onClick={sync} disabled={syncing}>
             {syncing ? 'Sincronizando…' : '🔄 Sincronizar'}
           </button>
         </div>
       </div>
 
+      {showForm && (
+        <div className="chart-section" style={{ marginBottom: 12, maxWidth: 620 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+              list="repos-datalist"
+              placeholder="Repositório (owner/name) *"
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+            />
+            <datalist id="repos-datalist">
+              {linkable.map((x) => (
+                <option key={x.p.id} value={x.repo} />
+              ))}
+            </datalist>
+            <input placeholder="Título *" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <textarea placeholder="Descrição (opcional)" rows={3} value={body} onChange={(e) => setBody(e.target.value)} />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowForm(false)}>Cancelar</button>
+              <button className="btn btn-primary btn-sm" onClick={handleAdd}>Adicionar local</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && <div className="empty-hint" style={{ color: 'var(--danger)' }}>{error}</div>}
+      {pushError && <div className="empty-hint" style={{ color: 'var(--danger)' }}>{pushError}</div>}
 
       {issues.length === 0 && !error && (
         <div className="empty-hint">
-          Nenhuma issue. Configure o token do GitHub em <strong>Configurações</strong> e clique em
-          Sincronizar.
+          Nenhuma issue. Sincronize com o GitHub (token em <strong>Configurações</strong>) ou crie uma
+          issue local com <strong>+ Nova issue</strong>.
         </div>
       )}
 
@@ -114,7 +193,13 @@ export function IssuesPage(): React.ReactElement {
               </div>
               <div className="kanban-column-body">
                 {grouped[col.key].map((i) => (
-                  <IssueCard key={i.id} issue={i} />
+                  <IssueCard
+                    key={i.id}
+                    issue={i}
+                    pushing={pushingId === i.id}
+                    onPush={handlePush}
+                    onDelete={removeIssue}
+                  />
                 ))}
               </div>
             </div>

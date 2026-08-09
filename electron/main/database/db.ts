@@ -41,6 +41,22 @@ const MIGRATIONS: Migration[] = [
         // column already exists
       }
     }
+  },
+  {
+    version: 3,
+    label: 'github_issues.local + body',
+    run: (db) => {
+      try {
+        db.run('ALTER TABLE github_issues ADD COLUMN local INTEGER NOT NULL DEFAULT 0;')
+      } catch {
+        // column already exists
+      }
+      try {
+        db.run('ALTER TABLE github_issues ADD COLUMN body TEXT;')
+      } catch {
+        // column already exists
+      }
+    }
   }
 ]
 

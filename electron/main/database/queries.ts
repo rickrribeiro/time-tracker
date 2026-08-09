@@ -646,17 +646,44 @@ export interface DbGithubIssue {
   labels: string | null // JSON array
   milestone: string | null
   updatedAt: string | null
+  local: number
+  body: string | null
 }
 
 export async function getGithubIssues(): Promise<DbGithubIssue[]> {
   const db = await getDb()
-  return getAll<DbGithubIssue>(db, 'SELECT * FROM github_issues ORDER BY updatedAt DESC')
+  return getAll<DbGithubIssue>(db, 'SELECT * FROM github_issues ORDER BY local DESC, updatedAt DESC')
 }
 
-/** Full replace: the table is a read-only mirror of the current assigned issues. */
+/** Create a local-only issue (negative id so it never collides with GitHub ids). */
+export async function createLocalIssue(repo: string, title: string, body: string | null): Promise<DbGithubIssue> {
+  const db = await getDb()
+  const minRow = getOne<{ m: number | null }>(db, 'SELECT MIN(id) as m FROM github_issues WHERE id < 0')
+  const id = (minRow?.m ?? 0) - 1
+  run(
+    db,
+    `INSERT INTO github_issues (id, number, title, state, repo, url, labels, milestone, updatedAt, local, body)
+     VALUES (?, 0, ?, 'open', ?, NULL, '[]', NULL, ?, 1, ?)`,
+    [id, title, repo, new Date().toISOString(), body]
+  )
+  return getOne<DbGithubIssue>(db, 'SELECT * FROM github_issues WHERE id = ?', [id])!
+}
+
+/** Mark a local issue as existing on GitHub after creation. */
+export async function markIssueOnGithub(id: number, url: string, number: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE github_issues SET url = ?, number = ? WHERE id = ?', [url, number, id])
+}
+
+export async function deleteGithubIssue(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM github_issues WHERE id = ?', [id])
+}
+
+/** Full replace of the GitHub mirror — keeps local (in-app) issues. */
 export async function replaceGithubIssues(issues: DbGithubIssue[]): Promise<void> {
   const db = await getDb()
-  run(db, 'DELETE FROM github_issues')
+  run(db, 'DELETE FROM github_issues WHERE local = 0')
   for (const i of issues) {
     run(
       db,

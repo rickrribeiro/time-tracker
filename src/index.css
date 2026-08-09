@@ -1783,3 +1783,23 @@ select:focus {
   padding: 6px 12px 6px 22px;
   font-size: 12.5px;
 }
+
+/* segmented toggle (ex.: autenticação do GitHub) */
+.seg-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  width: fit-content;
+}
+.seg-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+.seg-btn:hover { color: var(--text-primary); }
+.seg-btn.active {
+  background: var(--accent);
+  color: white;
+}

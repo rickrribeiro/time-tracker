@@ -8,10 +8,43 @@ import {
   markIssueOnGithub,
   DbGithubIssue
 } from '../database/queries'
+import { spawn } from 'child_process'
+import os from 'os'
+import path from 'path'
 import { decodeSecret } from './secrets'
 import { runClaude } from './claude'
 
 const GITHUB_API = 'https://api.github.com'
+
+/** Augmented PATH so the packaged app can find `gh` (like the claude service does). */
+function ghPath(): string {
+  const home = os.homedir()
+  const extra = ['/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', path.join(home, '.local', 'bin')]
+  return [process.env.PATH || '', ...extra].join(path.delimiter)
+}
+
+/** Run `gh <args>` using the machine's authenticated GitHub CLI; returns stdout. */
+function runGh(args: string[]): Promise<string> {
+  const attempt = (viaShell: boolean): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const env = { ...process.env, PATH: ghPath() }
+      const child = viaShell
+        ? spawn(process.env.SHELL || '/bin/zsh', ['-ilc', `gh ${args.map((a) => `'${a.replace(/'/g, `'\\''`)}'`).join(' ')}`], { env })
+        : spawn('gh', args, { env })
+      let out = ''
+      let err = ''
+      child.stdout.on('data', (d) => (out += d.toString()))
+      child.stderr.on('data', (d) => (err += d.toString()))
+      child.on('error', (e: NodeJS.ErrnoException) => reject(e))
+      child.on('close', (code) =>
+        code === 0 ? resolve(out) : reject(new Error(err.trim() || `gh saiu com código ${code}.`))
+      )
+    })
+  return attempt(false).catch((e: NodeJS.ErrnoException) => {
+    if (e?.code === 'ENOENT') return attempt(true)
+    throw e
+  })
+}
 
 interface GithubApiIssue {
   id: number
@@ -77,26 +110,20 @@ function mapIssue(i: GithubApiIssue): DbGithubIssue {
  * Reads the token from settings. Throws a clear error if unconfigured or on API failure.
  * Returns the number of issues fetched this run.
  */
-export async function syncGithubIssues(): Promise<number> {
+/** Fetch assigned issues via the REST API using the in-app PAT (Link-header pagination). */
+async function fetchIssuesViaToken(query: string): Promise<GithubApiIssue[]> {
   const token = decodeSecret(await getSetting('github_token'))
   if (!token) {
     throw new Error('GitHub token não configurado. Vá em Configurações e adicione um token.')
   }
-
   const headers = {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
     'User-Agent': 'RickOS'
   }
-
-  const lastSync = await getSetting('github_last_sync')
-  const full = !lastSync
-  let url: string | null = `${GITHUB_API}/issues?filter=assigned&state=all&per_page=100&sort=updated`
-  if (!full) url += `&since=${encodeURIComponent(lastSync as string)}`
-
-  // Follow the Link: rel="next" header to paginate past 100 issues.
   const data: GithubApiIssue[] = []
+  let url: string | null = `${GITHUB_API}/${query}`
   let pages = 0
   while (url && pages < MAX_PAGES) {
     const res = await fetch(url, { headers })
@@ -109,6 +136,39 @@ export async function syncGithubIssues(): Promise<number> {
     url = parseNextLink(res.headers.get('link'))
     pages++
   }
+  return data
+}
+
+/** Fetch assigned issues via the machine's authenticated `gh` CLI (no PAT needed). */
+async function fetchIssuesViaGh(query: string): Promise<GithubApiIssue[]> {
+  let out: string
+  try {
+    out = await runGh(['api', query, '--paginate'])
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      throw new Error('`gh` (GitHub CLI) não encontrado. Instale e rode `gh auth login`, ou use o modo Token.')
+    }
+    throw new Error(`Falha no gh: ${msg}`)
+  }
+  // `gh api --paginate` on an array endpoint may concatenate multiple JSON arrays.
+  try {
+    return JSON.parse(out) as GithubApiIssue[]
+  } catch {
+    const merged = out.replace(/\]\s*\[/g, ',')
+    return JSON.parse(merged) as GithubApiIssue[]
+  }
+}
+
+export async function syncGithubIssues(): Promise<number> {
+  const mode = (await getSetting('github_auth_mode')) || 'token'
+  const lastSync = await getSetting('github_last_sync')
+  const full = !lastSync
+  const query =
+    `issues?filter=assigned&state=all&per_page=100&sort=updated` +
+    (full ? '' : `&since=${encodeURIComponent(lastSync as string)}`)
+
+  const data = mode === 'ssh' ? await fetchIssuesViaGh(query) : await fetchIssuesViaToken(query)
 
   const issues = data
     // the /issues endpoint can include PRs; the search fields differ — keep true issues only

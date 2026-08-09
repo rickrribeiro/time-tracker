@@ -1329,6 +1329,30 @@ async function runClaude(prompt, command = "claude", opts = {}) {
   }
 }
 const GITHUB_API = "https://api.github.com";
+function ghPath() {
+  const home = os.homedir();
+  const extra = ["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin", path.join(home, ".local", "bin")];
+  return [process.env.PATH || "", ...extra].join(path.delimiter);
+}
+function runGh(args) {
+  const attempt2 = (viaShell) => new Promise((resolve, reject) => {
+    const env = { ...process.env, PATH: ghPath() };
+    const child = viaShell ? child_process.spawn(process.env.SHELL || "/bin/zsh", ["-ilc", `gh ${args.map((a) => `'${a.replace(/'/g, `'\\''`)}'`).join(" ")}`], { env }) : child_process.spawn("gh", args, { env });
+    let out = "";
+    let err = "";
+    child.stdout.on("data", (d) => out += d.toString());
+    child.stderr.on("data", (d) => err += d.toString());
+    child.on("error", (e) => reject(e));
+    child.on(
+      "close",
+      (code) => code === 0 ? resolve(out) : reject(new Error(err.trim() || `gh saiu com código ${code}.`))
+    );
+  });
+  return attempt2(false).catch((e) => {
+    if (e?.code === "ENOENT") return attempt2(true);
+    throw e;
+  });
+}
 function repoFromIssue(issue) {
   if (issue.repository?.full_name) return issue.repository.full_name;
   if (issue.repository_url) {
@@ -1364,7 +1388,7 @@ function mapIssue(i) {
     body: null
   };
 }
-async function syncGithubIssues() {
+async function fetchIssuesViaToken(query) {
   const token = decodeSecret(await getSetting("github_token"));
   if (!token) {
     throw new Error("GitHub token não configurado. Vá em Configurações e adicione um token.");
@@ -1375,11 +1399,8 @@ async function syncGithubIssues() {
     "X-GitHub-Api-Version": "2022-11-28",
     "User-Agent": "RickOS"
   };
-  const lastSync = await getSetting("github_last_sync");
-  const full = !lastSync;
-  let url = `${GITHUB_API}/issues?filter=assigned&state=all&per_page=100&sort=updated`;
-  if (!full) url += `&since=${encodeURIComponent(lastSync)}`;
   const data = [];
+  let url = `${GITHUB_API}/${query}`;
   let pages = 0;
   while (url && pages < MAX_PAGES) {
     const res = await fetch(url, { headers: headers2 });
@@ -1392,6 +1413,32 @@ async function syncGithubIssues() {
     url = parseNextLink(res.headers.get("link"));
     pages++;
   }
+  return data;
+}
+async function fetchIssuesViaGh(query) {
+  let out;
+  try {
+    out = await runGh(["api", query, "--paginate"]);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (e?.code === "ENOENT") {
+      throw new Error("`gh` (GitHub CLI) não encontrado. Instale e rode `gh auth login`, ou use o modo Token.");
+    }
+    throw new Error(`Falha no gh: ${msg}`);
+  }
+  try {
+    return JSON.parse(out);
+  } catch {
+    const merged = out.replace(/\]\s*\[/g, ",");
+    return JSON.parse(merged);
+  }
+}
+async function syncGithubIssues() {
+  const mode = await getSetting("github_auth_mode") || "token";
+  const lastSync = await getSetting("github_last_sync");
+  const full = !lastSync;
+  const query = `issues?filter=assigned&state=all&per_page=100&sort=updated` + (full ? "" : `&since=${encodeURIComponent(lastSync)}`);
+  const data = mode === "ssh" ? await fetchIssuesViaGh(query) : await fetchIssuesViaToken(query);
   const issues = data.filter((i) => typeof i.number === "number" && typeof i.id === "number").map(mapIssue);
   if (full) await replaceGithubIssues(issues);
   else await upsertGithubIssues(issues);

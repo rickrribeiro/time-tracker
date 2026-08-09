@@ -25,6 +25,12 @@ export function SettingsPage(): React.ReactElement {
   const [token, setToken] = useState('')
   const [username, setUsername] = useState('')
   const [saved, setSaved] = useState(false)
+  const [authMode, setAuthMode] = useState<'token' | 'ssh'>('token')
+
+  async function changeAuthMode(m: 'token' | 'ssh'): Promise<void> {
+    setAuthMode(m)
+    await set('github_auth_mode', m)
+  }
 
   // IA (Claude CLI)
   const [claudeCmd, setClaudeCmd] = useState('claude')
@@ -75,9 +81,11 @@ export function SettingsPage(): React.ReactElement {
     setClaudeCmd(values.claude_command ?? 'claude')
     setSkyKey(values.skyscanner_rapidapi_key ?? '')
     setSkyHost(values.skyscanner_rapidapi_host ?? '')
+    setAuthMode((values.github_auth_mode as 'token' | 'ssh') || 'token')
   }, [
     values.github_token,
     values.github_username,
+    values.github_auth_mode,
     values.google_client_id,
     values.google_client_secret,
     values.pluggy_client_id,
@@ -179,36 +187,63 @@ export function SettingsPage(): React.ReactElement {
 
       <div className="chart-section" style={{ maxWidth: 560 }}>
         <div className="chart-title">🐙 GitHub</div>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 12px' }}>
-          Crie um <strong>Personal Access Token</strong> (classic) com escopo <code>repo</code> em
-          github.com → Settings → Developer settings. Ele é usado só localmente para ler suas issues
-          atribuídas.
-        </p>
 
         <div className="editor-field">
-          <label>Personal Access Token</label>
-          <input
-            type="password"
-            placeholder="ghp_…"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-          />
+          <label>Autenticação</label>
+          <div className="seg-toggle">
+            <button className={`seg-btn ${authMode === 'ssh' ? 'active' : ''}`} onClick={() => changeAuthMode('ssh')}>
+              Máquina (gh/SSH)
+            </button>
+            <button className={`seg-btn ${authMode === 'token' ? 'active' : ''}`} onClick={() => changeAuthMode('token')}>
+              Token (PAT)
+            </button>
+          </div>
         </div>
-        <div className="editor-field">
-          <label>Username (opcional)</label>
-          <input
-            type="text"
-            placeholder="seu-usuario"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </div>
+
+        {authMode === 'ssh' ? (
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '8px 0 12px' }}>
+            Usa o <strong>GitHub CLI (<code>gh</code>)</strong> autenticado na sua máquina (mesma conta do
+            seu git/SSH) — sem precisar de token no app. Requer <code>gh</code> instalado e
+            <code>gh auth login</code> feito. (A REST API do GitHub não autentica por chave SSH; o
+            <code>gh</code> usa a credencial já configurada.)
+          </p>
+        ) : (
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '8px 0 12px' }}>
+            Crie um <strong>Personal Access Token</strong> (classic) com escopo <code>repo</code> em
+            github.com → Settings → Developer settings. Usado só localmente para ler suas issues.
+          </p>
+        )}
+
+        {authMode === 'token' && (
+          <>
+            <div className="editor-field">
+              <label>Personal Access Token</label>
+              <input
+                type="password"
+                placeholder="ghp_…"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+              />
+            </div>
+            <div className="editor-field">
+              <label>Username (opcional)</label>
+              <input
+                type="text"
+                placeholder="seu-usuario"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+          </>
+        )}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' }}>
-          <button className="btn btn-primary btn-sm" onClick={handleSave}>
-            {saved ? '✓ Salvo' : 'Salvar'}
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={sync} disabled={syncing || !token.trim()}>
+          {authMode === 'token' && (
+            <button className="btn btn-primary btn-sm" onClick={handleSave}>
+              {saved ? '✓ Salvo' : 'Salvar'}
+            </button>
+          )}
+          <button className="btn btn-secondary btn-sm" onClick={sync} disabled={syncing || (authMode === 'token' && !token.trim())}>
             {syncing ? 'Sincronizando…' : '🔄 Testar / Sincronizar Issues'}
           </button>
           {lastCount !== null && !error && (

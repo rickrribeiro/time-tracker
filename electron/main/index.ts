@@ -371,7 +371,10 @@ ipcMain.handle('flights:delete', (_, id: number) => deleteFlightWatch(id))
 
 // ── IPC: AI (Claude CLI) ──────────────────────────────────────────────────────
 
-ipcMain.handle('ai:run', (_, prompt: string) => runClaude(prompt))
+ipcMain.handle('ai:run', async (_, prompt: string) => {
+  const command = (await getSetting('claude_command')) || 'claude'
+  return runClaude(prompt, command)
+})
 
 // ── IPC: App ──────────────────────────────────────────────────────────────────
 

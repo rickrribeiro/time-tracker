@@ -18,21 +18,29 @@ function buildPath(): string {
   return [process.env.PATH || '', ...extra].join(path.delimiter)
 }
 
-/**
- * Run the local Claude Code CLI headlessly: `claude -p "<prompt>"`.
- * Prompt is passed as an argv element (no shell) to avoid injection.
- * Resolves with stdout text; rejects with a friendly message on failure.
- */
-export function runClaude(prompt: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!prompt.trim()) {
-      reject(new Error('Prompt vazio.'))
-      return
-    }
+interface SpawnErr extends Error {
+  code?: string
+}
 
-    const child = spawn('claude', ['-p', prompt], {
-      env: { ...process.env, PATH: buildPath() }
-    })
+/**
+ * Run one attempt. When `viaShell` is false, spawn the binary directly (clean, fast).
+ * When true, run through an interactive login shell so shell aliases resolve
+ * (e.g. `claude-trabalho='CLAUDE_CONFIG_DIR=~/.claude-trabalho claude'`). The prompt
+ * is passed through the RICKOS_PROMPT env var (never interpolated into the command
+ * string) so it can't break out — no shell injection.
+ */
+function attempt(bin: string, prompt: string, viaShell: boolean): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const env = { ...process.env, PATH: buildPath() }
+    let child
+    if (viaShell) {
+      const shell = process.env.SHELL || '/bin/zsh'
+      child = spawn(shell, ['-ilc', `${bin} -p "$RICKOS_PROMPT"`], {
+        env: { ...env, RICKOS_PROMPT: prompt }
+      })
+    } else {
+      child = spawn(bin, ['-p', prompt], { env })
+    }
 
     let stdout = ''
     let stderr = ''
@@ -48,30 +56,53 @@ export function runClaude(prompt: string): Promise<string> {
     child.stdout.on('data', (d) => (stdout += d.toString()))
     child.stderr.on('data', (d) => (stderr += d.toString()))
 
-    child.on('error', (err: NodeJS.ErrnoException) => {
+    child.on('error', (err: SpawnErr) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      if (err.code === 'ENOENT') {
-        reject(
-          new Error(
-            'Claude CLI não encontrado. Instale o Claude Code e garanta que `claude` está no PATH.'
-          )
-        )
-      } else {
-        reject(err)
-      }
+      reject(err) // preserve .code so the caller can decide to fall back
     })
 
     child.on('close', (code) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      if (code === 0) {
-        resolve(stdout.trim())
-      } else {
-        reject(new Error(stderr.trim() || `Claude CLI saiu com código ${code}.`))
-      }
+      if (code === 0) resolve(stdout.trim())
+      else reject(new Error(stderr.trim() || `Claude CLI saiu com código ${code}.`))
     })
   })
+}
+
+/**
+ * Run the local Claude Code CLI headlessly: `<command> -p "<prompt>"`.
+ * `command` is the configured CLI (default "claude"); supports multiple subscriptions
+ * (e.g. "claude" vs "claude-trabalho"). Tries a direct binary spawn first; if the
+ * command isn't a binary on PATH (ENOENT — typical for a shell alias), retries through
+ * an interactive login shell so aliases resolve.
+ */
+export async function runClaude(prompt: string, command = 'claude'): Promise<string> {
+  const bin = (command || '').trim() || 'claude'
+  if (!/^[A-Za-z0-9_./-]+$/.test(bin)) {
+    throw new Error(`Comando inválido: "${bin}". Use apenas letras, números, ., _, - ou /.`)
+  }
+  if (!prompt.trim()) throw new Error('Prompt vazio.')
+
+  try {
+    return await attempt(bin, prompt, false)
+  } catch (err) {
+    if ((err as SpawnErr)?.code === 'ENOENT') {
+      // Not a binary on PATH — likely a shell alias; retry via interactive shell.
+      try {
+        return await attempt(bin, prompt, true)
+      } catch (err2) {
+        if ((err2 as SpawnErr)?.code === 'ENOENT') {
+          throw new Error(
+            `Comando "${bin}" não encontrado. Verifique o comando do Claude em Configurações e se ele existe (binário ou alias no seu shell).`
+          )
+        }
+        throw err2
+      }
+    }
+    throw err
+  }
 }

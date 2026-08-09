@@ -961,15 +961,18 @@ function buildPath() {
   ];
   return [process.env.PATH || "", ...extra].join(path.delimiter);
 }
-function runClaude(prompt) {
+function attempt(bin, prompt, viaShell) {
   return new Promise((resolve, reject) => {
-    if (!prompt.trim()) {
-      reject(new Error("Prompt vazio."));
-      return;
+    const env = { ...process.env, PATH: buildPath() };
+    let child;
+    if (viaShell) {
+      const shell = process.env.SHELL || "/bin/zsh";
+      child = child_process.spawn(shell, ["-ilc", `${bin} -p "$RICKOS_PROMPT"`], {
+        env: { ...env, RICKOS_PROMPT: prompt }
+      });
+    } else {
+      child = child_process.spawn(bin, ["-p", prompt], { env });
     }
-    const child = child_process.spawn("claude", ["-p", prompt], {
-      env: { ...process.env, PATH: buildPath() }
-    });
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -985,27 +988,40 @@ function runClaude(prompt) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (err.code === "ENOENT") {
-        reject(
-          new Error(
-            "Claude CLI não encontrado. Instale o Claude Code e garanta que `claude` está no PATH."
-          )
-        );
-      } else {
-        reject(err);
-      }
+      reject(err);
     });
     child.on("close", (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (code === 0) {
-        resolve(stdout.trim());
-      } else {
-        reject(new Error(stderr.trim() || `Claude CLI saiu com código ${code}.`));
-      }
+      if (code === 0) resolve(stdout.trim());
+      else reject(new Error(stderr.trim() || `Claude CLI saiu com código ${code}.`));
     });
   });
+}
+async function runClaude(prompt, command = "claude") {
+  const bin = (command || "").trim() || "claude";
+  if (!/^[A-Za-z0-9_./-]+$/.test(bin)) {
+    throw new Error(`Comando inválido: "${bin}". Use apenas letras, números, ., _, - ou /.`);
+  }
+  if (!prompt.trim()) throw new Error("Prompt vazio.");
+  try {
+    return await attempt(bin, prompt, false);
+  } catch (err) {
+    if (err?.code === "ENOENT") {
+      try {
+        return await attempt(bin, prompt, true);
+      } catch (err2) {
+        if (err2?.code === "ENOENT") {
+          throw new Error(
+            `Comando "${bin}" não encontrado. Verifique o comando do Claude em Configurações e se ele existe (binário ou alias no seu shell).`
+          );
+        }
+        throw err2;
+      }
+    }
+    throw err;
+  }
 }
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
@@ -1415,7 +1431,10 @@ electron.ipcMain.handle(
   (_, tripId, origin, destination, price, currency) => createFlightWatch(tripId, origin, destination, price, currency, (/* @__PURE__ */ new Date()).toISOString())
 );
 electron.ipcMain.handle("flights:delete", (_, id) => deleteFlightWatch(id));
-electron.ipcMain.handle("ai:run", (_, prompt) => runClaude(prompt));
+electron.ipcMain.handle("ai:run", async (_, prompt) => {
+  const command = await getSetting("claude_command") || "claude";
+  return runClaude(prompt, command);
+});
 electron.ipcMain.handle("app:openExternal", (_, url) => electron.shell.openExternal(url));
 electron.ipcMain.handle("app:exportDb", async () => {
   saveDb();

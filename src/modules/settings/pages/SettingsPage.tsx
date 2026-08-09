@@ -26,6 +26,10 @@ export function SettingsPage(): React.ReactElement {
   const [username, setUsername] = useState('')
   const [saved, setSaved] = useState(false)
 
+  // IA (Claude CLI)
+  const [claudeCmd, setClaudeCmd] = useState('claude')
+  const [claudeSaved, setClaudeSaved] = useState(false)
+
   // Google Calendar
   const [gClientId, setGClientId] = useState('')
   const [gClientSecret, setGClientSecret] = useState('')
@@ -63,6 +67,7 @@ export function SettingsPage(): React.ReactElement {
     setPClientId(values.pluggy_client_id ?? '')
     setPClientSecret(values.pluggy_client_secret ?? '')
     setPItemId(values.pluggy_item_id ?? '')
+    setClaudeCmd(values.claude_command ?? 'claude')
   }, [
     values.github_token,
     values.github_username,
@@ -70,8 +75,15 @@ export function SettingsPage(): React.ReactElement {
     values.google_client_secret,
     values.pluggy_client_id,
     values.pluggy_client_secret,
-    values.pluggy_item_id
+    values.pluggy_item_id,
+    values.claude_command
   ])
+
+  async function saveClaudeCmd(): Promise<void> {
+    await set('claude_command', claudeCmd.trim() || 'claude')
+    setClaudeSaved(true)
+    setTimeout(() => setClaudeSaved(false), 2000)
+  }
 
   async function syncPluggy(): Promise<void> {
     await set('pluggy_client_id', pClientId.trim())
@@ -288,6 +300,26 @@ export function SettingsPage(): React.ReactElement {
         {pMsg && (
           <div style={{ fontSize: 12, color: pMsg.ok ? 'var(--success)' : 'var(--danger)', marginTop: 8 }}>{pMsg.text}</div>
         )}
+      </div>
+
+      <div className="chart-section" style={{ maxWidth: 560, marginTop: 16 }}>
+        <div className="chart-title">🤖 IA (Claude CLI)</div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 12px' }}>
+          Comando usado para rodar o Claude Code local. Padrão <code>claude</code>. Use outro se tiver
+          mais de uma assinatura (ex.: <code>claude-trabalho</code>).
+        </p>
+        <div className="editor-field">
+          <label>Comando</label>
+          <input
+            type="text"
+            placeholder="claude"
+            value={claudeCmd}
+            onChange={(e) => setClaudeCmd(e.target.value)}
+          />
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <button className="btn btn-primary btn-sm" onClick={saveClaudeCmd}>{claudeSaved ? '✓ Salvo' : 'Salvar comando'}</button>
+        </div>
       </div>
     </div>
   )

@@ -34,6 +34,7 @@ export function CalendarView({
 }: Props): React.ReactElement {
   const [statsMap, setStatsMap] = useState<Record<string, DailyStats>>({})
   const [maxMinutes, setMaxMinutes] = useState(0)
+  const [eventDays, setEventDays] = useState<Record<string, number>>({})
 
   const refreshStats = () => {
     const startStr = localDayStartISO(localDateStr(new Date(year, month, 1)))
@@ -47,6 +48,15 @@ export function CalendarView({
       }
       setStatsMap(map)
       setMaxMinutes(max)
+    })
+    // Calendar events overlay (manual + Google) for this month
+    window.api.calendar.range(startStr, endStr).then((events) => {
+      const byDay: Record<string, number> = {}
+      for (const e of events) {
+        const d = localDateStr(new Date(e.startTime))
+        byDay[d] = (byDay[d] || 0) + 1
+      }
+      setEventDays(byDay)
     })
   }
 
@@ -148,6 +158,11 @@ export function CalendarView({
               >
                 <div className="calendar-day-top">
                   <span className="calendar-day-num">{cell.day}</span>
+                  {!cell.otherMonth && eventDays[cell.date] > 0 && (
+                    <span className="cal-event-badge" title={`${eventDays[cell.date]} evento(s)`}>
+                      📅 {eventDays[cell.date]}
+                    </span>
+                  )}
                   {!cell.otherMonth && (
                     <input
                       type="checkbox"

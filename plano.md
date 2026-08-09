@@ -107,7 +107,7 @@ Feito:
 Restante:
 - [x] **OAuth Google** (fluxo desktop loopback + PKCE em `services/google.ts`) + refresh token cifrado; UI em Configurações (Client ID/Secret, Conectar, Sincronizar, Desconectar).
 - [x] Sync dos próximos 7 dias (`calendar.readonly`) → `calendar_events` source='google' (replace só dos google, preserva manuais).
-- [ ] Overlay de eventos no calendário mensal do time-tracker.
+- [x] Overlay de eventos (manual + Google) no calendário mensal do time-tracker: badge 📅 N por dia.
 
 ## 6. Finanças  *(prioridade #6 — FEITO no MVP)*
 

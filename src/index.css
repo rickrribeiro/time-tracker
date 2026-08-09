@@ -1664,3 +1664,12 @@ select:focus {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
 }
+
+.cal-event-badge {
+  font-size: 10px;
+  color: var(--accent-hover);
+  background: var(--accent-dim);
+  border-radius: 999px;
+  padding: 0 6px;
+  white-space: nowrap;
+}

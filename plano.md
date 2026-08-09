@@ -125,7 +125,7 @@ Restante / melhorias:
 - [x] Importação melhor: detecta coluna de moeda (Wise) + mais aliases de colunas; **auto-categorização** por palavra-chave (Transporte/Alimentação/Moradia/Lazer/Salário) com fallback "Outros".
 - [x] Conversão entre moedas: moeda base + taxas manuais (Configurações → Finanças); Dashboard mostra "Saldo do mês em <base>" consolidado.
 - [x] Editar transação (modal `TransactionEditor`: tipo, valor, moeda, categoria, conta, data, descrição).
-- [ ] Open Finance (via agregador Pluggy).
+- [x] **Open Finance** via agregador **Pluggy**: `services/pluggy.ts` autentica, lista contas do `itemId` e importa transações (DEBIT/CREDIT → despesa/receita), deduplicadas por data+valor+descrição. Configurações → Open Finance (Client ID/Secret + Item ID). Requer conta Pluggy + banco conectado via Pluggy Connect.
 
 ## 7. Viagens  *(prioridade #7 — FEITO no MVP)*
 

@@ -1160,6 +1160,61 @@ async function syncGoogleCalendar() {
   await replaceGoogleEvents(events);
   return events.length;
 }
+const PLUGGY_API = "https://api.pluggy.ai";
+const OUTROS_CATEGORY_ID = 6;
+async function apiKey() {
+  const clientId = await getSetting("pluggy_client_id") ?? "";
+  const clientSecret = decodeSecret(await getSetting("pluggy_client_secret")) ?? "";
+  if (!clientId || !clientSecret) {
+    throw new Error("Configure o Client ID e o Client Secret do Pluggy em Configurações.");
+  }
+  const res = await fetch(`${PLUGGY_API}/auth`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clientId, clientSecret })
+  });
+  const json = await res.json();
+  if (!res.ok || !json.apiKey) throw new Error(json.message || `Falha ao autenticar no Pluggy (${res.status}).`);
+  return json.apiKey;
+}
+async function get(path2, key) {
+  const res = await fetch(`${PLUGGY_API}${path2}`, { headers: { "X-API-KEY": key } });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Pluggy ${path2} falhou (${res.status}). ${body.slice(0, 120)}`);
+  }
+  return await res.json();
+}
+async function syncPluggy() {
+  const itemId = await getSetting("pluggy_item_id") ?? "";
+  if (!itemId) throw new Error("Configure o Item ID do Pluggy (banco conectado) em Configurações.");
+  const key = await apiKey();
+  const accounts = (await get(`/accounts?itemId=${encodeURIComponent(itemId)}`, key)).results;
+  const incoming = [];
+  for (const acc of accounts) {
+    const txs = (await get(`/transactions?accountId=${acc.id}&pageSize=500`, key)).results;
+    for (const t of txs) {
+      const isExpense = t.type === "DEBIT" || t.amount < 0;
+      incoming.push({
+        accountId: null,
+        categoryId: OUTROS_CATEGORY_ID,
+        amount: Math.abs(t.amount),
+        currency: (t.currencyCode || acc.currencyCode || "BRL").toUpperCase(),
+        type: isExpense ? "expense" : "income",
+        description: t.description ?? null,
+        date: t.date.slice(0, 10)
+      });
+    }
+  }
+  const existing = await getTransactions();
+  const seen = new Set(existing.map((t) => `${t.date}|${t.amount}|${t.description ?? ""}`));
+  const fresh = incoming.filter((t) => !seen.has(`${t.date}|${t.amount}|${t.description ?? ""}`));
+  if (fresh.length) await bulkInsertTransactions(fresh);
+  return { imported: fresh.length, skipped: incoming.length - fresh.length };
+}
+async function pluggyConfigured() {
+  return !!await getSetting("pluggy_client_id") && !!await getSetting("pluggy_item_id");
+}
 function createWindow() {
   const win = new electron.BrowserWindow({
     width: 1280,
@@ -1342,6 +1397,8 @@ electron.ipcMain.handle("budgets:set", (_, categoryId, month, amount) => setBudg
 electron.ipcMain.handle("investments:getAll", () => getInvestments());
 electron.ipcMain.handle("investments:create", (_, name, type, amount, currency) => createInvestment(name, type, amount, currency));
 electron.ipcMain.handle("investments:delete", (_, id) => deleteInvestment(id));
+electron.ipcMain.handle("pluggy:sync", () => syncPluggy());
+electron.ipcMain.handle("pluggy:status", () => pluggyConfigured());
 electron.ipcMain.handle("trips:getAll", () => getTrips());
 electron.ipcMain.handle(
   "trips:create",

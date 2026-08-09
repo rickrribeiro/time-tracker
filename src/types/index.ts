@@ -327,6 +327,10 @@ declare global {
         create: (name: string, type: string | null, amount: number, currency: string) => Promise<Investment>
         delete: (id: number) => Promise<void>
       }
+      pluggy: {
+        sync: () => Promise<{ imported: number; skipped: number }>
+        status: () => Promise<boolean>
+      }
       trips: {
         getAll: () => Promise<Trip[]>
         create: (origin: string | null, destination: string, startDate: string | null, endDate: string | null, budget: number | null, currency: string, status: string) => Promise<Trip>

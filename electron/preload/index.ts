@@ -152,6 +152,10 @@ const api = {
     create: (name: string, type: string | null, amount: number, currency: string) => ipcRenderer.invoke('investments:create', name, type, amount, currency),
     delete: (id: number) => ipcRenderer.invoke('investments:delete', id)
   },
+  pluggy: {
+    sync: () => ipcRenderer.invoke('pluggy:sync'),
+    status: () => ipcRenderer.invoke('pluggy:status')
+  },
   trips: {
     getAll: () => ipcRenderer.invoke('trips:getAll'),
     create: (origin: string | null, destination: string, startDate: string | null, endDate: string | null, budget: number | null, currency: string, status: string) =>

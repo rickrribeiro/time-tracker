@@ -14,6 +14,14 @@ export function SettingsPage(): React.ReactElement {
   const [fxBase, setFxBase] = useState('BRL')
   const [fxRates, setFxRates] = useState<Record<string, string>>({})
   const [fxSaved, setFxSaved] = useState(false)
+
+  // Open Finance (Pluggy)
+  const [pClientId, setPClientId] = useState('')
+  const [pClientSecret, setPClientSecret] = useState('')
+  const [pItemId, setPItemId] = useState('')
+  const [pBusy, setPBusy] = useState(false)
+  const [pMsg, setPMsg] = useState<{ text: string; ok: boolean } | null>(null)
+
   const [token, setToken] = useState('')
   const [username, setUsername] = useState('')
   const [saved, setSaved] = useState(false)
@@ -52,7 +60,35 @@ export function SettingsPage(): React.ReactElement {
     setUsername(values.github_username ?? '')
     setGClientId(values.google_client_id ?? '')
     setGClientSecret(values.google_client_secret ?? '')
-  }, [values.github_token, values.github_username, values.google_client_id, values.google_client_secret])
+    setPClientId(values.pluggy_client_id ?? '')
+    setPClientSecret(values.pluggy_client_secret ?? '')
+    setPItemId(values.pluggy_item_id ?? '')
+  }, [
+    values.github_token,
+    values.github_username,
+    values.google_client_id,
+    values.google_client_secret,
+    values.pluggy_client_id,
+    values.pluggy_client_secret,
+    values.pluggy_item_id
+  ])
+
+  async function syncPluggy(): Promise<void> {
+    await set('pluggy_client_id', pClientId.trim())
+    await set('pluggy_client_secret', pClientSecret.trim())
+    await set('pluggy_item_id', pItemId.trim())
+    setPBusy(true)
+    setPMsg(null)
+    try {
+      const r = await window.api.pluggy.sync()
+      await refreshFinance()
+      setPMsg({ text: `${r.imported} importadas, ${r.skipped} já existiam.`, ok: true })
+    } catch (e) {
+      setPMsg({ text: e instanceof Error ? e.message : String(e), ok: false })
+    } finally {
+      setPBusy(false)
+    }
+  }
 
   async function handleSave(): Promise<void> {
     await set('github_token', token.trim())
@@ -219,6 +255,39 @@ export function SettingsPage(): React.ReactElement {
         <div style={{ marginTop: 12 }}>
           <button className="btn btn-primary btn-sm" onClick={saveFx}>{fxSaved ? '✓ Salvo' : 'Salvar câmbio'}</button>
         </div>
+      </div>
+
+      <div className="chart-section" style={{ maxWidth: 560, marginTop: 16 }}>
+        <div className="chart-title">🏦 Open Finance (Pluggy)</div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 12px' }}>
+          Conecte seu banco via <strong>Pluggy Connect</strong> (agregador de Open Finance). Cole o
+          Client ID/Secret da sua conta Pluggy e o <strong>Item ID</strong> do banco já conectado. As
+          transações são importadas (deduplicadas por data+valor+descrição).
+        </p>
+        <div className="editor-field">
+          <label>Client ID</label>
+          <input type="text" value={pClientId} onChange={(e) => setPClientId(e.target.value)} />
+        </div>
+        <div className="editor-field">
+          <label>Client Secret</label>
+          <input type="password" value={pClientSecret} onChange={(e) => setPClientSecret(e.target.value)} />
+        </div>
+        <div className="editor-field">
+          <label>Item ID (banco conectado)</label>
+          <input type="text" value={pItemId} onChange={(e) => setPItemId(e.target.value)} />
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={syncPluggy}
+            disabled={pBusy || !pClientId.trim() || !pClientSecret.trim() || !pItemId.trim()}
+          >
+            {pBusy ? 'Importando…' : '🔄 Importar transações'}
+          </button>
+        </div>
+        {pMsg && (
+          <div style={{ fontSize: 12, color: pMsg.ok ? 'var(--success)' : 'var(--danger)', marginTop: 8 }}>{pMsg.text}</div>
+        )}
       </div>
     </div>
   )

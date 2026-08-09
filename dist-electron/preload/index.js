@@ -105,6 +105,10 @@ const api = {
     create: (name, type, amount, currency) => electron.ipcRenderer.invoke("investments:create", name, type, amount, currency),
     delete: (id) => electron.ipcRenderer.invoke("investments:delete", id)
   },
+  pluggy: {
+    sync: () => electron.ipcRenderer.invoke("pluggy:sync"),
+    status: () => electron.ipcRenderer.invoke("pluggy:status")
+  },
   trips: {
     getAll: () => electron.ipcRenderer.invoke("trips:getAll"),
     create: (origin, destination, startDate, endDate, budget, currency, status) => electron.ipcRenderer.invoke("trips:create", origin, destination, startDate, endDate, budget, currency, status),

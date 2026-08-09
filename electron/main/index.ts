@@ -71,6 +71,7 @@ import type { DbTransaction } from './database/queries'
 import { syncGithubIssues } from './services/github'
 import { runClaude } from './services/claude'
 import { connectGoogle, googleConnected, disconnectGoogle, syncGoogleCalendar } from './services/google'
+import { syncPluggy, pluggyConfigured } from './services/pluggy'
 import { encodeSecret, decodeSecret } from './services/secrets'
 
 function createWindow(): void {
@@ -345,6 +346,11 @@ ipcMain.handle('budgets:set', (_, categoryId: number, month: string, amount: num
 ipcMain.handle('investments:getAll', () => getInvestments())
 ipcMain.handle('investments:create', (_, name: string, type: string | null, amount: number, currency: string) => createInvestment(name, type, amount, currency))
 ipcMain.handle('investments:delete', (_, id: number) => deleteInvestment(id))
+
+// ── IPC: Open Finance (Pluggy) ────────────────────────────────────────────────
+
+ipcMain.handle('pluggy:sync', () => syncPluggy())
+ipcMain.handle('pluggy:status', () => pluggyConfigured())
 
 // ── IPC: Travel ───────────────────────────────────────────────────────────────
 

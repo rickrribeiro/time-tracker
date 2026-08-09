@@ -141,7 +141,7 @@ Feito:
 Restante / melhorias:
 - [x] Busca de preços de passagem via **Skyscanner (RapidAPI)**: `services/flights.ts` (auto-complete → search-one-way, extração de menor preço robusta a schema). Botão "🔎 Buscar preço" no add e "🔄 Atualizar preço" por trecho (usa a data de início da viagem). Chave/host em Configurações. Requer assinatura de uma API Skyscanner no RapidAPI.
 - [x] Persistir checklist de documentos por viagem: tabela `trip_documents` (PK tripId+item, cascade); Documentos passa a ter seletor de viagem e estado persistido por viagem.
-- [ ] Recomendações geradas por IA (ver #8).
+- [x] Recomendações geradas por IA — coberto pela ação **Roteiro de viagem** na página IA (#8), que usa o perfil e a próxima viagem.
 
 ## 8. IA local (Claude Code CLI)  *(prioridade #8 — FEITO)*
 
@@ -163,8 +163,8 @@ Restante / melhorias:
 
 - [ ] Banco de horas: 8h por dia útil, tratar feriados; mostrar saldo do dia no calendário (ex.: +3, -2). *(WIP em `day_configs`/`Dashboard.tsx`/`queries.ts`)*
 - [ ] "Semi productive" para hk e velt.
-- [ ] Integrar com calendário (ver #5).
-- [ ] Integrar IA para sugestões (ver #8).
+- [x] Integrar com calendário — feito no #5 (Google Calendar OAuth + eventos manuais + overlay no calendário mensal).
+- [x] Integrar IA para sugestões — feito no #8 (página IA com ações que usam dados do app + comando por projeto/modelo).
 
 ## 🛠 Técnico / higiene
 

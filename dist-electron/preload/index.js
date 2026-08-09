@@ -129,6 +129,30 @@ const api = {
     get: (tripId) => electron.ipcRenderer.invoke("tripDocs:get", tripId),
     set: (tripId, item, checked) => electron.ipcRenderer.invoke("tripDocs:set", tripId, item, checked)
   },
+  // IA library
+  skills: {
+    getAll: () => electron.ipcRenderer.invoke("skills:getAll"),
+    create: (name, description, category, tags, content) => electron.ipcRenderer.invoke("skills:create", name, description, category, tags, content),
+    update: (id, name, description, category, tags, content) => electron.ipcRenderer.invoke("skills:update", id, name, description, category, tags, content),
+    delete: (id) => electron.ipcRenderer.invoke("skills:delete", id),
+    toggleFavorite: (id) => electron.ipcRenderer.invoke("skills:toggleFavorite", id),
+    export: (id) => electron.ipcRenderer.invoke("skills:export", id),
+    import: () => electron.ipcRenderer.invoke("skills:import")
+  },
+  agents: {
+    getAll: () => electron.ipcRenderer.invoke("agents:getAll"),
+    create: (name, description, role, systemPrompt, defaultSkillIds, tags) => electron.ipcRenderer.invoke("agents:create", name, description, role, systemPrompt, defaultSkillIds, tags),
+    update: (id, name, description, role, systemPrompt, defaultSkillIds, tags) => electron.ipcRenderer.invoke("agents:update", id, name, description, role, systemPrompt, defaultSkillIds, tags),
+    delete: (id) => electron.ipcRenderer.invoke("agents:delete", id),
+    toggleFavorite: (id) => electron.ipcRenderer.invoke("agents:toggleFavorite", id),
+    export: (id) => electron.ipcRenderer.invoke("agents:export", id),
+    import: () => electron.ipcRenderer.invoke("agents:import")
+  },
+  executions: {
+    getAll: () => electron.ipcRenderer.invoke("executions:getAll"),
+    create: (agentId, skillIds, userPrompt, finalPrompt, response) => electron.ipcRenderer.invoke("executions:create", agentId, skillIds, userPrompt, finalPrompt, response),
+    delete: (id) => electron.ipcRenderer.invoke("executions:delete", id)
+  },
   // AI (Claude CLI)
   ai: {
     run: (prompt, projectId, model) => electron.ipcRenderer.invoke("ai:run", prompt, projectId, model),

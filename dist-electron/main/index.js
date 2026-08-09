@@ -25,10 +25,10 @@ const electron = require("electron");
 const path = require("path");
 const fs = require("fs");
 const initSqlJs = require("sql.js");
+const crypto = require("crypto");
 const child_process = require("child_process");
 const os = require("os");
 const http = require("http");
-const crypto = require("crypto");
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -202,7 +202,158 @@ const SCHEMA = `
     location TEXT,
     source TEXT NOT NULL DEFAULT 'manual'  -- manual | google
   );
+
+  -- ── RickOS: IA (skills, agentes, execuções) ──────────────────────────
+  CREATE TABLE IF NOT EXISTS skills (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    category TEXT,
+    tags TEXT NOT NULL DEFAULT '[]',
+    content TEXT NOT NULL DEFAULT '',
+    isFavorite INTEGER NOT NULL DEFAULT 0,
+    usageCount INTEGER NOT NULL DEFAULT 0,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS agents (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    role TEXT,
+    systemPrompt TEXT NOT NULL DEFAULT '',
+    defaultSkillIds TEXT NOT NULL DEFAULT '[]',
+    tags TEXT NOT NULL DEFAULT '[]',
+    isFavorite INTEGER NOT NULL DEFAULT 0,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS prompt_executions (
+    id TEXT PRIMARY KEY,
+    createdAt TEXT NOT NULL,
+    agentId TEXT,
+    skillIds TEXT NOT NULL DEFAULT '[]',
+    userPrompt TEXT NOT NULL DEFAULT '',
+    finalPrompt TEXT NOT NULL DEFAULT '',
+    response TEXT
+  );
 `;
+const SKILLS = [
+  {
+    id: "seed-skill-code-review",
+    name: "Code Review",
+    description: "Revisão de código focada em bugs e clareza.",
+    category: "Engenharia",
+    tags: ["código", "qualidade"],
+    content: "Revise o código a seguir. Aponte bugs, riscos e melhorias de legibilidade, em ordem de severidade. Seja específico e sugira o diff quando fizer sentido."
+  },
+  {
+    id: "seed-skill-refactor-ts",
+    name: "Refatoração TypeScript",
+    description: "Refatorar TS mantendo comportamento.",
+    category: "Engenharia",
+    tags: ["typescript", "refactor"],
+    content: "Refatore o TypeScript a seguir para reduzir complexidade e melhorar tipos, sem mudar o comportamento. Explique cada mudança brevemente."
+  },
+  {
+    id: "seed-skill-project-plan",
+    name: "Planejamento de Projeto",
+    description: "Quebrar um objetivo em plano acionável.",
+    category: "Produto",
+    tags: ["planejamento"],
+    content: "Transforme o objetivo a seguir em um plano com marcos, tarefas priorizadas e riscos. Formate como checklist."
+  },
+  {
+    id: "seed-skill-prompt-eng",
+    name: "Prompt Engineering",
+    description: "Melhorar um prompt de IA.",
+    category: "IA",
+    tags: ["prompt"],
+    content: "Melhore o prompt a seguir: deixe objetivo, contexto e formato de saída explícitos. Retorne o prompt reescrito."
+  },
+  {
+    id: "seed-skill-log-analysis",
+    name: "Análise de Logs",
+    description: "Encontrar a causa raiz em logs.",
+    category: "DevOps",
+    tags: ["logs", "debug"],
+    content: "Analise os logs a seguir, identifique a causa raiz provável e proponha os próximos passos de diagnóstico."
+  },
+  {
+    id: "seed-skill-k8s-diag",
+    name: "Diagnóstico Kubernetes",
+    description: "Diagnosticar problemas em clusters k8s.",
+    category: "DevOps",
+    tags: ["kubernetes"],
+    content: "Dado o sintoma a seguir num cluster Kubernetes, liste hipóteses ordenadas por probabilidade e os comandos kubectl para verificar cada uma."
+  }
+];
+const AGENTS = [
+  {
+    id: "seed-agent-backend",
+    name: "Backend Engineer",
+    description: "Engenheiro backend pragmático.",
+    role: "Engenharia",
+    systemPrompt: "Você é um engenheiro backend sênior. Priorize correção, simplicidade e testes.",
+    defaultSkillIds: ["seed-skill-code-review", "seed-skill-refactor-ts"],
+    tags: ["backend"]
+  },
+  {
+    id: "seed-agent-devops",
+    name: "DevOps Engineer",
+    description: "Especialista em infraestrutura e observabilidade.",
+    role: "DevOps",
+    systemPrompt: "Você é um engenheiro DevOps. Pense em confiabilidade, logs e diagnóstico rápido.",
+    defaultSkillIds: ["seed-skill-log-analysis", "seed-skill-k8s-diag"],
+    tags: ["devops"]
+  },
+  {
+    id: "seed-agent-product",
+    name: "Product Strategist",
+    description: "Estrategista de produto orientado a impacto.",
+    role: "Produto",
+    systemPrompt: "Você é um estrategista de produto. Foque em impacto, escopo e clareza.",
+    defaultSkillIds: ["seed-skill-project-plan"],
+    tags: ["produto"]
+  },
+  {
+    id: "seed-agent-prompt",
+    name: "Prompt Engineer",
+    description: "Especialista em prompts de IA.",
+    role: "IA",
+    systemPrompt: "Você é um especialista em prompt engineering. Torne instruções claras e testáveis.",
+    defaultSkillIds: ["seed-skill-prompt-eng"],
+    tags: ["ia", "prompt"]
+  }
+];
+function count(db2, table) {
+  const res = db2.exec(`SELECT COUNT(*) FROM ${table}`);
+  const v = res[0]?.values?.[0]?.[0];
+  return typeof v === "number" ? v : 0;
+}
+function seedAiLibrary(db2) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  if (count(db2, "skills") === 0) {
+    for (const s of SKILLS) {
+      db2.run(
+        `INSERT OR IGNORE INTO skills (id, name, description, category, tags, content, isFavorite, usageCount, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
+        [s.id, s.name, s.description, s.category, JSON.stringify(s.tags), s.content, now, now]
+      );
+    }
+  }
+  if (count(db2, "agents") === 0) {
+    for (const a of AGENTS) {
+      db2.run(
+        `INSERT OR IGNORE INTO agents (id, name, description, role, systemPrompt, defaultSkillIds, tags, isFavorite, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+        [a.id, a.name, a.description, a.role, a.systemPrompt, JSON.stringify(a.defaultSkillIds), JSON.stringify(a.tags), now, now]
+      );
+    }
+  }
+}
 let db = null;
 let dbPath;
 const MIGRATIONS = [
@@ -272,6 +423,7 @@ async function getDb() {
   db.run("PRAGMA foreign_keys = ON;");
   db.run(SCHEMA);
   runMigrations(db);
+  seedAiLibrary(db);
   saveDb();
   return db;
 }
@@ -930,6 +1082,143 @@ async function setTripDocument(tripId, item, checked) {
      ON CONFLICT(tripId, item) DO UPDATE SET checked = excluded.checked`,
     [tripId, item, checked]
   );
+}
+async function getSkills() {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM skills ORDER BY isFavorite DESC, updatedAt DESC");
+}
+async function createSkill(name, description, category, tags, content) {
+  const db2 = await getDb();
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const id = crypto.randomUUID();
+  run(
+    db2,
+    `INSERT INTO skills (id, name, description, category, tags, content, isFavorite, usageCount, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
+    [id, name, description, category, tags, content, now, now]
+  );
+  return getOne(db2, "SELECT * FROM skills WHERE id = ?", [id]);
+}
+async function updateSkill(id, name, description, category, tags, content) {
+  const db2 = await getDb();
+  run(
+    db2,
+    "UPDATE skills SET name = ?, description = ?, category = ?, tags = ?, content = ?, updatedAt = ? WHERE id = ?",
+    [name, description, category, tags, content, (/* @__PURE__ */ new Date()).toISOString(), id]
+  );
+  return getOne(db2, "SELECT * FROM skills WHERE id = ?", [id]);
+}
+async function deleteSkill(id) {
+  const db2 = await getDb();
+  run(db2, "DELETE FROM skills WHERE id = ?", [id]);
+}
+async function toggleSkillFavorite(id) {
+  const db2 = await getDb();
+  run(db2, "UPDATE skills SET isFavorite = 1 - isFavorite WHERE id = ?", [id]);
+}
+async function importSkill(s) {
+  const db2 = await getDb();
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const exists = s.id ? getOne(db2, "SELECT id FROM skills WHERE id = ?", [s.id]) : null;
+  const id = exists || !s.id ? crypto.randomUUID() : s.id;
+  run(
+    db2,
+    `INSERT INTO skills (id, name, description, category, tags, content, isFavorite, usageCount, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    [
+      id,
+      s.name,
+      s.description ?? null,
+      s.category ?? null,
+      s.tags ?? "[]",
+      s.content ?? "",
+      s.isFavorite ?? 0,
+      s.createdAt ?? now,
+      now
+    ]
+  );
+  return getOne(db2, "SELECT * FROM skills WHERE id = ?", [id]);
+}
+async function getAgents() {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM agents ORDER BY isFavorite DESC, updatedAt DESC");
+}
+async function createAgent(name, description, role, systemPrompt, defaultSkillIds, tags) {
+  const db2 = await getDb();
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const id = crypto.randomUUID();
+  run(
+    db2,
+    `INSERT INTO agents (id, name, description, role, systemPrompt, defaultSkillIds, tags, isFavorite, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    [id, name, description, role, systemPrompt, defaultSkillIds, tags, now, now]
+  );
+  return getOne(db2, "SELECT * FROM agents WHERE id = ?", [id]);
+}
+async function updateAgent(id, name, description, role, systemPrompt, defaultSkillIds, tags) {
+  const db2 = await getDb();
+  run(
+    db2,
+    "UPDATE agents SET name = ?, description = ?, role = ?, systemPrompt = ?, defaultSkillIds = ?, tags = ?, updatedAt = ? WHERE id = ?",
+    [name, description, role, systemPrompt, defaultSkillIds, tags, (/* @__PURE__ */ new Date()).toISOString(), id]
+  );
+  return getOne(db2, "SELECT * FROM agents WHERE id = ?", [id]);
+}
+async function deleteAgent(id) {
+  const db2 = await getDb();
+  run(db2, "DELETE FROM agents WHERE id = ?", [id]);
+}
+async function toggleAgentFavorite(id) {
+  const db2 = await getDb();
+  run(db2, "UPDATE agents SET isFavorite = 1 - isFavorite WHERE id = ?", [id]);
+}
+async function importAgent(a) {
+  const db2 = await getDb();
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const exists = a.id ? getOne(db2, "SELECT id FROM agents WHERE id = ?", [a.id]) : null;
+  const id = exists || !a.id ? crypto.randomUUID() : a.id;
+  run(
+    db2,
+    `INSERT INTO agents (id, name, description, role, systemPrompt, defaultSkillIds, tags, isFavorite, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      a.name,
+      a.description ?? null,
+      a.role ?? null,
+      a.systemPrompt ?? "",
+      a.defaultSkillIds ?? "[]",
+      a.tags ?? "[]",
+      a.isFavorite ?? 0,
+      a.createdAt ?? now,
+      now
+    ]
+  );
+  return getOne(db2, "SELECT * FROM agents WHERE id = ?", [id]);
+}
+async function getExecutions() {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM prompt_executions ORDER BY createdAt DESC");
+}
+async function createExecution(agentId, skillIds, userPrompt, finalPrompt, response) {
+  const db2 = await getDb();
+  const id = crypto.randomUUID();
+  run(
+    db2,
+    `INSERT INTO prompt_executions (id, createdAt, agentId, skillIds, userPrompt, finalPrompt, response)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, (/* @__PURE__ */ new Date()).toISOString(), agentId, skillIds, userPrompt, finalPrompt, response]
+  );
+  try {
+    const ids = JSON.parse(skillIds);
+    for (const sid of ids) run(db2, "UPDATE skills SET usageCount = usageCount + 1 WHERE id = ?", [sid]);
+  } catch {
+  }
+  return getOne(db2, "SELECT * FROM prompt_executions WHERE id = ?", [id]);
+}
+async function deleteExecution(id) {
+  const db2 = await getDb();
+  run(db2, "DELETE FROM prompt_executions WHERE id = ?", [id]);
 }
 const SENSITIVE_KEYS = /* @__PURE__ */ new Set([
   "github_token",
@@ -1646,6 +1935,73 @@ electron.ipcMain.handle(
   "tripDocs:set",
   (_, tripId, item, checked) => setTripDocument(tripId, item, checked)
 );
+electron.ipcMain.handle("skills:getAll", () => getSkills());
+electron.ipcMain.handle(
+  "skills:create",
+  (_, name, description, category, tags, content) => createSkill(name, description, category, tags, content)
+);
+electron.ipcMain.handle(
+  "skills:update",
+  (_, id, name, description, category, tags, content) => updateSkill(id, name, description, category, tags, content)
+);
+electron.ipcMain.handle("skills:delete", (_, id) => deleteSkill(id));
+electron.ipcMain.handle("skills:toggleFavorite", (_, id) => toggleSkillFavorite(id));
+electron.ipcMain.handle("agents:getAll", () => getAgents());
+electron.ipcMain.handle(
+  "agents:create",
+  (_, name, description, role, systemPrompt, defaultSkillIds, tags) => createAgent(name, description, role, systemPrompt, defaultSkillIds, tags)
+);
+electron.ipcMain.handle(
+  "agents:update",
+  (_, id, name, description, role, systemPrompt, defaultSkillIds, tags) => updateAgent(id, name, description, role, systemPrompt, defaultSkillIds, tags)
+);
+electron.ipcMain.handle("agents:delete", (_, id) => deleteAgent(id));
+electron.ipcMain.handle("agents:toggleFavorite", (_, id) => toggleAgentFavorite(id));
+electron.ipcMain.handle("executions:getAll", () => getExecutions());
+electron.ipcMain.handle(
+  "executions:create",
+  (_, agentId, skillIds, userPrompt, finalPrompt, response) => createExecution(agentId, skillIds, userPrompt, finalPrompt, response)
+);
+electron.ipcMain.handle("executions:delete", (_, id) => deleteExecution(id));
+async function exportJson(defaultName, data) {
+  const result = await electron.dialog.showSaveDialog({
+    title: "Exportar",
+    defaultPath: defaultName,
+    filters: [{ name: "JSON", extensions: ["json"] }]
+  });
+  if (result.canceled || !result.filePath) return false;
+  fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2));
+  return true;
+}
+async function readJson() {
+  const result = await electron.dialog.showOpenDialog({
+    title: "Importar",
+    filters: [{ name: "JSON", extensions: ["json"] }],
+    properties: ["openFile"]
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  return JSON.parse(fs.readFileSync(result.filePaths[0], "utf8"));
+}
+electron.ipcMain.handle("skills:export", async (_, id) => {
+  const skill = (await getSkills()).find((s) => s.id === id);
+  if (!skill) return false;
+  return exportJson(`${skill.name}.skill.json`, skill);
+});
+electron.ipcMain.handle("skills:import", async () => {
+  const obj = await readJson();
+  if (!obj || !obj.name) return null;
+  return importSkill(obj);
+});
+electron.ipcMain.handle("agents:export", async (_, id) => {
+  const agent = (await getAgents()).find((a) => a.id === id);
+  if (!agent) return false;
+  return exportJson(`${agent.name}.agent.json`, agent);
+});
+electron.ipcMain.handle("agents:import", async () => {
+  const obj = await readJson();
+  if (!obj || !obj.name) return null;
+  return importAgent(obj);
+});
 async function resolveClaudeCommand(projectId) {
   if (projectId != null) {
     const projects = await getProjects();

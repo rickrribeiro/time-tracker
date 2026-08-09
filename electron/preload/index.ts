@@ -182,6 +182,35 @@ const api = {
     get: (tripId: number) => ipcRenderer.invoke('tripDocs:get', tripId),
     set: (tripId: number, item: string, checked: number) => ipcRenderer.invoke('tripDocs:set', tripId, item, checked)
   },
+  // IA library
+  skills: {
+    getAll: () => ipcRenderer.invoke('skills:getAll'),
+    create: (name: string, description: string | null, category: string | null, tags: string, content: string) =>
+      ipcRenderer.invoke('skills:create', name, description, category, tags, content),
+    update: (id: string, name: string, description: string | null, category: string | null, tags: string, content: string) =>
+      ipcRenderer.invoke('skills:update', id, name, description, category, tags, content),
+    delete: (id: string) => ipcRenderer.invoke('skills:delete', id),
+    toggleFavorite: (id: string) => ipcRenderer.invoke('skills:toggleFavorite', id),
+    export: (id: string) => ipcRenderer.invoke('skills:export', id),
+    import: () => ipcRenderer.invoke('skills:import')
+  },
+  agents: {
+    getAll: () => ipcRenderer.invoke('agents:getAll'),
+    create: (name: string, description: string | null, role: string | null, systemPrompt: string, defaultSkillIds: string, tags: string) =>
+      ipcRenderer.invoke('agents:create', name, description, role, systemPrompt, defaultSkillIds, tags),
+    update: (id: string, name: string, description: string | null, role: string | null, systemPrompt: string, defaultSkillIds: string, tags: string) =>
+      ipcRenderer.invoke('agents:update', id, name, description, role, systemPrompt, defaultSkillIds, tags),
+    delete: (id: string) => ipcRenderer.invoke('agents:delete', id),
+    toggleFavorite: (id: string) => ipcRenderer.invoke('agents:toggleFavorite', id),
+    export: (id: string) => ipcRenderer.invoke('agents:export', id),
+    import: () => ipcRenderer.invoke('agents:import')
+  },
+  executions: {
+    getAll: () => ipcRenderer.invoke('executions:getAll'),
+    create: (agentId: string | null, skillIds: string, userPrompt: string, finalPrompt: string, response: string | null) =>
+      ipcRenderer.invoke('executions:create', agentId, skillIds, userPrompt, finalPrompt, response),
+    delete: (id: string) => ipcRenderer.invoke('executions:delete', id)
+  },
   // AI (Claude CLI)
   ai: {
     run: (prompt: string, projectId?: number, model?: string) => ipcRenderer.invoke('ai:run', prompt, projectId, model),

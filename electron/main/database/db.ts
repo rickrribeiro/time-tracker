@@ -3,6 +3,7 @@ import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { SCHEMA } from './schema'
+import { seedAiLibrary } from './aiSeeds'
 
 let db: Database | null = null
 let dbPath: string
@@ -100,6 +101,7 @@ export async function getDb(): Promise<Database> {
   db.run('PRAGMA foreign_keys = ON;')
   db.run(SCHEMA)
   runMigrations(db)
+  seedAiLibrary(db)
 
   saveDb()
 

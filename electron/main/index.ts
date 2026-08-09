@@ -69,9 +69,24 @@ import {
   createFlightWatch,
   deleteFlightWatch,
   getTripDocuments,
-  setTripDocument
+  setTripDocument,
+  getSkills,
+  createSkill,
+  updateSkill,
+  deleteSkill,
+  toggleSkillFavorite,
+  importSkill,
+  getAgents,
+  createAgent,
+  updateAgent,
+  deleteAgent,
+  toggleAgentFavorite,
+  importAgent,
+  getExecutions,
+  createExecution,
+  deleteExecution
 } from './database/queries'
-import type { DbTransaction } from './database/queries'
+import type { DbTransaction, DbSkill, DbAgent } from './database/queries'
 import { syncGithubIssues, createIssueViaClaude } from './services/github'
 import { runClaude } from './services/claude'
 import { connectGoogle, googleConnected, disconnectGoogle, syncGoogleCalendar } from './services/google'
@@ -388,6 +403,78 @@ ipcMain.handle('tripDocs:get', (_, tripId: number) => getTripDocuments(tripId))
 ipcMain.handle('tripDocs:set', (_, tripId: number, item: string, checked: number) =>
   setTripDocument(tripId, item, checked)
 )
+
+// ── IPC: IA library (skills / agents / executions) ────────────────────────────
+
+ipcMain.handle('skills:getAll', () => getSkills())
+ipcMain.handle('skills:create', (_, name: string, description: string | null, category: string | null, tags: string, content: string) =>
+  createSkill(name, description, category, tags, content)
+)
+ipcMain.handle('skills:update', (_, id: string, name: string, description: string | null, category: string | null, tags: string, content: string) =>
+  updateSkill(id, name, description, category, tags, content)
+)
+ipcMain.handle('skills:delete', (_, id: string) => deleteSkill(id))
+ipcMain.handle('skills:toggleFavorite', (_, id: string) => toggleSkillFavorite(id))
+
+ipcMain.handle('agents:getAll', () => getAgents())
+ipcMain.handle('agents:create', (_, name: string, description: string | null, role: string | null, systemPrompt: string, defaultSkillIds: string, tags: string) =>
+  createAgent(name, description, role, systemPrompt, defaultSkillIds, tags)
+)
+ipcMain.handle('agents:update', (_, id: string, name: string, description: string | null, role: string | null, systemPrompt: string, defaultSkillIds: string, tags: string) =>
+  updateAgent(id, name, description, role, systemPrompt, defaultSkillIds, tags)
+)
+ipcMain.handle('agents:delete', (_, id: string) => deleteAgent(id))
+ipcMain.handle('agents:toggleFavorite', (_, id: string) => toggleAgentFavorite(id))
+
+ipcMain.handle('executions:getAll', () => getExecutions())
+ipcMain.handle('executions:create', (_, agentId: string | null, skillIds: string, userPrompt: string, finalPrompt: string, response: string | null) =>
+  createExecution(agentId, skillIds, userPrompt, finalPrompt, response)
+)
+ipcMain.handle('executions:delete', (_, id: string) => deleteExecution(id))
+
+// Per-entity JSON export/import (mirrors app:exportDb using dialog + fs)
+async function exportJson(defaultName: string, data: unknown): Promise<boolean> {
+  const result = await dialog.showSaveDialog({
+    title: 'Exportar',
+    defaultPath: defaultName,
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  })
+  if (result.canceled || !result.filePath) return false
+  fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2))
+  return true
+}
+
+async function readJson<T>(): Promise<T | null> {
+  const result = await dialog.showOpenDialog({
+    title: 'Importar',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['openFile']
+  })
+  if (result.canceled || !result.filePaths[0]) return null
+  return JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8')) as T
+}
+
+ipcMain.handle('skills:export', async (_, id: string) => {
+  const skill = (await getSkills()).find((s) => s.id === id)
+  if (!skill) return false
+  return exportJson(`${skill.name}.skill.json`, skill)
+})
+ipcMain.handle('skills:import', async () => {
+  const obj = await readJson<Partial<DbSkill> & { name?: string }>()
+  if (!obj || !obj.name) return null
+  return importSkill(obj as Partial<DbSkill> & { name: string })
+})
+
+ipcMain.handle('agents:export', async (_, id: string) => {
+  const agent = (await getAgents()).find((a) => a.id === id)
+  if (!agent) return false
+  return exportJson(`${agent.name}.agent.json`, agent)
+})
+ipcMain.handle('agents:import', async () => {
+  const obj = await readJson<Partial<DbAgent> & { name?: string }>()
+  if (!obj || !obj.name) return null
+  return importAgent(obj as Partial<DbAgent> & { name: string })
+})
 
 // ── IPC: AI (Claude CLI) ──────────────────────────────────────────────────────
 

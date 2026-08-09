@@ -1,4 +1,5 @@
 import { Database } from 'sql.js'
+import { randomUUID } from 'crypto'
 import { getDb, saveDb } from './db'
 
 export interface DbTag {
@@ -1060,4 +1061,244 @@ export async function setTripDocument(tripId: number, item: string, checked: num
      ON CONFLICT(tripId, item) DO UPDATE SET checked = excluded.checked`,
     [tripId, item, checked]
   )
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IA — Skills, Agentes, Execuções (ids TEXT uuid p/ export/import portável)
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface DbSkill {
+  id: string
+  name: string
+  description: string | null
+  category: string | null
+  tags: string // JSON array
+  content: string
+  isFavorite: number
+  usageCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DbAgent {
+  id: string
+  name: string
+  description: string | null
+  role: string | null
+  systemPrompt: string
+  defaultSkillIds: string // JSON array
+  tags: string // JSON array
+  isFavorite: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DbPromptExecution {
+  id: string
+  createdAt: string
+  agentId: string | null
+  skillIds: string // JSON array
+  userPrompt: string
+  finalPrompt: string
+  response: string | null
+}
+
+// ── Skills ──────────────────────────────────────────────────────────────────
+
+export async function getSkills(): Promise<DbSkill[]> {
+  const db = await getDb()
+  return getAll<DbSkill>(db, 'SELECT * FROM skills ORDER BY isFavorite DESC, updatedAt DESC')
+}
+
+export async function createSkill(
+  name: string,
+  description: string | null,
+  category: string | null,
+  tags: string,
+  content: string
+): Promise<DbSkill> {
+  const db = await getDb()
+  const now = new Date().toISOString()
+  const id = randomUUID()
+  run(
+    db,
+    `INSERT INTO skills (id, name, description, category, tags, content, isFavorite, usageCount, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
+    [id, name, description, category, tags, content, now, now]
+  )
+  return getOne<DbSkill>(db, 'SELECT * FROM skills WHERE id = ?', [id])!
+}
+
+export async function updateSkill(
+  id: string,
+  name: string,
+  description: string | null,
+  category: string | null,
+  tags: string,
+  content: string
+): Promise<DbSkill> {
+  const db = await getDb()
+  run(
+    db,
+    'UPDATE skills SET name = ?, description = ?, category = ?, tags = ?, content = ?, updatedAt = ? WHERE id = ?',
+    [name, description, category, tags, content, new Date().toISOString(), id]
+  )
+  return getOne<DbSkill>(db, 'SELECT * FROM skills WHERE id = ?', [id])!
+}
+
+export async function deleteSkill(id: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM skills WHERE id = ?', [id])
+}
+
+export async function toggleSkillFavorite(id: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE skills SET isFavorite = 1 - isFavorite WHERE id = ?', [id])
+}
+
+export async function incrementSkillUsage(id: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE skills SET usageCount = usageCount + 1 WHERE id = ?', [id])
+}
+
+/** Import a skill object; assigns a fresh id if the incoming id already exists (no clobber). */
+export async function importSkill(s: Partial<DbSkill> & { name: string }): Promise<DbSkill> {
+  const db = await getDb()
+  const now = new Date().toISOString()
+  const exists = s.id ? getOne<DbSkill>(db, 'SELECT id FROM skills WHERE id = ?', [s.id]) : null
+  const id = exists || !s.id ? randomUUID() : s.id
+  run(
+    db,
+    `INSERT INTO skills (id, name, description, category, tags, content, isFavorite, usageCount, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    [
+      id,
+      s.name,
+      s.description ?? null,
+      s.category ?? null,
+      s.tags ?? '[]',
+      s.content ?? '',
+      s.isFavorite ?? 0,
+      s.createdAt ?? now,
+      now
+    ]
+  )
+  return getOne<DbSkill>(db, 'SELECT * FROM skills WHERE id = ?', [id])!
+}
+
+// ── Agents ──────────────────────────────────────────────────────────────────
+
+export async function getAgents(): Promise<DbAgent[]> {
+  const db = await getDb()
+  return getAll<DbAgent>(db, 'SELECT * FROM agents ORDER BY isFavorite DESC, updatedAt DESC')
+}
+
+export async function createAgent(
+  name: string,
+  description: string | null,
+  role: string | null,
+  systemPrompt: string,
+  defaultSkillIds: string,
+  tags: string
+): Promise<DbAgent> {
+  const db = await getDb()
+  const now = new Date().toISOString()
+  const id = randomUUID()
+  run(
+    db,
+    `INSERT INTO agents (id, name, description, role, systemPrompt, defaultSkillIds, tags, isFavorite, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    [id, name, description, role, systemPrompt, defaultSkillIds, tags, now, now]
+  )
+  return getOne<DbAgent>(db, 'SELECT * FROM agents WHERE id = ?', [id])!
+}
+
+export async function updateAgent(
+  id: string,
+  name: string,
+  description: string | null,
+  role: string | null,
+  systemPrompt: string,
+  defaultSkillIds: string,
+  tags: string
+): Promise<DbAgent> {
+  const db = await getDb()
+  run(
+    db,
+    'UPDATE agents SET name = ?, description = ?, role = ?, systemPrompt = ?, defaultSkillIds = ?, tags = ?, updatedAt = ? WHERE id = ?',
+    [name, description, role, systemPrompt, defaultSkillIds, tags, new Date().toISOString(), id]
+  )
+  return getOne<DbAgent>(db, 'SELECT * FROM agents WHERE id = ?', [id])!
+}
+
+export async function deleteAgent(id: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM agents WHERE id = ?', [id])
+}
+
+export async function toggleAgentFavorite(id: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE agents SET isFavorite = 1 - isFavorite WHERE id = ?', [id])
+}
+
+export async function importAgent(a: Partial<DbAgent> & { name: string }): Promise<DbAgent> {
+  const db = await getDb()
+  const now = new Date().toISOString()
+  const exists = a.id ? getOne<DbAgent>(db, 'SELECT id FROM agents WHERE id = ?', [a.id]) : null
+  const id = exists || !a.id ? randomUUID() : a.id
+  run(
+    db,
+    `INSERT INTO agents (id, name, description, role, systemPrompt, defaultSkillIds, tags, isFavorite, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      a.name,
+      a.description ?? null,
+      a.role ?? null,
+      a.systemPrompt ?? '',
+      a.defaultSkillIds ?? '[]',
+      a.tags ?? '[]',
+      a.isFavorite ?? 0,
+      a.createdAt ?? now,
+      now
+    ]
+  )
+  return getOne<DbAgent>(db, 'SELECT * FROM agents WHERE id = ?', [id])!
+}
+
+// ── Executions ────────────────────────────────────────────────────────────────
+
+export async function getExecutions(): Promise<DbPromptExecution[]> {
+  const db = await getDb()
+  return getAll<DbPromptExecution>(db, 'SELECT * FROM prompt_executions ORDER BY createdAt DESC')
+}
+
+export async function createExecution(
+  agentId: string | null,
+  skillIds: string, // JSON array
+  userPrompt: string,
+  finalPrompt: string,
+  response: string | null
+): Promise<DbPromptExecution> {
+  const db = await getDb()
+  const id = randomUUID()
+  run(
+    db,
+    `INSERT INTO prompt_executions (id, createdAt, agentId, skillIds, userPrompt, finalPrompt, response)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, new Date().toISOString(), agentId, skillIds, userPrompt, finalPrompt, response]
+  )
+  // bump usage of each skill referenced
+  try {
+    const ids = JSON.parse(skillIds) as string[]
+    for (const sid of ids) run(db, 'UPDATE skills SET usageCount = usageCount + 1 WHERE id = ?', [sid])
+  } catch {
+    // ignore malformed skillIds
+  }
+  return getOne<DbPromptExecution>(db, 'SELECT * FROM prompt_executions WHERE id = ?', [id])!
+}
+
+export async function deleteExecution(id: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM prompt_executions WHERE id = ?', [id])
 }

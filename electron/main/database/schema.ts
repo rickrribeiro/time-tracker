@@ -171,4 +171,41 @@ export const SCHEMA = `
     location TEXT,
     source TEXT NOT NULL DEFAULT 'manual'  -- manual | google
   );
+
+  -- ── RickOS: IA (skills, agentes, execuções) ──────────────────────────
+  CREATE TABLE IF NOT EXISTS skills (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    category TEXT,
+    tags TEXT NOT NULL DEFAULT '[]',
+    content TEXT NOT NULL DEFAULT '',
+    isFavorite INTEGER NOT NULL DEFAULT 0,
+    usageCount INTEGER NOT NULL DEFAULT 0,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS agents (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    role TEXT,
+    systemPrompt TEXT NOT NULL DEFAULT '',
+    defaultSkillIds TEXT NOT NULL DEFAULT '[]',
+    tags TEXT NOT NULL DEFAULT '[]',
+    isFavorite INTEGER NOT NULL DEFAULT 0,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS prompt_executions (
+    id TEXT PRIMARY KEY,
+    createdAt TEXT NOT NULL,
+    agentId TEXT,
+    skillIds TEXT NOT NULL DEFAULT '[]',
+    userPrompt TEXT NOT NULL DEFAULT '',
+    finalPrompt TEXT NOT NULL DEFAULT '',
+    response TEXT
+  );
 `;

@@ -165,6 +165,42 @@ export interface TripDocument {
   checked: number
 }
 
+export interface Skill {
+  id: string
+  name: string
+  description: string | null
+  category: string | null
+  tags: string // JSON array
+  content: string
+  isFavorite: number
+  usageCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Agent {
+  id: string
+  name: string
+  description: string | null
+  role: string | null
+  systemPrompt: string
+  defaultSkillIds: string // JSON array
+  tags: string // JSON array
+  isFavorite: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PromptExecution {
+  id: string
+  createdAt: string
+  agentId: string | null
+  skillIds: string // JSON array
+  userPrompt: string
+  finalPrompt: string
+  response: string | null
+}
+
 export type Page =
   // Time Tracker (existente)
   | 'timeline'
@@ -367,6 +403,29 @@ declare global {
         run: (prompt: string, projectId?: number, model?: string) => Promise<string>
         runStream: (prompt: string, projectId?: number, model?: string) => Promise<string>
         onChunk: (cb: (text: string) => void) => () => void
+      }
+      skills: {
+        getAll: () => Promise<Skill[]>
+        create: (name: string, description: string | null, category: string | null, tags: string, content: string) => Promise<Skill>
+        update: (id: string, name: string, description: string | null, category: string | null, tags: string, content: string) => Promise<Skill>
+        delete: (id: string) => Promise<void>
+        toggleFavorite: (id: string) => Promise<void>
+        export: (id: string) => Promise<boolean>
+        import: () => Promise<Skill | null>
+      }
+      agents: {
+        getAll: () => Promise<Agent[]>
+        create: (name: string, description: string | null, role: string | null, systemPrompt: string, defaultSkillIds: string, tags: string) => Promise<Agent>
+        update: (id: string, name: string, description: string | null, role: string | null, systemPrompt: string, defaultSkillIds: string, tags: string) => Promise<Agent>
+        delete: (id: string) => Promise<void>
+        toggleFavorite: (id: string) => Promise<void>
+        export: (id: string) => Promise<boolean>
+        import: () => Promise<Agent | null>
+      }
+      executions: {
+        getAll: () => Promise<PromptExecution[]>
+        create: (agentId: string | null, skillIds: string, userPrompt: string, finalPrompt: string, response: string | null) => Promise<PromptExecution>
+        delete: (id: string) => Promise<void>
       }
       on: {
         quickCapture: (cb: () => void) => () => void

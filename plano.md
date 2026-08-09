@@ -122,7 +122,7 @@ Feito:
 - [x] Navegação por mês (MonthNav) em todas as telas.
 
 Restante / melhorias:
-- [ ] Parsers específicos por banco (Wise, cartões) e mapeamento de categorias na importação (hoje entra tudo em "Outros").
+- [x] Importação melhor: detecta coluna de moeda (Wise) + mais aliases de colunas; **auto-categorização** por palavra-chave (Transporte/Alimentação/Moradia/Lazer/Salário) com fallback "Outros".
 - [x] Conversão entre moedas: moeda base + taxas manuais (Configurações → Finanças); Dashboard mostra "Saldo do mês em <base>" consolidado.
 - [x] Editar transação (modal `TransactionEditor`: tipo, valor, moeda, categoria, conta, data, descrição).
 - [ ] Open Finance (via agregador Pluggy).

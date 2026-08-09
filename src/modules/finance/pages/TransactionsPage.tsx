@@ -3,7 +3,7 @@ import { Transaction } from '../../../types'
 import { useFinanceStore } from '../store/financeStore'
 import { MonthNav } from '../components/MonthNav'
 import { TransactionEditor } from '../components/TransactionEditor'
-import { formatMoney, parseBankCsv, transactionsToCsv } from '../util'
+import { formatMoney, parseBankCsv, transactionsToCsv, matchCategoryId } from '../util'
 import { localDateStr } from '../../../utils/dates'
 
 const CURRENCIES = ['BRL', 'USD', 'JPY', 'EUR']
@@ -60,13 +60,14 @@ export function TransactionsPage(): React.ReactElement {
       alert('Não consegui reconhecer o CSV. Esperado colunas de data e valor.')
       return
     }
-    if (!confirm(`Importar ${rows.length} transações para ${month}? (categoria: Outros)`)) return
+    const categorized = rows.filter((r) => matchCategoryId(r.description, categories) !== null).length
+    if (!confirm(`Importar ${rows.length} transações? ${categorized} auto-categorizadas; o resto vai p/ "Outros".`)) return
     await importTransactions(
       rows.map((r) => ({
         accountId: accountId === '' ? null : Number(accountId),
-        categoryId: 6, // "Outros" seed
+        categoryId: matchCategoryId(r.description, categories) ?? 6, // fallback "Outros" seed
         amount: r.amount,
-        currency,
+        currency: r.currency ?? currency,
         type: r.type,
         description: r.description || null,
         date: r.date

@@ -58,6 +58,31 @@ export interface ParsedCsvRow {
   description: string
   amount: number
   type: 'income' | 'expense'
+  currency?: string
+}
+
+/** Keyword rules → seed category name. Used to auto-categorize imported rows. */
+const CATEGORY_RULES: { name: string; keywords: string[] }[] = [
+  { name: 'Transporte', keywords: ['uber', '99', 'taxi', 'metro', 'metrô', 'gasolina', 'posto', 'combust', 'passagem', 'voo', 'latam', 'gol', 'azul'] },
+  { name: 'Alimentação', keywords: ['ifood', 'rappi', 'restaurante', 'mercado', 'supermerc', 'padaria', 'lanche', 'food', 'café', 'cafe', 'bar ', 'pizza', 'burger'] },
+  { name: 'Moradia', keywords: ['aluguel', 'condominio', 'condomínio', 'luz', 'agua', 'água', 'energia', 'internet', 'vivo', 'claro', 'tim ', 'gás', 'gas '] },
+  { name: 'Lazer', keywords: ['cinema', 'netflix', 'spotify', 'steam', 'show', 'ingresso', 'disney', 'hbo', 'prime'] },
+  { name: 'Salário', keywords: ['salario', 'salário', 'salary', 'provento', 'pagamento recebido'] }
+]
+
+/** Match a transaction description to a seed category id (by name), or null. */
+export function matchCategoryId(
+  description: string,
+  categories: { id: number; name: string }[]
+): number | null {
+  const d = description.toLowerCase()
+  for (const rule of CATEGORY_RULES) {
+    if (rule.keywords.some((k) => d.includes(k))) {
+      const cat = categories.find((c) => c.name.toLowerCase() === rule.name.toLowerCase())
+      if (cat) return cat.id
+    }
+  }
+  return null
 }
 
 /** Parse a bank-export CSV into rows. Best-effort: auto-detects delimiter and common headers. */
@@ -75,7 +100,8 @@ export function parseBankCsv(text: string): ParsedCsvRow[] {
 
   const dateCol = findCol('data', 'date')
   const amountCol = findCol('valor', 'amount', 'value', 'montante')
-  const descCol = findCol('desc', 'title', 'histór', 'lança', 'estabelecimento', 'title')
+  const descCol = findCol('desc', 'title', 'histór', 'lança', 'estabelecimento', 'merchant', 'payee', 'reference')
+  const currencyCol = findCol('currency', 'moeda', 'ccy')
 
   if (dateCol < 0 || amountCol < 0) return []
 
@@ -93,11 +119,13 @@ export function parseBankCsv(text: string): ParsedCsvRow[] {
     }
     const value = parseFloat(normalized)
     if (isNaN(value)) continue
+    const currency = currencyCol >= 0 ? cols[currencyCol].toUpperCase().slice(0, 3) : undefined
     rows.push({
       date: normalizeDate(cols[dateCol]),
       description: descCol >= 0 ? cols[descCol] : '',
       amount: Math.abs(value),
-      type: value < 0 ? 'expense' : 'income'
+      type: value < 0 ? 'expense' : 'income',
+      currency: currency && /^[A-Z]{3}$/.test(currency) ? currency : undefined
     })
   }
   return rows

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
-import { closeDb, saveDb } from './database/db'
+import { getDb, closeDb, saveDb } from './database/db'
 import {
   getAllTags,
   getAllTasks,
@@ -419,6 +419,9 @@ ipcMain.handle('ai:runStream', async (event, prompt: string, projectId?: number,
 ipcMain.handle('app:openExternal', (_, url: string) => shell.openExternal(url))
 
 ipcMain.handle('app:exportDb', async () => {
+  // Ensure the DB is loaded (schema/migrations applied) and flushed so the snapshot
+  // contains every table — the whole sql.js DB lives in this single file.
+  await getDb()
   saveDb()
   const dbPath = join(app.getPath('userData'), 'timetracker.db')
   const options = {

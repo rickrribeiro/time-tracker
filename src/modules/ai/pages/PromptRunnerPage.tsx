@@ -4,7 +4,7 @@ import { useAgentStore } from '../store/agentStore'
 import { useExecutionStore } from '../store/executionStore'
 import { composePrompt } from '../compose'
 
-const DRAFT_KEY = 'rickos:promptRunnerDraft'
+export const DRAFT_KEY = 'rickos:promptRunnerDraft'
 
 interface Draft {
   agentId: string | null

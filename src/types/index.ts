@@ -235,6 +235,7 @@ export type Page =
   | 'ai-skills'
   | 'ai-agents'
   | 'ai-runner'
+  | 'ai-history'
   // Configurações
   | 'settings'
 

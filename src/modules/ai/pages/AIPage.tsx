@@ -3,6 +3,7 @@ import { useTodoStore } from '../../todo/store/todoStore'
 import { useHabitStore } from '../../habits/store/habitStore'
 import { useCalendarStore } from '../../calendar/store/calendarStore'
 import { useTripStore } from '../../travel/store/tripStore'
+import { localDateStr, localDayStartISO, localDayEndISO } from '../../../utils/dates'
 
 interface QuickAction {
   key: string
@@ -15,9 +16,14 @@ interface Ctx {
   habitNames: string[]
   events: ReturnType<typeof useCalendarStore.getState>['upcoming']
   nextTrip: ReturnType<typeof useTripStore.getState>['trips'][number] | undefined
+  weekHours: string
 }
 
 const list = (items: string[]): string => items.map((t) => `- ${t}`).join('\n') || '(nenhum)'
+
+function fmtHours(minutes: number): string {
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
 
 const ACTIONS: QuickAction[] = [
   {
@@ -55,6 +61,26 @@ const ACTIONS: QuickAction[] = [
             c.nextTrip.startDate ? ` (a partir de ${c.nextTrip.startDate})` : ''
           }. Considere meu perfil: gosto de café, anime, ramen/izakaya, vida noturna e bairros caminháveis.`
         : 'Sugira um destino de viagem para alguém que gosta de café, anime, ramen/izakaya, vida noturna e bairros caminháveis.'
+  },
+  {
+    key: 'weekly',
+    label: 'Resumo semanal',
+    build: (c) =>
+      `Faça um resumo da minha semana e sugira ajustes para a próxima.\n\nHoras trabalhadas: ${c.weekHours}\n\nTarefas concluídas:\n${list(
+        c.todos.filter((t) => t.status === 'done').map((t) => t.title)
+      )}\n\nTarefas em aberto:\n${list(
+        c.todos.filter((t) => t.status !== 'done' && t.status !== 'inbox').map((t) => t.title)
+      )}\n\nHábitos monitorados:\n${list(c.habitNames)}`
+  },
+  {
+    key: 'trip-checklist',
+    label: 'Checklist de viagem',
+    build: (c) =>
+      c.nextTrip
+        ? `Monte um checklist completo de preparação para a viagem a ${c.nextTrip.destination}${
+            c.nextTrip.startDate ? ` (${c.nextTrip.startDate}${c.nextTrip.endDate ? ` a ${c.nextTrip.endDate}` : ''})` : ''
+          }: documentos, bagagem, saúde/seguro, finanças/câmbio e itens específicos do destino.`
+        : 'Monte um checklist genérico de preparação de viagem internacional (documentos, bagagem, saúde, finanças).'
   }
 ]
 
@@ -69,6 +95,7 @@ export function AIPage(): React.ReactElement {
   const [running, setRunning] = useState(false)
   const [error, setError] = useState('')
   const [model, setModel] = useState('')
+  const [weekMinutes, setWeekMinutes] = useState(0)
 
   useEffect(() => {
     rT()
@@ -76,6 +103,14 @@ export function AIPage(): React.ReactElement {
     rC()
     rTr()
     window.api.settings.get('claude_model').then((m) => setModel(m ?? ''))
+
+    const now = new Date()
+    const monday = new Date(now)
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7))
+    window.api.stats
+      .daily(localDayStartISO(localDateStr(monday)), localDayEndISO(localDateStr(now)))
+      .then((rows) => setWeekMinutes(rows.reduce((s, r) => s + r.totalMinutes, 0)))
+
     // Stream tokens into the output as they arrive.
     const off = window.api.ai.onChunk((text) => setOutput((o) => o + text))
     return off
@@ -90,7 +125,8 @@ export function AIPage(): React.ReactElement {
     todos,
     habitNames: habits.map((h) => h.name),
     events: upcoming,
-    nextTrip: trips[0]
+    nextTrip: trips[0],
+    weekHours: fmtHours(weekMinutes)
   }
 
   async function run(text: string): Promise<void> {

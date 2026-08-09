@@ -972,17 +972,20 @@ function buildPath() {
   ];
   return [process.env.PATH || "", ...extra].join(path.delimiter);
 }
-function attempt(bin, prompt, viaShell) {
+function attempt(bin, prompt, viaShell, opts = {}) {
   return new Promise((resolve, reject) => {
     const env = { ...process.env, PATH: buildPath() };
+    const model = opts.model?.trim();
     let child;
     if (viaShell) {
       const shell = process.env.SHELL || "/bin/zsh";
-      child = child_process.spawn(shell, ["-ilc", `${bin} -p "$RICKOS_PROMPT"`], {
-        env: { ...env, RICKOS_PROMPT: prompt }
+      const modelPart = model ? ' --model "$RICKOS_MODEL"' : "";
+      child = child_process.spawn(shell, ["-ilc", `${bin} -p "$RICKOS_PROMPT"${modelPart}`], {
+        env: { ...env, RICKOS_PROMPT: prompt, RICKOS_MODEL: model || "" }
       });
     } else {
-      child = child_process.spawn(bin, ["-p", prompt], { env });
+      const args = model ? ["--model", model, "-p", prompt] : ["-p", prompt];
+      child = child_process.spawn(bin, args, { env });
     }
     let stdout = "";
     let stderr = "";
@@ -993,7 +996,11 @@ function attempt(bin, prompt, viaShell) {
       child.kill("SIGKILL");
       reject(new Error("Tempo esgotado (120s) executando o Claude CLI."));
     }, TIMEOUT_MS);
-    child.stdout.on("data", (d) => stdout += d.toString());
+    child.stdout.on("data", (d) => {
+      const text = d.toString();
+      stdout += text;
+      opts.onChunk?.(text);
+    });
     child.stderr.on("data", (d) => stderr += d.toString());
     child.on("error", (err) => {
       if (settled) return;
@@ -1010,18 +1017,18 @@ function attempt(bin, prompt, viaShell) {
     });
   });
 }
-async function runClaude(prompt, command = "claude") {
+async function runClaude(prompt, command = "claude", opts = {}) {
   const bin = (command || "").trim() || "claude";
   if (!/^[A-Za-z0-9_./-]+$/.test(bin)) {
     throw new Error(`Comando inválido: "${bin}". Use apenas letras, números, ., _, - ou /.`);
   }
   if (!prompt.trim()) throw new Error("Prompt vazio.");
   try {
-    return await attempt(bin, prompt, false);
+    return await attempt(bin, prompt, false, opts);
   } catch (err) {
     if (err?.code === "ENOENT") {
       try {
-        return await attempt(bin, prompt, true);
+        return await attempt(bin, prompt, true, opts);
       } catch (err2) {
         if (err2?.code === "ENOENT") {
           throw new Error(
@@ -1450,8 +1457,20 @@ async function resolveClaudeCommand(projectId) {
   }
   return await getSetting("claude_command") || "claude";
 }
-electron.ipcMain.handle("ai:run", async (_, prompt, projectId) => {
-  return runClaude(prompt, await resolveClaudeCommand(projectId));
+async function resolveModel(model) {
+  return (model || await getSetting("claude_model") || "").trim();
+}
+electron.ipcMain.handle("ai:run", async (_, prompt, projectId, model) => {
+  return runClaude(prompt, await resolveClaudeCommand(projectId), { model: await resolveModel(model) });
+});
+electron.ipcMain.handle("ai:runStream", async (event, prompt, projectId, model) => {
+  const command = await resolveClaudeCommand(projectId);
+  return runClaude(prompt, command, {
+    model: await resolveModel(model),
+    onChunk: (text) => {
+      if (!event.sender.isDestroyed()) event.sender.send("ai:chunk", text);
+    }
+  });
 });
 electron.ipcMain.handle("app:openExternal", (_, url) => electron.shell.openExternal(url));
 electron.ipcMain.handle("app:exportDb", async () => {

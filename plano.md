@@ -155,7 +155,7 @@ Feito:
 Restante / melhorias:
 - [x] Streaming da resposta: serviço emite chunks (`onChunk`), IPC `ai:runStream` envia eventos `ai:chunk`; a página IA mostra o texto ao vivo.
 - [x] Escolher modelo (`--model`): seletor na página IA (Padrão/Sonnet/Opus/Haiku), persistido em `claude_model`; serviço adiciona `--model` (direto e via shell, sem injeção).
-- [ ] Mais ações (resumo semanal com horas do tracker, checklist de viagem).
+- [x] Mais ações: **Resumo semanal** (horas do tracker + tarefas concluídas/abertas + hábitos) e **Checklist de viagem** (próxima trip).
 
 ---
 

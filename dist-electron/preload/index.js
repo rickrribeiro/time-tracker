@@ -122,7 +122,13 @@ const api = {
   },
   // AI (Claude CLI)
   ai: {
-    run: (prompt, projectId) => electron.ipcRenderer.invoke("ai:run", prompt, projectId)
+    run: (prompt, projectId, model) => electron.ipcRenderer.invoke("ai:run", prompt, projectId, model),
+    runStream: (prompt, projectId, model) => electron.ipcRenderer.invoke("ai:runStream", prompt, projectId, model),
+    onChunk: (cb) => {
+      const listener = (_e, text) => cb(text);
+      electron.ipcRenderer.on("ai:chunk", listener);
+      return () => electron.ipcRenderer.removeListener("ai:chunk", listener);
+    }
   },
   // Events (main → renderer)
   on: {

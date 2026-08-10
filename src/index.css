@@ -226,6 +226,13 @@ select:focus {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* conteúdo das páginas é selecionável (permite copiar erros, valores, prompts…) */
+  user-select: text;
+}
+
+/* a timeline tem blocos arrastáveis — evita seleção de texto ao arrastar */
+.timeline-page {
+  user-select: none;
 }
 
 /* ── Active Task Bar ─────────────────────────────────────────────────────────── */

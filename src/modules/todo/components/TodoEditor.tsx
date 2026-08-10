@@ -16,8 +16,12 @@ export function TodoEditor({ todo, onClose }: TodoEditorProps): React.ReactEleme
 
   const [title, setTitle] = useState(todo.title)
   const [notes, setNotes] = useState(todo.notes ?? '')
-  const [status, setStatus] = useState(todo.status === 'inbox' ? 'todo' : todo.status)
+  // Keep the real status (inbox stays inbox until the user explicitly promotes it).
+  const [status, setStatus] = useState(todo.status)
   const [priority, setPriority] = useState(todo.priority)
+
+  // Inbox items can be promoted; show 'inbox' as an option so it can also be kept.
+  const statusOptions = todo.status === 'inbox' ? ['inbox', ...STATUSES] : STATUSES
   const [dueDate, setDueDate] = useState(todo.dueDate ?? '')
   const [projectId, setProjectId] = useState<number | null>(todo.projectId)
 
@@ -58,7 +62,7 @@ export function TodoEditor({ todo, onClose }: TodoEditorProps): React.ReactEleme
           <div className="editor-field">
             <label>Status</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              {STATUSES.map((s) => (
+              {statusOptions.map((s) => (
                 <option key={s} value={s}>
                   {STATUS_LABELS[s]}
                 </option>

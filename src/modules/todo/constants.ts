@@ -22,6 +22,7 @@ export const STATUSES = ['todo', 'doing', 'done'] as const
 export type TodoStatus = (typeof STATUSES)[number]
 
 export const STATUS_LABELS: Record<string, string> = {
+  inbox: 'Caixa de entrada',
   todo: 'A fazer',
   doing: 'Fazendo',
   done: 'Concluído'

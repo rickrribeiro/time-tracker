@@ -7,6 +7,7 @@ import { TopicEditor, TOPIC_STATUS_LABEL } from '../components/TopicEditor'
 interface Progress {
   done: number
   total: number
+  cards: number
 }
 
 export function EstudosDashboardPage(): React.ReactElement {
@@ -19,8 +20,8 @@ export function EstudosDashboardPage(): React.ReactElement {
   async function loadProgress(): Promise<void> {
     const entries = await Promise.all(
       topics.map(async (t) => {
-        const nodes = await window.api.study.nodes(t.id)
-        return [t.id, { done: nodes.filter((n) => n.status === 'done').length, total: nodes.length }] as const
+        const [nodes, cards] = await Promise.all([window.api.study.nodes(t.id), window.api.study.flashcards(t.id)])
+        return [t.id, { done: nodes.filter((n) => n.status === 'done').length, total: nodes.length, cards: cards.length }] as const
       })
     )
     setProgress(Object.fromEntries(entries))
@@ -95,7 +96,7 @@ export function EstudosDashboardPage(): React.ReactElement {
       <div className="list-stack">
         {topics.length === 0 && <div className="empty-hint">Nenhum tópico. Crie o primeiro com ＋ Tópico.</div>}
         {topics.map((t) => {
-          const p = progress[t.id] ?? { done: 0, total: 0 }
+          const p = progress[t.id] ?? { done: 0, total: 0, cards: 0 }
           const pct = p.total ? Math.round((p.done / p.total) * 100) : 0
           return (
             <div key={t.id} className="list-row">
@@ -109,6 +110,7 @@ export function EstudosDashboardPage(): React.ReactElement {
                 <div className="bar-fill" style={{ width: `${pct}%`, background: t.color }} />
               </div>
               <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 34, textAlign: 'right' }}>{pct}%</span>
+              <span className="project-chip" title="Flashcards">🃏 {p.cards}</span>
               <div className="list-row-actions">
                 <button className="btn btn-secondary btn-sm" onClick={() => openTopic(t.id)}>Abrir</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => setEditing(t)}>Editar</button>

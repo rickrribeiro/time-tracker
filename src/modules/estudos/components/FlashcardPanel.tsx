@@ -6,6 +6,18 @@ interface GenCard {
   back: string
 }
 
+/** Human label for when a card is next due (nextReviewAt = YYYY-MM-DD or ISO). */
+function nextReviewLabel(iso: string | null): { text: string; cls: string } {
+  if (!iso) return { text: 'novo', cls: 'due-today' }
+  const day = iso.slice(0, 10)
+  const today = new Date().toISOString().slice(0, 10)
+  if (day <= today) return { text: 'vence hoje', cls: 'due-overdue' }
+  const d = new Date(`${day}T12:00:00`)
+  const diff = Math.round((d.getTime() - new Date(`${today}T12:00:00`).getTime()) / 86400000)
+  const label = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+  return { text: `em ${diff}d · ${label}`, cls: 'due-future' }
+}
+
 /** Tolerant parse of a JSON array of {front, back} from Claude's output. */
 function extractCards(raw: string): GenCard[] | null {
   if (!raw) return null
@@ -169,30 +181,34 @@ ${content}
 
       <div className="list-stack">
         {visible.length === 0 && <div className="empty-hint">Nenhum flashcard{selectedNodeId != null ? ' neste item' : ''}.</div>}
-        {visible.map((f) => (
-          <div key={f.id} className="list-row" style={{ alignItems: 'flex-start' }}>
-            <button
-              className="list-row-title"
-              style={{ textAlign: 'left', whiteSpace: 'normal', cursor: 'pointer' }}
-              onClick={() =>
-                setFlipped((prev) => {
-                  const next = new Set(prev)
-                  next.has(f.id) ? next.delete(f.id) : next.add(f.id)
-                  return next
-                })
-              }
-            >
-              <strong>{f.front}</strong>
-              {flipped.has(f.id) && (
-                <>
-                  <br />
-                  <span style={{ color: 'var(--text-secondary)' }}>{f.back}</span>
-                </>
-              )}
-            </button>
-            <button className="btn btn-danger btn-sm" onClick={() => removeFlashcard(f.id)}>✕</button>
-          </div>
-        ))}
+        {visible.map((f) => {
+          const due = nextReviewLabel(f.nextReviewAt)
+          return (
+            <div key={f.id} className="list-row" style={{ alignItems: 'flex-start' }}>
+              <button
+                className="list-row-title"
+                style={{ textAlign: 'left', whiteSpace: 'normal', cursor: 'pointer' }}
+                onClick={() =>
+                  setFlipped((prev) => {
+                    const next = new Set(prev)
+                    next.has(f.id) ? next.delete(f.id) : next.add(f.id)
+                    return next
+                  })
+                }
+              >
+                <strong>{f.front}</strong>
+                {flipped.has(f.id) && (
+                  <>
+                    <br />
+                    <span style={{ color: 'var(--text-secondary)' }}>{f.back}</span>
+                  </>
+                )}
+              </button>
+              <span className={`due-badge ${due.cls}`} title="Próxima revisão">{due.text}</span>
+              <button className="btn btn-danger btn-sm" onClick={() => removeFlashcard(f.id)}>✕</button>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

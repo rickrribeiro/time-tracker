@@ -40,6 +40,16 @@ export function EstudosDashboardPage(): React.ReactElement {
     setPage('estudos-topic')
   }
 
+  async function importTopic(kind: 'json' | 'folder'): Promise<void> {
+    const r = kind === 'json' ? await window.api.study.importJson() : await window.api.study.importFolder()
+    if (r.ok) {
+      await refreshTopics()
+      if (r.topicId) await openTopic(r.topicId)
+    } else if (r.error) {
+      alert('Falha ao importar: ' + r.error)
+    }
+  }
+
   const activeTopics = topics.filter((t) => t.status === 'studying').length
   const totalDone = Object.values(progress).reduce((s, p) => s + p.done, 0)
 
@@ -52,10 +62,12 @@ export function EstudosDashboardPage(): React.ReactElement {
             Tópicos → roadmap → anotações → flashcards → revisão.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-secondary btn-sm" onClick={() => setPage('estudos-review')}>
             🔁 Revisões ({dueCards.length})
           </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => importTopic('json')} title="Importar backup JSON de um tópico">⬇ JSON</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => importTopic('folder')} title="Importar pasta Markdown (Obsidian)">⬇ Pasta</button>
           <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>＋ Tópico</button>
         </div>
       </div>

@@ -28,6 +28,14 @@ export function TopicWorkspacePage(): React.ReactElement {
   const done = nodes.filter((n) => n.status === 'done').length
   const pct = nodes.length ? Math.round((done / nodes.length) * 100) : 0
 
+  async function runExport(fn: () => Promise<{ ok: boolean; message?: string; error?: string } | boolean>): Promise<void> {
+    const r = await fn()
+    if (typeof r === 'boolean') {
+      if (r) alert('Backup JSON exportado.')
+    } else if (r.ok) alert(r.message || 'Exportado.')
+    else if (r.error) alert('Falha: ' + r.error)
+  }
+
   return (
     <div className="module-page">
       <div className="module-header">
@@ -40,6 +48,11 @@ export function TopicWorkspacePage(): React.ReactElement {
               {done}/{nodes.length} concluídos · {pct}%
             </p>
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => runExport(() => window.api.study.exportMarkdown(topic.id))} title="Gerar caderno (.md) do tópico">📄 Caderno .md</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => runExport(() => window.api.study.exportJson(topic.id))} title="Backup JSON do tópico">🗄 JSON</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => runExport(() => window.api.study.exportFolder(topic.id))} title="Exportar pasta Markdown (Obsidian)">📁 Pasta</button>
         </div>
       </div>
 

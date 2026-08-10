@@ -91,6 +91,33 @@ async function get<T>(path: string, key: string): Promise<T> {
 }
 
 /**
+ * Fetch every transaction of an account via the cursor-paginated `/v2/transactions`
+ * endpoint (the old page-based `/transactions` was deprecated → 410). Pages are 500;
+ * `next` is a URL carrying the `after` cursor, null when exhausted.
+ */
+async function fetchAllTransactions(accountId: string, key: string): Promise<PluggyTransaction[]> {
+  const out: PluggyTransaction[] = []
+  let after: string | null = null
+  for (let i = 0; i < 200; i++) {
+    const qs = new URLSearchParams({ accountId, pageSize: '500' })
+    if (after) qs.set('after', after)
+    const page = await get<{ results: PluggyTransaction[]; next: string | null }>(
+      `/v2/transactions?${qs.toString()}`,
+      key
+    )
+    out.push(...(page.results ?? []))
+    if (!page.next) break
+    try {
+      after = new URL(page.next, PLUGGY_API).searchParams.get('after')
+    } catch {
+      after = null
+    }
+    if (!after) break
+  }
+  return out
+}
+
+/**
  * Open Finance (Brasil) via the Pluggy aggregator.
  * Requires the user's Pluggy clientId/clientSecret and an itemId (a bank connected
  * through Pluggy Connect). Pulls transactions for all accounts of the item and
@@ -109,7 +136,7 @@ export async function syncPluggy(): Promise<{ imported: number; skipped: number 
 
   const incoming: Omit<DbTransaction, 'id'>[] = []
   for (const acc of accounts) {
-    const txs = (await get<{ results: PluggyTransaction[] }>(`/transactions?accountId=${acc.id}&pageSize=500`, key)).results
+    const txs = await fetchAllTransactions(acc.id, key)
     for (const t of txs) {
       const isExpense = t.type === 'DEBIT' || t.amount < 0
       incoming.push({

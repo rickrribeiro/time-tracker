@@ -1356,6 +1356,7 @@ export interface DbLink {
   title: string
   url: string
   checked: number
+  tags: string // JSON array
   createdAt: string
 }
 
@@ -1364,19 +1365,20 @@ export async function getLinks(): Promise<DbLink[]> {
   return getAll<DbLink>(db, 'SELECT * FROM links ORDER BY id ASC')
 }
 
-export async function createLink(title: string, url: string): Promise<DbLink> {
+export async function createLink(title: string, url: string, tags = '[]'): Promise<DbLink> {
   const db = await getDb()
-  run(db, 'INSERT INTO links (title, url, checked, createdAt) VALUES (?, ?, 0, ?)', [
+  run(db, 'INSERT INTO links (title, url, checked, tags, createdAt) VALUES (?, ?, 0, ?, ?)', [
     title,
     url,
+    tags,
     new Date().toISOString()
   ])
   return getOne<DbLink>(db, 'SELECT * FROM links WHERE id = ?', [lastInsertId(db)])!
 }
 
-export async function updateLink(id: number, title: string, url: string): Promise<void> {
+export async function updateLink(id: number, title: string, url: string, tags = '[]'): Promise<void> {
   const db = await getDb()
-  run(db, 'UPDATE links SET title = ?, url = ? WHERE id = ?', [title, url, id])
+  run(db, 'UPDATE links SET title = ?, url = ?, tags = ? WHERE id = ?', [title, url, tags, id])
 }
 
 export async function setLinkChecked(id: number, checked: number): Promise<void> {

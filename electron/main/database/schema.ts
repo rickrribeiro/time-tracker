@@ -222,6 +222,7 @@ export const SCHEMA = `
     title TEXT NOT NULL,
     url TEXT NOT NULL,
     checked INTEGER NOT NULL DEFAULT 0,
+    tags TEXT NOT NULL DEFAULT '[]',
     createdAt TEXT NOT NULL
   );
 `;

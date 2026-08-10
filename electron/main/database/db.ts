@@ -84,6 +84,17 @@ const MIGRATIONS: Migration[] = [
         // best-effort backfill
       }
     }
+  },
+  {
+    version: 5,
+    label: 'links.tags',
+    run: (db) => {
+      try {
+        db.run("ALTER TABLE links ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';")
+      } catch {
+        // column already exists
+      }
+    }
   }
 ]
 

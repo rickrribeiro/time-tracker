@@ -4,8 +4,8 @@ import { Link } from '../../../types'
 interface LinkState {
   links: Link[]
   refresh: () => Promise<void>
-  create: (title: string, url: string) => Promise<void>
-  update: (id: number, title: string, url: string) => Promise<void>
+  create: (title: string, url: string, tags: string[]) => Promise<void>
+  update: (id: number, title: string, url: string, tags: string[]) => Promise<void>
   remove: (id: number) => Promise<void>
   setChecked: (id: number, checked: boolean) => Promise<void>
 }
@@ -15,12 +15,12 @@ export const useLinkStore = create<LinkState>((set, get) => ({
 
   refresh: async () => set({ links: await window.api.links.getAll() }),
 
-  create: async (title, url) => {
-    await window.api.links.create(title, url)
+  create: async (title, url, tags) => {
+    await window.api.links.create(title, url, JSON.stringify(tags))
     await get().refresh()
   },
-  update: async (id, title, url) => {
-    await window.api.links.update(id, title, url)
+  update: async (id, title, url, tags) => {
+    await window.api.links.update(id, title, url, JSON.stringify(tags))
     await get().refresh()
   },
   remove: async (id) => {
@@ -38,4 +38,14 @@ export const useLinkStore = create<LinkState>((set, get) => ({
 export function normalizeUrl(url: string): string {
   const u = url.trim()
   return /^[a-z]+:\/\//i.test(u) ? u : `https://${u}`
+}
+
+/** Parse a JSON tags string into a string[] (defensive). */
+export function parseTags(json: string): string[] {
+  try {
+    const v = JSON.parse(json)
+    return Array.isArray(v) ? v : []
+  } catch {
+    return []
+  }
 }

@@ -480,8 +480,8 @@ ipcMain.handle('executions:delete', (_, id: string) => deleteExecution(id))
 // ── IPC: Links ────────────────────────────────────────────────────────────────
 
 ipcMain.handle('links:getAll', () => getLinks())
-ipcMain.handle('links:create', (_, title: string, url: string) => createLink(title, url))
-ipcMain.handle('links:update', (_, id: number, title: string, url: string) => updateLink(id, title, url))
+ipcMain.handle('links:create', (_, title: string, url: string, tags?: string) => createLink(title, url, tags))
+ipcMain.handle('links:update', (_, id: number, title: string, url: string, tags?: string) => updateLink(id, title, url, tags))
 ipcMain.handle('links:setChecked', (_, id: number, checked: number) => setLinkChecked(id, checked))
 ipcMain.handle('links:delete', (_, id: number) => deleteLink(id))
 

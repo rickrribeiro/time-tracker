@@ -216,8 +216,8 @@ const api = {
   },
   links: {
     getAll: () => ipcRenderer.invoke('links:getAll'),
-    create: (title: string, url: string) => ipcRenderer.invoke('links:create', title, url),
-    update: (id: number, title: string, url: string) => ipcRenderer.invoke('links:update', id, title, url),
+    create: (title: string, url: string, tags?: string) => ipcRenderer.invoke('links:create', title, url, tags),
+    update: (id: number, title: string, url: string, tags?: string) => ipcRenderer.invoke('links:update', id, title, url, tags),
     setChecked: (id: number, checked: number) => ipcRenderer.invoke('links:setChecked', id, checked),
     delete: (id: number) => ipcRenderer.invoke('links:delete', id)
   },

@@ -2,8 +2,23 @@ import React, { useEffect, useState } from 'react'
 import { Habit } from '../../../types'
 import { useHabitStore } from '../store/habitStore'
 import { HabitStats } from '../components/HabitStats'
+import { localDateStr } from '../../../utils/dates'
 
 const SUGGESTED = ['Academia', 'Estudar japonês', 'Meditar', 'Dormir antes de 00:00', 'Sem álcool', 'Revisar TODO']
+
+function offsetDay(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setDate(d.getDate() + days)
+  return localDateStr(d)
+}
+
+function formatDayLabel(dateStr: string): string {
+  const today = localDateStr(new Date())
+  if (dateStr === today) return 'Hoje'
+  if (dateStr === offsetDay(today, -1)) return 'Ontem'
+  const d = new Date(dateStr + 'T12:00:00')
+  return d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
+}
 
 function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }): React.ReactElement {
   const { update } = useHabitStore()
@@ -54,7 +69,7 @@ function HabitEditor({ habit, onClose }: { habit: Habit; onClose: () => void }):
 }
 
 export function HabitsPage(): React.ReactElement {
-  const { habits, refresh, create, remove, toggle, isDone, streak, weekRate, last7, date } = useHabitStore()
+  const { habits, refresh, create, remove, toggle, isDone, streak, weekRate, last7, date, setDate } = useHabitStore()
   const [name, setName] = useState('')
   const [editing, setEditing] = useState<Habit | null>(null)
 
@@ -73,6 +88,8 @@ export function HabitsPage(): React.ReactElement {
   const activeHabits = habits.filter((h) => h.active === 1)
   const doneCount = activeHabits.filter((h) => isDone(h.id)).length
   const missingSuggestions = SUGGESTED.filter((s) => !habits.some((h) => h.name.toLowerCase() === s.toLowerCase()))
+  const today = localDateStr(new Date())
+  const isToday = date === today
 
   return (
     <div className="module-page">
@@ -80,8 +97,27 @@ export function HabitsPage(): React.ReactElement {
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700 }}>🔥 Hábitos</h2>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            {date} — {doneCount}/{activeHabits.length} concluídos hoje
+            {doneCount}/{activeHabits.length} concluídos
           </p>
+        </div>
+        <div className="date-nav">
+          <button className="date-nav-btn" onClick={() => setDate(offsetDay(date, -1))} title="Dia anterior">
+            ‹
+          </button>
+          <span className="date-display">{formatDayLabel(date)}</span>
+          <button
+            className="date-nav-btn"
+            onClick={() => setDate(offsetDay(date, 1))}
+            disabled={isToday}
+            title="Próximo dia"
+          >
+            ›
+          </button>
+          {!isToday && (
+            <button className="btn btn-secondary btn-sm" style={{ marginLeft: 8 }} onClick={() => setDate(today)}>
+              Hoje
+            </button>
+          )}
         </div>
       </div>
 

@@ -422,6 +422,11 @@ select:focus {
   color: var(--text-primary);
 }
 
+.date-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .date-display {
   font-size: 16px;
   font-weight: 600;

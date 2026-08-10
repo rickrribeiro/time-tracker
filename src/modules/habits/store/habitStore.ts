@@ -19,8 +19,9 @@ interface DayCell {
 interface HabitState {
   habits: Habit[]
   completed: Set<string> // "habitId|date" for completed entries in the loaded range
-  date: string // today
+  date: string // the day being viewed/edited (defaults to today)
   refresh: () => Promise<void>
+  setDate: (date: string) => Promise<void>
   create: (name: string, frequency: string, target: number) => Promise<void>
   update: (habit: Habit) => Promise<void>
   remove: (id: number) => Promise<void>
@@ -38,12 +39,23 @@ export const useHabitStore = create<HabitState>((set, get) => ({
 
   refresh: async () => {
     const today = localDateStr(new Date())
+    const selected = get().date || today
+    // Load a range that always covers both the recent history AND the selected day,
+    // so navigating far back/forward still shows/persists that day's marks.
+    const start60 = dateNDaysAgo(RANGE_DAYS)
+    const start = selected < start60 ? selected : start60
+    const end = selected > today ? selected : today
     const [habits, entries] = await Promise.all([
       window.api.habits.getAll(),
-      window.api.habits.getEntriesRange(dateNDaysAgo(RANGE_DAYS), today)
+      window.api.habits.getEntriesRange(start, end)
     ])
     const completed = new Set(entries.map((e) => `${e.habitId}|${e.date}`))
-    set({ habits, completed, date: today })
+    set({ habits, completed })
+  },
+
+  setDate: async (date) => {
+    set({ date })
+    await get().refresh()
   },
 
   create: async (name, frequency, target) => {

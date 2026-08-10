@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useSkillStore, parseTags } from '../store/skillStore'
 import { useAgentStore } from '../store/agentStore'
 import { useProjectStore } from '../../projects/store/projectStore'
@@ -48,7 +48,8 @@ function loadTabs(): RunnerTab[] {
           agentId: t.agentId ?? null,
           projectId: t.projectId ?? null,
           skillIds: Array.isArray(t.skillIds) ? t.skillIds : [],
-          userPrompt: t.userPrompt ?? ''
+          userPrompt: t.userPrompt ?? '',
+          runId: typeof t.runId === 'string' ? t.runId : null
         })
       )
     }
@@ -78,23 +79,49 @@ export function PromptRunnerPage(): React.ReactElement {
   const [search, setSearch] = useState('')
   const [model, setModel] = useState('')
   const [toast, setToast] = useState('')
-  const cancelledRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     refreshSkills()
     refreshAgents()
     refreshProjects()
     window.api.settings.get('claude_model').then((m) => setModel(m ?? ''))
-    const off = window.api.ai.onChunk((runId, text) => {
+
+    // reconnect to any runs still owned by the main process (survives navigation)
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (!t.runId) return t
+        const rid = t.runId
+        window.api.ai.getRun(rid).then((r) => {
+          setTabs((cur) =>
+            cur.map((x) => {
+              if (x.id !== t.id || x.runId !== rid) return x
+              if (!r) return { ...x, runId: null, running: false }
+              if (r.status === 'running') return { ...x, running: true, output: r.output }
+              return { ...x, running: false, runId: null, output: r.output, error: r.error ?? '' }
+            })
+          )
+        })
+        return { ...t, running: true, output: '' } // optimistic until getRun resolves
+      })
+    )
+
+    const offChunk = window.api.ai.onChunk((runId, text) => {
       if (!runId) return
       setTabs((prev) => prev.map((t) => (t.runId === runId ? { ...t, output: t.output + text } : t)))
     })
-    return off
+    const offDone = window.api.ai.onDone(({ runId, ok, output, error }) => {
+      setTabs((prev) => prev.map((t) => (t.runId === runId ? { ...t, running: false, runId: null, output, error: ok ? '' : error ?? '' } : t)))
+    })
+    return () => {
+      offChunk()
+      offDone()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // persist tab config (not transient run state)
+  // persist tab config + runId (so an in-progress run can be reconnected after navigation)
   useEffect(() => {
-    const slim = tabs.map((t) => ({ id: t.id, agentId: t.agentId, projectId: t.projectId, skillIds: t.skillIds, userPrompt: t.userPrompt }))
+    const slim = tabs.map((t) => ({ id: t.id, agentId: t.agentId, projectId: t.projectId, skillIds: t.skillIds, userPrompt: t.userPrompt, runId: t.runId }))
     localStorage.setItem(TABS_KEY, JSON.stringify(slim))
   }, [tabs])
 
@@ -158,28 +185,23 @@ export function PromptRunnerPage(): React.ReactElement {
   async function run(tab: RunnerTab): Promise<void> {
     const fp = composeFor(tab)
     if (!fp.trim() || tab.running) return
-    const runId = crypto.randomUUID()
+    // main owns the run (keeps going in background, saves on completion); we get a runId
+    // and finish via the ai:done event — reconnected on remount via getRun.
+    const runId = await window.api.ai.start({
+      prompt: fp,
+      projectId: tab.projectId ?? undefined,
+      model,
+      agentId: tab.agentId,
+      skillIds: JSON.stringify(tab.skillIds),
+      userPrompt: tab.userPrompt
+    })
     patchTab(tab.id, { running: true, runId, output: '', error: '' })
-    try {
-      const result = await window.api.ai.runStream(fp, tab.projectId ?? undefined, model, runId)
-      patchTab(tab.id, { output: result, running: false, runId: null })
-      await save(tab.agentId, tab.skillIds, tab.userPrompt, fp, result)
-    } catch (e) {
-      const cancelled = cancelledRef.current.has(runId)
-      cancelledRef.current.delete(runId)
-      patchTab(tab.id, {
-        running: false,
-        runId: null,
-        error: cancelled ? 'Execução cancelada.' : e instanceof Error ? e.message : String(e)
-      })
-    }
   }
 
   async function cancel(tab: RunnerTab): Promise<void> {
     if (!tab.runId) return
-    cancelledRef.current.add(tab.runId)
     await window.api.ai.cancel(tab.runId)
-    patchTab(tab.id, { running: false })
+    // ai:done fires with the cancelled state and finalizes the tab
   }
 
   function tabTitle(t: RunnerTab, i: number): string {

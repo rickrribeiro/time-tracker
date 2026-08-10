@@ -416,8 +416,18 @@ declare global {
       ai: {
         run: (prompt: string, projectId?: number, model?: string) => Promise<string>
         runStream: (prompt: string, projectId?: number, model?: string, runId?: string) => Promise<string>
+        start: (params: {
+          prompt: string
+          projectId?: number | null
+          model?: string
+          agentId?: string | null
+          skillIds?: string
+          userPrompt?: string
+        }) => Promise<string>
+        getRun: (runId: string) => Promise<{ status: 'running' | 'done' | 'error' | 'cancelled'; output: string; error: string | null } | null>
         cancel: (runId: string) => Promise<boolean>
         onChunk: (cb: (runId: string | undefined, text: string) => void) => () => void
+        onDone: (cb: (payload: { runId: string; ok: boolean; output: string; error: string | null }) => void) => () => void
       }
       skills: {
         getAll: () => Promise<Skill[]>

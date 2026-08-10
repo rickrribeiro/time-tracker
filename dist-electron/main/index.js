@@ -22,10 +22,10 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 const electron = require("electron");
+const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
 const initSqlJs = require("sql.js");
-const crypto = require("crypto");
 const child_process = require("child_process");
 const os = require("os");
 const http = require("http");
@@ -2161,27 +2161,60 @@ electron.ipcMain.handle("ai:run", async (_, prompt, projectId, model) => {
   return runClaude(prompt, await resolveClaudeCommand(projectId), { model: await resolveModel(model) });
 });
 const aiRuns = /* @__PURE__ */ new Map();
+function broadcast(channel, payload) {
+  for (const w of electron.BrowserWindow.getAllWindows()) if (!w.webContents.isDestroyed()) w.webContents.send(channel, payload);
+}
+electron.ipcMain.handle("ai:start", async (_, params) => {
+  const runId = crypto.randomUUID();
+  const run2 = { id: runId, status: "running", output: "", error: null };
+  aiRuns.set(runId, run2);
+  const command = await resolveClaudeCommand(params.projectId ?? void 0);
+  const model = await resolveModel(params.model);
+  runClaude(params.prompt, command, {
+    model,
+    onChunk: (text) => {
+      run2.output += text;
+      broadcast("ai:chunk", { runId, text });
+    },
+    registerChild: (kill) => {
+      run2.kill = kill;
+    }
+  }).then(async (result) => {
+    run2.status = "done";
+    run2.output = result;
+    try {
+      await createExecution(params.agentId ?? null, params.skillIds ?? "[]", params.userPrompt ?? "", params.prompt, result);
+    } catch {
+    }
+    broadcast("ai:done", { runId, ok: true, output: result, error: null });
+  }).catch((e) => {
+    const cancelled = run2.status === "cancelled";
+    run2.status = cancelled ? "cancelled" : "error";
+    run2.error = cancelled ? "Execução cancelada." : e instanceof Error ? e.message : String(e);
+    broadcast("ai:done", { runId, ok: false, output: run2.output, error: run2.error });
+  }).finally(() => {
+    setTimeout(() => aiRuns.delete(runId), 10 * 60 * 1e3);
+  });
+  return runId;
+});
+electron.ipcMain.handle("ai:getRun", (_, runId) => {
+  const r = aiRuns.get(runId);
+  return r ? { status: r.status, output: r.output, error: r.error } : null;
+});
 electron.ipcMain.handle("ai:runStream", async (event, prompt, projectId, model, runId) => {
   const command = await resolveClaudeCommand(projectId);
-  try {
-    return await runClaude(prompt, command, {
-      model: await resolveModel(model),
-      onChunk: (text) => {
-        if (!event.sender.isDestroyed()) event.sender.send("ai:chunk", { runId, text });
-      },
-      registerChild: (kill) => {
-        if (runId) aiRuns.set(runId, kill);
-      }
-    });
-  } finally {
-    if (runId) aiRuns.delete(runId);
-  }
+  return runClaude(prompt, command, {
+    model: await resolveModel(model),
+    onChunk: (text) => {
+      if (!event.sender.isDestroyed()) event.sender.send("ai:chunk", { runId, text });
+    }
+  });
 });
 electron.ipcMain.handle("ai:cancel", (_, runId) => {
-  const kill = aiRuns.get(runId);
-  if (kill) {
-    kill();
-    aiRuns.delete(runId);
+  const r = aiRuns.get(runId);
+  if (r?.kill) {
+    r.status = "cancelled";
+    r.kill();
     return true;
   }
   return false;

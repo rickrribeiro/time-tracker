@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut } from 'electron'
+import { randomUUID } from 'crypto'
 import { join } from 'path'
 import fs from 'fs'
 import { getDb, closeDb, saveDb } from './database/db'
@@ -511,33 +512,94 @@ ipcMain.handle('ai:run', async (_, prompt: string, projectId?: number, model?: s
   return runClaude(prompt, await resolveClaudeCommand(projectId), { model: await resolveModel(model) })
 })
 
-// Active streaming runs, keyed by runId, so they can be cancelled.
-const aiRuns = new Map<string, () => void>()
+// ── Background AI runs (owned by main; survive renderer navigation) ────────────
+interface AiRun {
+  id: string
+  status: 'running' | 'done' | 'error' | 'cancelled'
+  output: string
+  error: string | null
+  kill?: () => void
+}
+const aiRuns = new Map<string, AiRun>()
 
-// Streaming variant: emits 'ai:chunk' {runId,text} events; resolves with full text.
-// `runId` lets multiple runs stream in parallel and be cancelled individually.
+function broadcast(channel: string, payload: unknown): void {
+  for (const w of BrowserWindow.getAllWindows()) if (!w.webContents.isDestroyed()) w.webContents.send(channel, payload)
+}
+
+interface AiStartParams {
+  prompt: string
+  projectId?: number | null
+  model?: string
+  agentId?: string | null
+  skillIds?: string
+  userPrompt?: string
+}
+
+// Start a run in the background: returns runId immediately. Output accumulates in main,
+// streams via 'ai:chunk', completes via 'ai:done', and the execution is persisted here —
+// so it keeps running (and is saved) even if the user leaves the Prompt Runner.
+ipcMain.handle('ai:start', async (_, params: AiStartParams) => {
+  const runId = randomUUID()
+  const run: AiRun = { id: runId, status: 'running', output: '', error: null }
+  aiRuns.set(runId, run)
+  const command = await resolveClaudeCommand(params.projectId ?? undefined)
+  const model = await resolveModel(params.model)
+
+  runClaude(params.prompt, command, {
+    model,
+    onChunk: (text) => {
+      run.output += text
+      broadcast('ai:chunk', { runId, text })
+    },
+    registerChild: (kill) => {
+      run.kill = kill
+    }
+  })
+    .then(async (result) => {
+      run.status = 'done'
+      run.output = result
+      try {
+        await createExecution(params.agentId ?? null, params.skillIds ?? '[]', params.userPrompt ?? '', params.prompt, result)
+      } catch {
+        // saving is best-effort
+      }
+      broadcast('ai:done', { runId, ok: true, output: result, error: null })
+    })
+    .catch((e) => {
+      const cancelled = run.status === 'cancelled'
+      run.status = cancelled ? 'cancelled' : 'error'
+      run.error = cancelled ? 'Execução cancelada.' : e instanceof Error ? e.message : String(e)
+      broadcast('ai:done', { runId, ok: false, output: run.output, error: run.error })
+    })
+    .finally(() => {
+      // keep the finished run available for reconnect for a while, then prune
+      setTimeout(() => aiRuns.delete(runId), 10 * 60 * 1000)
+    })
+
+  return runId
+})
+
+ipcMain.handle('ai:getRun', (_, runId: string) => {
+  const r = aiRuns.get(runId)
+  return r ? { status: r.status, output: r.output, error: r.error } : null
+})
+
+// One-shot streaming (used by the Assistente page).
 ipcMain.handle('ai:runStream', async (event, prompt: string, projectId?: number, model?: string, runId?: string) => {
   const command = await resolveClaudeCommand(projectId)
-  try {
-    return await runClaude(prompt, command, {
-      model: await resolveModel(model),
-      onChunk: (text) => {
-        if (!event.sender.isDestroyed()) event.sender.send('ai:chunk', { runId, text })
-      },
-      registerChild: (kill) => {
-        if (runId) aiRuns.set(runId, kill)
-      }
-    })
-  } finally {
-    if (runId) aiRuns.delete(runId)
-  }
+  return runClaude(prompt, command, {
+    model: await resolveModel(model),
+    onChunk: (text) => {
+      if (!event.sender.isDestroyed()) event.sender.send('ai:chunk', { runId, text })
+    }
+  })
 })
 
 ipcMain.handle('ai:cancel', (_, runId: string) => {
-  const kill = aiRuns.get(runId)
-  if (kill) {
-    kill()
-    aiRuns.delete(runId)
+  const r = aiRuns.get(runId)
+  if (r?.kill) {
+    r.status = 'cancelled'
+    r.kill()
     return true
   }
   return false

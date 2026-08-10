@@ -165,11 +165,18 @@ const api = {
   ai: {
     run: (prompt, projectId, model) => electron.ipcRenderer.invoke("ai:run", prompt, projectId, model),
     runStream: (prompt, projectId, model, runId) => electron.ipcRenderer.invoke("ai:runStream", prompt, projectId, model, runId),
+    start: (params) => electron.ipcRenderer.invoke("ai:start", params),
+    getRun: (runId) => electron.ipcRenderer.invoke("ai:getRun", runId),
     cancel: (runId) => electron.ipcRenderer.invoke("ai:cancel", runId),
     onChunk: (cb) => {
       const listener = (_e, payload) => cb(payload.runId, payload.text);
       electron.ipcRenderer.on("ai:chunk", listener);
       return () => electron.ipcRenderer.removeListener("ai:chunk", listener);
+    },
+    onDone: (cb) => {
+      const listener = (_e, payload) => cb(payload);
+      electron.ipcRenderer.on("ai:done", listener);
+      return () => electron.ipcRenderer.removeListener("ai:done", listener);
     }
   },
   // Events (main → renderer)

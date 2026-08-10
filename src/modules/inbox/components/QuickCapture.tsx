@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTodoStore } from '../../todo/store/todoStore'
-import { parseCapture, SUGGESTION_LABEL } from '../parse'
+import { parseCapture } from '../parse'
 
 /**
  * Global quick-capture modal. Opens on the main-process global shortcut
@@ -61,17 +61,14 @@ export function QuickCapture(): React.ReactElement | null {
         <input
           ref={inputRef}
           type="text"
-          placeholder="Título… (use // para nota rápida, → para trecho de viagem)"
+          placeholder="Título… (use // para uma nota rápida)"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
           style={{ width: '100%', marginTop: 8 }}
         />
-        {preview && (
-          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-            <span>{SUGGESTION_LABEL[preview.suggestion]}</span>
-            {preview.notes && <span style={{ marginLeft: 8, color: 'var(--text-muted)' }}>📝 {preview.notes}</span>}
-          </div>
+        {preview?.notes && (
+          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>📝 {preview.notes}</div>
         )}
         <div className="modal-actions">
           <button className="btn btn-secondary btn-sm" onClick={() => setOpen(false)}>

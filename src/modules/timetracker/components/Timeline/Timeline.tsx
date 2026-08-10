@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { TaskWithTag } from '@/types'
+import { TaskWithTag, CalendarEvent } from '@/types'
 import { TimelineBlock } from './TimelineBlock'
+import { TimelineEventBlock } from './TimelineEventBlock'
 import { useTaskStore } from '../../store/taskStore'
 import { useTagStore } from '../../store/tagStore'
 import { localDateStr } from '@/utils/dates'
@@ -10,6 +11,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 interface Props {
   tasks: TaskWithTag[]
+  events: CalendarEvent[]
   selectedDate: string
   onRefresh: () => void
 }
@@ -29,7 +31,7 @@ function toLocalInput(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-export function Timeline({ tasks, selectedDate, onRefresh }: Props): React.ReactElement {
+export function Timeline({ tasks, events, selectedDate, onRefresh }: Props): React.ReactElement {
   const { updateTask, deleteTask } = useTaskStore()
   const { tags } = useTagStore()
   const [selected, setSelected] = useState<number | null>(null)
@@ -207,7 +209,7 @@ export function Timeline({ tasks, selectedDate, onRefresh }: Props): React.React
             </div>
           )}
 
-          <div className="timeline-tasks">
+          <div className="timeline-tasks" style={events.length > 0 ? { right: 140 } : undefined}>
             {tasks.map((task) => (
               <TimelineBlock
                 key={task.id}
@@ -220,6 +222,19 @@ export function Timeline({ tasks, selectedDate, onRefresh }: Props): React.React
               />
             ))}
           </div>
+
+          {events.length > 0 && (
+            <div className="timeline-events">
+              {events.map((ev) => (
+                <TimelineEventBlock
+                  key={ev.id}
+                  event={ev}
+                  pixelsPerMinute={PIXELS_PER_MINUTE}
+                  dayStart={dayStart}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

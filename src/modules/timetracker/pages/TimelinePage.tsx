@@ -1,9 +1,10 @@
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useState } from 'react'
 import { useUIStore } from '@/store/uiStore'
 import { useTaskStore } from '../store/taskStore'
 import { useTagStore } from '../store/tagStore'
 import { Timeline } from '../components/Timeline/Timeline'
-import { localDateStr } from '@/utils/dates'
+import { CalendarEvent } from '@/types'
+import { localDateStr, localDayStartISO, localDayEndISO } from '@/utils/dates'
 
 function formatDateDisplay(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00')
@@ -27,14 +28,26 @@ export function TimelinePage(): React.ReactElement {
   const { selectedDate, setSelectedDate } = useUIStore()
   const { todayTasks, refreshTasks, startTask, activeTask } = useTaskStore()
   const { tags } = useTagStore()
+  const [events, setEvents] = useState<CalendarEvent[]>([])
 
   const load = useCallback(() => {
     refreshTasks(selectedDate)
   }, [selectedDate])
 
+  const loadEvents = useCallback(async () => {
+    const ev = await window.api.calendar.range(localDayStartISO(selectedDate), localDayEndISO(selectedDate))
+    setEvents(ev)
+  }, [selectedDate])
+
   useEffect(() => {
     load()
   }, [load])
+
+  // Calendar events for the day (+ live refresh when the daily Google sync lands)
+  useEffect(() => {
+    loadEvents()
+    return window.api.on.calendarUpdated(() => loadEvents())
+  }, [loadEvents])
 
   // Refresh task list when active task changes (start/stop from the ActiveTask bar)
   const activeTaskId = activeTask?.id ?? null
@@ -92,7 +105,7 @@ export function TimelinePage(): React.ReactElement {
         </div>
       </div>
 
-      <Timeline tasks={todayTasks} selectedDate={selectedDate} onRefresh={load} />
+      <Timeline tasks={todayTasks} events={events} selectedDate={selectedDate} onRefresh={load} />
     </div>
   )
 }

@@ -1844,3 +1844,45 @@ select:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Prompt Runner tabs ──────────────────────────────────────────────────────── */
+.runner-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+}
+.runner-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  max-width: 160px;
+}
+.runner-tab.active {
+  background: var(--accent-dim);
+  color: var(--accent-hover);
+  border-color: var(--accent);
+}
+.runner-tab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runner-tab-close {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.runner-tab-close:hover { color: var(--danger); }
+.runner-tab-add {
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.runner-tab-add:hover { color: var(--text-primary); background: var(--bg-hover); }

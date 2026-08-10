@@ -164,9 +164,10 @@ const api = {
   // AI (Claude CLI)
   ai: {
     run: (prompt, projectId, model) => electron.ipcRenderer.invoke("ai:run", prompt, projectId, model),
-    runStream: (prompt, projectId, model) => electron.ipcRenderer.invoke("ai:runStream", prompt, projectId, model),
+    runStream: (prompt, projectId, model, runId) => electron.ipcRenderer.invoke("ai:runStream", prompt, projectId, model, runId),
+    cancel: (runId) => electron.ipcRenderer.invoke("ai:cancel", runId),
     onChunk: (cb) => {
-      const listener = (_e, text) => cb(text);
+      const listener = (_e, payload) => cb(payload.runId, payload.text);
       electron.ipcRenderer.on("ai:chunk", listener);
       return () => electron.ipcRenderer.removeListener("ai:chunk", listener);
     }

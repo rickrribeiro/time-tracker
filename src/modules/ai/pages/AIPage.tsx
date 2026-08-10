@@ -116,7 +116,7 @@ export function AIPage(): React.ReactElement {
       .then((rows) => setWeekMinutes(rows.reduce((s, r) => s + r.totalMinutes, 0)))
 
     // Stream tokens into the output as they arrive.
-    const off = window.api.ai.onChunk((text) => setOutput((o) => o + text))
+    const off = window.api.ai.onChunk((_runId, text) => setOutput((o) => o + text))
     return off
   }, [])
 

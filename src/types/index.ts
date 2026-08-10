@@ -415,8 +415,9 @@ declare global {
       }
       ai: {
         run: (prompt: string, projectId?: number, model?: string) => Promise<string>
-        runStream: (prompt: string, projectId?: number, model?: string) => Promise<string>
-        onChunk: (cb: (text: string) => void) => () => void
+        runStream: (prompt: string, projectId?: number, model?: string, runId?: string) => Promise<string>
+        cancel: (runId: string) => Promise<boolean>
+        onChunk: (cb: (runId: string | undefined, text: string) => void) => () => void
       }
       skills: {
         getAll: () => Promise<Skill[]>

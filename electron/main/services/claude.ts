@@ -27,6 +27,8 @@ export interface RunOptions {
   model?: string
   /** Extra CLI flags before `-p` (controlled by the app, e.g. ['--allowedTools', 'Bash(gh:*)']). */
   extraArgs?: string[]
+  /** Receives a kill fn once the child spawns, so the run can be cancelled. */
+  registerChild?: (kill: () => void) => void
 }
 
 /** Single-quote a token for safe inclusion in the interactive-shell command string. */
@@ -47,18 +49,31 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
     const env = { ...process.env, PATH: buildPath() }
     const model = opts.model?.trim()
     const extra = opts.extraArgs ?? []
+    // stdin must be closed ('ignore') — otherwise `claude -p` waits for stdin data
+    // (it warns "no stdin data received in 3s") and can hang on an open pipe.
+    const stdio: ['ignore', 'pipe', 'pipe'] = ['ignore', 'pipe', 'pipe']
     let child
     if (viaShell) {
       const shell = process.env.SHELL || '/bin/zsh'
       const modelPart = model ? ' --model "$RICKOS_MODEL"' : ''
       const extraPart = extra.length ? ' ' + extra.map(shquote).join(' ') : ''
       child = spawn(shell, ['-ilc', `${bin}${extraPart}${modelPart} -p "$RICKOS_PROMPT"`], {
-        env: { ...env, RICKOS_PROMPT: prompt, RICKOS_MODEL: model || '' }
+        env: { ...env, RICKOS_PROMPT: prompt, RICKOS_MODEL: model || '' },
+        stdio
       })
     } else {
       const args = [...extra, ...(model ? ['--model', model] : []), '-p', prompt]
-      child = spawn(bin, args, { env })
+      child = spawn(bin, args, { env, stdio })
     }
+
+    // expose a kill handle so callers (IPC) can cancel this run
+    opts.registerChild?.(() => {
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        // already gone
+      }
+    })
 
     let stdout = ''
     let stderr = ''

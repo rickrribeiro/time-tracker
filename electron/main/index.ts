@@ -511,15 +511,36 @@ ipcMain.handle('ai:run', async (_, prompt: string, projectId?: number, model?: s
   return runClaude(prompt, await resolveClaudeCommand(projectId), { model: await resolveModel(model) })
 })
 
-// Streaming variant: emits 'ai:chunk' events as output arrives; resolves with full text.
-ipcMain.handle('ai:runStream', async (event, prompt: string, projectId?: number, model?: string) => {
+// Active streaming runs, keyed by runId, so they can be cancelled.
+const aiRuns = new Map<string, () => void>()
+
+// Streaming variant: emits 'ai:chunk' {runId,text} events; resolves with full text.
+// `runId` lets multiple runs stream in parallel and be cancelled individually.
+ipcMain.handle('ai:runStream', async (event, prompt: string, projectId?: number, model?: string, runId?: string) => {
   const command = await resolveClaudeCommand(projectId)
-  return runClaude(prompt, command, {
-    model: await resolveModel(model),
-    onChunk: (text) => {
-      if (!event.sender.isDestroyed()) event.sender.send('ai:chunk', text)
-    }
-  })
+  try {
+    return await runClaude(prompt, command, {
+      model: await resolveModel(model),
+      onChunk: (text) => {
+        if (!event.sender.isDestroyed()) event.sender.send('ai:chunk', { runId, text })
+      },
+      registerChild: (kill) => {
+        if (runId) aiRuns.set(runId, kill)
+      }
+    })
+  } finally {
+    if (runId) aiRuns.delete(runId)
+  }
+})
+
+ipcMain.handle('ai:cancel', (_, runId: string) => {
+  const kill = aiRuns.get(runId)
+  if (kill) {
+    kill()
+    aiRuns.delete(runId)
+    return true
+  }
+  return false
 })
 
 // ── IPC: App ──────────────────────────────────────────────────────────────────

@@ -1296,18 +1296,26 @@ function attempt(bin, prompt, viaShell, opts = {}) {
     const env = { ...process.env, PATH: buildPath() };
     const model = opts.model?.trim();
     const extra = opts.extraArgs ?? [];
+    const stdio = ["ignore", "pipe", "pipe"];
     let child;
     if (viaShell) {
       const shell = process.env.SHELL || "/bin/zsh";
       const modelPart = model ? ' --model "$RICKOS_MODEL"' : "";
       const extraPart = extra.length ? " " + extra.map(shquote).join(" ") : "";
       child = child_process.spawn(shell, ["-ilc", `${bin}${extraPart}${modelPart} -p "$RICKOS_PROMPT"`], {
-        env: { ...env, RICKOS_PROMPT: prompt, RICKOS_MODEL: model || "" }
+        env: { ...env, RICKOS_PROMPT: prompt, RICKOS_MODEL: model || "" },
+        stdio
       });
     } else {
       const args = [...extra, ...model ? ["--model", model] : [], "-p", prompt];
-      child = child_process.spawn(bin, args, { env });
+      child = child_process.spawn(bin, args, { env, stdio });
     }
+    opts.registerChild?.(() => {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+      }
+    });
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -2152,14 +2160,31 @@ async function resolveModel(model) {
 electron.ipcMain.handle("ai:run", async (_, prompt, projectId, model) => {
   return runClaude(prompt, await resolveClaudeCommand(projectId), { model: await resolveModel(model) });
 });
-electron.ipcMain.handle("ai:runStream", async (event, prompt, projectId, model) => {
+const aiRuns = /* @__PURE__ */ new Map();
+electron.ipcMain.handle("ai:runStream", async (event, prompt, projectId, model, runId) => {
   const command = await resolveClaudeCommand(projectId);
-  return runClaude(prompt, command, {
-    model: await resolveModel(model),
-    onChunk: (text) => {
-      if (!event.sender.isDestroyed()) event.sender.send("ai:chunk", text);
-    }
-  });
+  try {
+    return await runClaude(prompt, command, {
+      model: await resolveModel(model),
+      onChunk: (text) => {
+        if (!event.sender.isDestroyed()) event.sender.send("ai:chunk", { runId, text });
+      },
+      registerChild: (kill) => {
+        if (runId) aiRuns.set(runId, kill);
+      }
+    });
+  } finally {
+    if (runId) aiRuns.delete(runId);
+  }
+});
+electron.ipcMain.handle("ai:cancel", (_, runId) => {
+  const kill = aiRuns.get(runId);
+  if (kill) {
+    kill();
+    aiRuns.delete(runId);
+    return true;
+  }
+  return false;
 });
 electron.ipcMain.handle("app:openExternal", (_, url) => electron.shell.openExternal(url));
 electron.ipcMain.handle("app:exportDb", async () => {

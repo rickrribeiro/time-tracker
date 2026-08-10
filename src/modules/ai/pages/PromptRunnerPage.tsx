@@ -1,82 +1,152 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSkillStore, parseTags } from '../store/skillStore'
 import { useAgentStore } from '../store/agentStore'
+import { useProjectStore } from '../../projects/store/projectStore'
 import { useExecutionStore } from '../store/executionStore'
 import { composePrompt } from '../compose'
 
+// Legacy single-draft key (History "reabrir" writes here); merged into a tab on load.
 export const DRAFT_KEY = 'rickos:promptRunnerDraft'
+const TABS_KEY = 'rickos:promptRunnerTabs'
 
-interface Draft {
+interface RunnerTab {
+  id: string
   agentId: string | null
+  projectId: number | null
   skillIds: string[]
   userPrompt: string
+  // transient (not persisted)
+  output: string
+  running: boolean
+  runId: string | null
+  error: string
 }
 
-function loadDraft(): Draft {
-  try {
-    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}')
-    return { agentId: d.agentId ?? null, skillIds: Array.isArray(d.skillIds) ? d.skillIds : [], userPrompt: d.userPrompt ?? '' }
-  } catch {
-    return { agentId: null, skillIds: [], userPrompt: '' }
+function makeTab(p: Partial<RunnerTab> = {}): RunnerTab {
+  return {
+    id: crypto.randomUUID(),
+    agentId: null,
+    projectId: null,
+    skillIds: [],
+    userPrompt: '',
+    output: '',
+    running: false,
+    runId: null,
+    error: '',
+    ...p
   }
+}
+
+function loadTabs(): RunnerTab[] {
+  let tabs: RunnerTab[] = []
+  try {
+    const raw = JSON.parse(localStorage.getItem(TABS_KEY) || '[]')
+    if (Array.isArray(raw)) {
+      tabs = raw.map((t) =>
+        makeTab({
+          id: typeof t.id === 'string' ? t.id : undefined,
+          agentId: t.agentId ?? null,
+          projectId: t.projectId ?? null,
+          skillIds: Array.isArray(t.skillIds) ? t.skillIds : [],
+          userPrompt: t.userPrompt ?? ''
+        })
+      )
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
+    if (d) {
+      tabs = [makeTab({ agentId: d.agentId ?? null, skillIds: Array.isArray(d.skillIds) ? d.skillIds : [], userPrompt: d.userPrompt ?? '' }), ...tabs]
+      localStorage.removeItem(DRAFT_KEY)
+    }
+  } catch {
+    // ignore
+  }
+  return tabs.length ? tabs : [makeTab()]
 }
 
 export function PromptRunnerPage(): React.ReactElement {
   const { skills, refresh: refreshSkills } = useSkillStore()
   const { agents, refresh: refreshAgents } = useAgentStore()
+  const { projects, refresh: refreshProjects } = useProjectStore()
   const { save } = useExecutionStore()
 
-  const initial = loadDraft()
-  const [agentId, setAgentId] = useState<string | null>(initial.agentId)
-  const [skillIds, setSkillIds] = useState<string[]>(initial.skillIds)
-  const [userPrompt, setUserPrompt] = useState(initial.userPrompt)
+  const [tabs, setTabs] = useState<RunnerTab[]>(loadTabs)
+  const [activeId, setActiveId] = useState<string>(tabs[0].id)
   const [search, setSearch] = useState('')
-  const [output, setOutput] = useState('')
-  const [running, setRunning] = useState(false)
-  const [toast, setToast] = useState('')
   const [model, setModel] = useState('')
+  const [toast, setToast] = useState('')
+  const cancelledRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     refreshSkills()
     refreshAgents()
+    refreshProjects()
     window.api.settings.get('claude_model').then((m) => setModel(m ?? ''))
-    const off = window.api.ai.onChunk((t) => setOutput((o) => o + t))
+    const off = window.api.ai.onChunk((runId, text) => {
+      if (!runId) return
+      setTabs((prev) => prev.map((t) => (t.runId === runId ? { ...t, output: t.output + text } : t)))
+    })
     return off
   }, [])
 
-  // autosave draft
+  // persist tab config (not transient run state)
   useEffect(() => {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ agentId, skillIds, userPrompt }))
-  }, [agentId, skillIds, userPrompt])
+    const slim = tabs.map((t) => ({ id: t.id, agentId: t.agentId, projectId: t.projectId, skillIds: t.skillIds, userPrompt: t.userPrompt }))
+    localStorage.setItem(TABS_KEY, JSON.stringify(slim))
+  }, [tabs])
 
-  const agent = agents.find((a) => a.id === agentId) ?? null
-  const selectedSkills = useMemo(
-    () => skillIds.map((id) => skills.find((s) => s.id === id)).filter(Boolean) as typeof skills,
-    [skillIds, skills]
-  )
-  const finalPrompt = useMemo(
-    () => composePrompt(agent ? { systemPrompt: agent.systemPrompt } : null, selectedSkills.map((s) => ({ name: s.name, content: s.content })), userPrompt),
-    [agent, selectedSkills, userPrompt]
-  )
+  const active = tabs.find((t) => t.id === activeId) ?? tabs[0]
+  const patchTab = (id: string, patch: Partial<RunnerTab>): void =>
+    setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
+  const patchActive = (patch: Partial<RunnerTab>): void => patchTab(active.id, patch)
+
+  function composeFor(t: RunnerTab): string {
+    const ag = agents.find((a) => a.id === t.agentId) ?? null
+    const sk = t.skillIds.map((id) => skills.find((s) => s.id === id)).filter(Boolean) as typeof skills
+    return composePrompt(ag ? { systemPrompt: ag.systemPrompt } : null, sk.map((s) => ({ name: s.name, content: s.content })), t.userPrompt)
+  }
+
+  const finalPrompt = composeFor(active)
 
   const filteredSkills = useMemo(() => {
     const q = search.trim().toLowerCase()
     return skills.filter((s) => !q || s.name.toLowerCase().includes(q) || parseTags(s.tags).some((t) => t.includes(q)))
   }, [skills, search])
 
-  function flash(msg: string): void {
-    setToast(msg)
+  function flash(m: string): void {
+    setToast(m)
     setTimeout(() => setToast(''), 1800)
   }
 
-  function toggleSkill(id: string): void {
-    setSkillIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
+  function addTab(): void {
+    const t = makeTab()
+    setTabs((prev) => [...prev, t])
+    setActiveId(t.id)
+  }
+  function closeTab(id: string): void {
+    setTabs((prev) => {
+      const t = prev.find((x) => x.id === id)
+      if (t?.runId) window.api.ai.cancel(t.runId)
+      const next = prev.filter((x) => x.id !== id)
+      const finalTabs = next.length ? next : [makeTab()]
+      if (id === activeId) setActiveId(finalTabs[0].id)
+      return finalTabs
+    })
   }
 
-  function applyAgent(id: string): void {
-    setAgentId(id || null)
-    const a = agents.find((x) => x.id === id)
-    if (a) setSkillIds(parseTags(a.defaultSkillIds))
+  function applyAgent(tabId: string, agentId: string): void {
+    const a = agents.find((x) => x.id === agentId)
+    patchTab(tabId, { agentId: agentId || null, ...(a ? { skillIds: parseTags(a.defaultSkillIds) } : {}) })
+  }
+  function toggleSkill(tabId: string, skillId: string): void {
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === tabId ? { ...t, skillIds: t.skillIds.includes(skillId) ? t.skillIds.filter((x) => x !== skillId) : [...t.skillIds, skillId] } : t
+      )
+    )
   }
 
   async function copyFinal(): Promise<void> {
@@ -85,43 +155,37 @@ export function PromptRunnerPage(): React.ReactElement {
     flash('Prompt copiado ✓')
   }
 
-  async function saveExecution(response: string | null): Promise<void> {
-    await save(agentId, skillIds, userPrompt, finalPrompt, response)
-    flash('Execução salva ✓')
-  }
-
-  async function runHere(): Promise<void> {
-    if (!finalPrompt.trim() || running) return
-    setRunning(true)
-    setOutput('')
+  async function run(tab: RunnerTab): Promise<void> {
+    const fp = composeFor(tab)
+    if (!fp.trim() || tab.running) return
+    const runId = crypto.randomUUID()
+    patchTab(tab.id, { running: true, runId, output: '', error: '' })
     try {
-      const result = await window.api.ai.runStream(finalPrompt, undefined, model)
-      setOutput(result)
-      await save(agentId, skillIds, userPrompt, finalPrompt, result)
-      flash('Executado e salvo ✓')
+      const result = await window.api.ai.runStream(fp, tab.projectId ?? undefined, model, runId)
+      patchTab(tab.id, { output: result, running: false, runId: null })
+      await save(tab.agentId, tab.skillIds, tab.userPrompt, fp, result)
     } catch (e) {
-      setOutput(e instanceof Error ? e.message : String(e))
-      flash('Erro ao executar')
-    } finally {
-      setRunning(false)
+      const cancelled = cancelledRef.current.has(runId)
+      cancelledRef.current.delete(runId)
+      patchTab(tab.id, {
+        running: false,
+        runId: null,
+        error: cancelled ? 'Execução cancelada.' : e instanceof Error ? e.message : String(e)
+      })
     }
   }
 
-  // keyboard shortcuts: Ctrl/Cmd+Enter = gerar/copiar preview, Ctrl/Cmd+Shift+C = copiar
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault()
-        flash('Prompt final atualizado ✓')
-      } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
-        e.preventDefault()
-        copyFinal()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finalPrompt])
+  async function cancel(tab: RunnerTab): Promise<void> {
+    if (!tab.runId) return
+    cancelledRef.current.add(tab.runId)
+    await window.api.ai.cancel(tab.runId)
+    patchTab(tab.id, { running: false })
+  }
+
+  function tabTitle(t: RunnerTab, i: number): string {
+    const base = t.userPrompt.trim().split('\n')[0].slice(0, 16)
+    return base || `Aba ${i + 1}`
+  }
 
   const favSkillIds = skills.filter((s) => s.isFavorite).map((s) => s.id)
 
@@ -131,57 +195,92 @@ export function PromptRunnerPage(): React.ReactElement {
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700 }}>▶️ Prompt Runner</h2>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            Monte o prompt (agente + skills + seu texto), copie ou execute no Claude local. Ctrl+Enter atualiza · Ctrl+Shift+C copia.
+            Abas independentes p/ rodar em paralelo · agente + skills + projeto + seu texto.
           </p>
         </div>
-        {toast && <span className="badge-hot" style={{ background: 'var(--accent-dim)', color: 'var(--accent-hover)' }}>{toast}</span>}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {toast && <span className="badge-hot" style={{ background: 'var(--accent-dim)', color: 'var(--accent-hover)' }}>{toast}</span>}
+          <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Modelo:</label>
+          <select value={model} onChange={(e) => { setModel(e.target.value); window.api.settings.set('claude_model', e.target.value) }}>
+            <option value="">Padrão</option>
+            <option value="sonnet">Sonnet</option>
+            <option value="opus">Opus</option>
+            <option value="haiku">Haiku</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="runner-tabs">
+        {tabs.map((t, i) => (
+          <div key={t.id} className={`runner-tab ${t.id === activeId ? 'active' : ''}`} onClick={() => setActiveId(t.id)}>
+            {t.running && <span className="active-task-dot" style={{ width: 7, height: 7 }} />}
+            <span>{tabTitle(t, i)}</span>
+            <button className="runner-tab-close" onClick={(e) => { e.stopPropagation(); closeTab(t.id) }} title="Fechar aba">✕</button>
+          </div>
+        ))}
+        <button className="runner-tab-add" onClick={addTab} title="Nova aba">＋</button>
       </div>
 
       <div className="runner-grid">
-        {/* Left: selectors */}
+        {/* Left */}
         <div className="runner-col">
-          <div className="editor-field">
-            <label>Agente</label>
-            <select value={agentId ?? ''} onChange={(e) => applyAgent(e.target.value)}>
-              <option value="">Nenhum</option>
-              {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+          <div className="editor-row">
+            <div className="editor-field">
+              <label>Agente</label>
+              <select value={active.agentId ?? ''} onChange={(e) => applyAgent(active.id, e.target.value)}>
+                <option value="">Nenhum</option>
+                {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+            <div className="editor-field">
+              <label>Projeto</label>
+              <select value={active.projectId ?? ''} onChange={(e) => patchActive({ projectId: e.target.value ? Number(e.target.value) : null })}>
+                <option value="">Nenhum</option>
+                {projects.filter((p) => !p.archived).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
           </div>
           <input type="text" placeholder="🔍 Buscar skills…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ margin: '8px 0' }} />
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => setSkillIds(favSkillIds)}>★ Favoritas</button>
-            <button className="btn btn-secondary btn-sm" onClick={() => setSkillIds([])}>Limpar</button>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center' }}>{skillIds.length} sel.</span>
+            <button className="btn btn-secondary btn-sm" onClick={() => patchActive({ skillIds: favSkillIds })}>★ Favoritas</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => patchActive({ skillIds: [] })}>Limpar</button>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center' }}>{active.skillIds.length} sel.</span>
           </div>
           <div className="skill-checklist" style={{ flex: 1, minHeight: 200 }}>
             {filteredSkills.map((s) => (
               <label key={s.id} className="skill-check-row">
-                <input type="checkbox" checked={skillIds.includes(s.id)} onChange={() => toggleSkill(s.id)} />
+                <input type="checkbox" checked={active.skillIds.includes(s.id)} onChange={() => toggleSkill(active.id, s.id)} />
                 <span>{s.isFavorite ? '★ ' : ''}{s.name}</span>
               </label>
             ))}
           </div>
         </div>
 
-        {/* Right: prompt + preview */}
+        {/* Right */}
         <div className="runner-col">
           <div className="editor-field">
             <label>Seu prompt</label>
-            <textarea rows={5} value={userPrompt} onChange={(e) => setUserPrompt(e.target.value)} style={{ resize: 'vertical' }} placeholder="Descreva a tarefa…" />
+            <textarea rows={5} value={active.userPrompt} onChange={(e) => patchActive({ userPrompt: e.target.value })} style={{ resize: 'vertical' }} placeholder="Descreva a tarefa…" />
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '4px 0 8px' }}>
             <button className="btn btn-secondary btn-sm" onClick={copyFinal} disabled={!finalPrompt.trim()}>📋 Copiar</button>
-            <button className="btn btn-secondary btn-sm" onClick={() => saveExecution(null)} disabled={!finalPrompt.trim()}>💾 Salvar</button>
-            <button className="btn btn-primary btn-sm" onClick={runHere} disabled={!finalPrompt.trim() || running}>{running ? 'Executando…' : '▶️ Executar aqui'}</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => save(active.agentId, active.skillIds, active.userPrompt, finalPrompt, null).then(() => flash('Salvo ✓'))} disabled={!finalPrompt.trim()}>💾 Salvar</button>
+            {active.running ? (
+              <button className="btn btn-danger btn-sm" onClick={() => cancel(active)}>⏹ Cancelar</button>
+            ) : (
+              <button className="btn btn-primary btn-sm" onClick={() => run(active)} disabled={!finalPrompt.trim()}>▶️ Executar aqui</button>
+            )}
           </div>
           <div className="editor-field">
             <label>Prompt final <span style={{ color: 'var(--text-muted)' }}>({finalPrompt.length} chars)</span></label>
-            <pre className="ai-output" style={{ minHeight: 120, maxHeight: 220 }}>{finalPrompt || '(vazio)'}</pre>
+            <pre className="ai-output" style={{ minHeight: 100, maxHeight: 200 }}>{finalPrompt || '(vazio)'}</pre>
           </div>
-          {output && (
+          {active.error && <div style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 8 }}>{active.error}</div>}
+          {(active.output || active.running) && (
             <div className="editor-field">
-              <label>Resposta (Claude local)</label>
-              <pre className="ai-output" style={{ maxHeight: 260 }}>{output}</pre>
+              <label>Resposta (Claude local){active.running ? ' — executando…' : ''}</label>
+              <pre className="ai-output" style={{ maxHeight: 260 }}>{active.output || '…'}</pre>
             </div>
           )}
         </div>

@@ -97,7 +97,7 @@ import {
 import type { DbTransaction, DbSkill, DbAgent } from './database/queries'
 import { syncGithubIssues, createIssueViaClaude } from './services/github'
 import { runClaude } from './services/claude'
-import { connectGoogle, googleConnected, disconnectGoogle, syncGoogleCalendar } from './services/google'
+import { connectGoogle, googleConnected, listGoogleAccounts, disconnectGoogle, disconnectGoogleAccount, syncGoogleCalendar } from './services/google'
 import { syncPluggy, pluggyConfigured, createConnectToken } from './services/pluggy'
 import { searchFlightPrice, refreshWatchPrice } from './services/flights'
 import { encodeSecret, decodeSecret } from './services/secrets'
@@ -370,7 +370,9 @@ ipcMain.handle('calendar:delete', (_, id: number) => deleteCalendarEvent(id))
 
 ipcMain.handle('google:connect', () => connectGoogle())
 ipcMain.handle('google:status', () => googleConnected())
+ipcMain.handle('google:accounts', () => listGoogleAccounts())
 ipcMain.handle('google:disconnect', () => disconnectGoogle())
+ipcMain.handle('google:disconnectAccount', (_, email: string) => disconnectGoogleAccount(email))
 ipcMain.handle('google:sync', async () => {
   const n = await syncGoogleCalendar()
   await setSetting('google_last_sync', new Date().toISOString())

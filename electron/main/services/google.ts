@@ -2,7 +2,7 @@ import http from 'http'
 import crypto from 'crypto'
 import { shell } from 'electron'
 import { getSetting, setSetting, replaceGoogleEvents } from '../database/queries'
-import { decodeSecret } from './secrets'
+import { decodeSecret, encodeSecret } from './secrets'
 
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
@@ -20,6 +20,48 @@ async function creds(): Promise<{ clientId: string; clientSecret: string }> {
     throw new Error('Configure o Client ID e o Client Secret do Google em Configurações.')
   }
   return { clientId, clientSecret }
+}
+
+// ── Multi-account storage ─────────────────────────────────────────────────────
+// Accounts are stored as an (encrypted) JSON list; the OAuth app (client id/secret)
+// is shared. A legacy single `google_refresh_token` is folded in transparently.
+interface GoogleAccount {
+  email: string
+  refreshToken: string
+}
+
+async function getAccounts(): Promise<GoogleAccount[]> {
+  const raw = decodeSecret(await getSetting('google_accounts'))
+  let list: GoogleAccount[] = []
+  if (raw) {
+    try {
+      const v = JSON.parse(raw)
+      if (Array.isArray(v)) list = v.filter((a) => a && a.refreshToken)
+    } catch {
+      // corrupt → treat as empty
+    }
+  }
+  const legacy = decodeSecret(await getSetting('google_refresh_token'))
+  if (legacy && !list.some((a) => a.refreshToken === legacy)) {
+    list = [{ email: 'Conta principal', refreshToken: legacy }, ...list]
+  }
+  return list
+}
+
+async function saveAccounts(list: GoogleAccount[]): Promise<void> {
+  await setSetting('google_accounts', encodeSecret('google_accounts', JSON.stringify(list)))
+  await setSetting('google_refresh_token', '') // legacy token now lives in the list
+}
+
+async function addAccount(email: string, refreshToken: string): Promise<void> {
+  const list = (await getAccounts()).filter((a) => a.email !== email) // replace on re-connect
+  list.push({ email, refreshToken })
+  await saveAccounts(list)
+}
+
+/** Emails of the connected Google accounts (for the settings UI). */
+export async function listGoogleAccounts(): Promise<string[]> {
+  return (await getAccounts()).map((a) => a.email)
 }
 
 /**
@@ -73,15 +115,21 @@ export async function connectGoogle(): Promise<boolean> {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body
         })
-        const json = (await tokenRes.json()) as { refresh_token?: string; error?: string }
+        const json = (await tokenRes.json()) as { refresh_token?: string; access_token?: string; error?: string }
         if (!tokenRes.ok || !json.refresh_token) {
           respond('Falha ao trocar o código.')
           cleanup()
           reject(new Error(json.error || 'Sem refresh_token (revogue o acesso e tente de novo).'))
           return
         }
-        await setSetting('google_refresh_token', json.refresh_token)
-        respond('✅ Conectado ao Google Calendar!')
+        // identify the account by its primary calendar id (= the account email)
+        let email = 'conta google'
+        if (json.access_token) {
+          const resolved = await fetchPrimaryEmail(json.access_token)
+          if (resolved) email = resolved
+        }
+        await addAccount(email, json.refresh_token)
+        respond(`✅ Conectado: ${email}`)
         cleanup()
         resolve(true)
       } catch (e) {
@@ -122,26 +170,32 @@ export async function connectGoogle(): Promise<boolean> {
   })
 }
 
-/** Whether a Google refresh token is stored. */
+/** Whether at least one Google account is connected. */
 export async function googleConnected(): Promise<boolean> {
-  return !!(await getSetting('google_refresh_token'))
+  return (await getAccounts()).length > 0
 }
 
+/** Disconnect all accounts. */
 export async function disconnectGoogle(): Promise<void> {
+  await setSetting('google_accounts', '')
   await setSetting('google_refresh_token', '')
 }
 
-async function accessToken(): Promise<string> {
+/** Disconnect a single account by email. */
+export async function disconnectGoogleAccount(email: string): Promise<void> {
+  const list = (await getAccounts()).filter((a) => a.email !== email)
+  await saveAccounts(list)
+}
+
+async function accessTokenFor(refreshToken: string): Promise<string> {
   const { clientId, clientSecret } = await creds()
-  const refresh = decodeSecret(await getSetting('google_refresh_token'))
-  if (!refresh) throw new Error('Google não conectado. Clique em Conectar em Configurações.')
   const res = await fetch(TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
-      refresh_token: refresh,
+      refresh_token: refreshToken,
       grant_type: 'refresh_token'
     })
   })
@@ -150,43 +204,93 @@ async function accessToken(): Promise<string> {
   return json.access_token
 }
 
+/** The primary calendar id equals the account's email. */
+async function fetchPrimaryEmail(token: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${CALENDAR_API}/calendars/primary`, { headers: { Authorization: `Bearer ${token}` } })
+    if (!r.ok) return null
+    const j = (await r.json()) as { id?: string }
+    return j.id ?? null
+  } catch {
+    return null
+  }
+}
+
 interface GCalEvent {
   summary?: string
   location?: string
   start?: { dateTime?: string; date?: string }
   end?: { dateTime?: string; date?: string }
 }
+interface EventRow {
+  title: string
+  startTime: string
+  endTime: string | null
+  location: string | null
+}
 
-/** Pull the next 7 days of events from the primary calendar into calendar_events (source='google'). */
-export async function syncGoogleCalendar(): Promise<number> {
-  const token = await accessToken()
-  const now = new Date()
-  const in7 = new Date(now.getTime() + 7 * 86400000)
+async function fetchEventsFor(token: string, timeMin: Date, timeMax: Date): Promise<EventRow[]> {
   const url =
     `${CALENDAR_API}/calendars/primary/events?` +
     new URLSearchParams({
-      timeMin: now.toISOString(),
-      timeMax: in7.toISOString(),
+      timeMin: timeMin.toISOString(),
+      timeMax: timeMax.toISOString(),
       singleEvents: 'true',
       orderBy: 'startTime',
       maxResults: '50'
     }).toString()
-
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     throw new Error(`Google Calendar falhou (${res.status}). ${body.slice(0, 120)}`)
   }
   const data = (await res.json()) as { items?: GCalEvent[] }
-  const events = (data.items ?? [])
+  return (data.items ?? [])
     .map((e) => ({
       title: e.summary || '(sem título)',
       startTime: e.start?.dateTime || (e.start?.date ? `${e.start.date}T00:00:00.000Z` : null),
       endTime: e.end?.dateTime || (e.end?.date ? `${e.end.date}T00:00:00.000Z` : null),
       location: e.location || null
     }))
-    .filter((e): e is { title: string; startTime: string; endTime: string | null; location: string | null } => !!e.startTime)
+    .filter((e): e is EventRow => !!e.startTime)
+}
 
-  await replaceGoogleEvents(events)
-  return events.length
+/**
+ * Pull the next 7 days from every connected account's primary calendar and
+ * aggregate them into calendar_events (source='google'). Best-effort per account:
+ * a failing account is skipped; if all fail, the last error is thrown.
+ */
+export async function syncGoogleCalendar(): Promise<number> {
+  const accounts = await getAccounts()
+  if (!accounts.length) throw new Error('Google não conectado. Clique em Conectar em Configurações.')
+
+  const now = new Date()
+  const in7 = new Date(now.getTime() + 7 * 86400000)
+  const all: EventRow[] = []
+  let okCount = 0
+  let emailsChanged = false
+  let lastErr: Error | null = null
+
+  for (const acc of accounts) {
+    try {
+      const token = await accessTokenFor(acc.refreshToken)
+      // migrate/label: resolve the real email if we only have a placeholder
+      if (!acc.email.includes('@')) {
+        const email = await fetchPrimaryEmail(token)
+        if (email) {
+          acc.email = email
+          emailsChanged = true
+        }
+      }
+      all.push(...(await fetchEventsFor(token, now, in7)))
+      okCount++
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+    }
+  }
+
+  if (emailsChanged) await saveAccounts(accounts)
+  if (okCount === 0 && lastErr) throw lastErr
+  await replaceGoogleEvents(all)
+  return all.length
 }

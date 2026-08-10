@@ -62,13 +62,23 @@ export function SettingsPage(): React.ReactElement {
   const [gClientId, setGClientId] = useState('')
   const [gClientSecret, setGClientSecret] = useState('')
   const [gConnected, setGConnected] = useState(false)
+  const [gAccounts, setGAccounts] = useState<string[]>([])
   const [gBusy, setGBusy] = useState<'connect' | 'sync' | null>(null)
   const [gMsg, setGMsg] = useState<{ text: string; ok: boolean } | null>(null)
+
+  async function refreshGoogle(): Promise<void> {
+    const [connected, accounts] = await Promise.all([
+      window.api.google.status(),
+      window.api.google.accounts ? window.api.google.accounts() : Promise.resolve([])
+    ])
+    setGConnected(connected)
+    setGAccounts(accounts)
+  }
 
   useEffect(() => {
     refresh()
     refreshFinance()
-    window.api.google.status().then(setGConnected)
+    refreshGoogle()
   }, [])
 
   useEffect(() => {
@@ -206,8 +216,8 @@ export function SettingsPage(): React.ReactElement {
     setGMsg(null)
     try {
       await window.api.google.connect()
-      setGConnected(true)
-      setGMsg({ text: 'Conectado! Clique em Sincronizar.', ok: true })
+      await refreshGoogle()
+      setGMsg({ text: 'Conta conectada! Clique em Sincronizar.', ok: true })
     } catch (e) {
       setGMsg({ text: e instanceof Error ? e.message : String(e), ok: false })
     } finally {
@@ -232,8 +242,14 @@ export function SettingsPage(): React.ReactElement {
 
   async function disconnectGoogle(): Promise<void> {
     await window.api.google.disconnect()
-    setGConnected(false)
-    setGMsg({ text: 'Desconectado.', ok: true })
+    await refreshGoogle()
+    setGMsg({ text: 'Todas as contas desconectadas.', ok: true })
+  }
+
+  async function disconnectGoogleAccount(email: string): Promise<void> {
+    await window.api.google.disconnectAccount(email)
+    await refreshGoogle()
+    setGMsg({ text: `Conta ${email} removida.`, ok: true })
   }
 
   return (
@@ -318,12 +334,31 @@ export function SettingsPage(): React.ReactElement {
       </div>
 
       <div className="chart-section" style={{ maxWidth: 560, marginTop: 16 }}>
-        <div className="chart-title">📅 Google Calendar {gConnected && <span style={{ color: 'var(--success)', fontSize: 12 }}>● conectado</span>}</div>
+        <div className="chart-title">📅 Google Calendar {gAccounts.length > 0 && <span style={{ color: 'var(--success)', fontSize: 12 }}>● {gAccounts.length} conta{gAccounts.length === 1 ? '' : 's'}</span>}</div>
         <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 12px' }}>
           Crie credenciais OAuth <strong>Desktop app</strong> no Google Cloud Console (API Google
-          Calendar) e cole abaixo. O redirect de loopback é tratado automaticamente. Leitura apenas
-          (escopo <code>calendar.readonly</code>).
+          Calendar) e cole abaixo. Você pode conectar <strong>várias contas</strong> — os eventos de
+          todas aparecem juntos. Leitura apenas (escopo <code>calendar.readonly</code>).
         </p>
+
+        {gAccounts.length > 0 && (
+          <div className="list-stack" style={{ marginBottom: 12 }}>
+            {gAccounts.map((email) => (
+              <div key={email} className="list-row">
+                <span className="list-row-title">{email}</span>
+                <button
+                  className="btn btn-danger btn-sm"
+                  style={{ marginLeft: 'auto' }}
+                  onClick={() => disconnectGoogleAccount(email)}
+                  disabled={gBusy !== null}
+                  title="Remover esta conta"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="editor-field">
           <label>Client ID</label>
@@ -336,14 +371,14 @@ export function SettingsPage(): React.ReactElement {
 
         <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="btn btn-primary btn-sm" onClick={connectGoogle} disabled={gBusy !== null || !gClientId.trim() || !gClientSecret.trim()}>
-            {gBusy === 'connect' ? 'Aguardando browser…' : gConnected ? 'Reconectar' : 'Conectar'}
+            {gBusy === 'connect' ? 'Aguardando browser…' : gConnected ? '+ Conectar outra conta' : 'Conectar conta'}
           </button>
           <button className="btn btn-secondary btn-sm" onClick={syncGoogle} disabled={gBusy !== null || !gConnected}>
             {gBusy === 'sync' ? 'Sincronizando…' : '🔄 Sincronizar (7 dias)'}
           </button>
-          {gConnected && (
+          {gConnected && gAccounts.length > 1 && (
             <button className="btn btn-danger btn-sm" onClick={disconnectGoogle} disabled={gBusy !== null}>
-              Desconectar
+              Desconectar todas
             </button>
           )}
         </div>

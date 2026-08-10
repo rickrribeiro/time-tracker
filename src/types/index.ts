@@ -368,7 +368,9 @@ declare global {
       google: {
         connect: () => Promise<boolean>
         status: () => Promise<boolean>
+        accounts: () => Promise<string[]>
         disconnect: () => Promise<void>
+        disconnectAccount: (email: string) => Promise<void>
         sync: () => Promise<number>
       }
       accounts: {

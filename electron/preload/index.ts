@@ -124,7 +124,9 @@ const api = {
   google: {
     connect: () => ipcRenderer.invoke('google:connect'),
     status: () => ipcRenderer.invoke('google:status'),
+    accounts: () => ipcRenderer.invoke('google:accounts'),
     disconnect: () => ipcRenderer.invoke('google:disconnect'),
+    disconnectAccount: (email: string) => ipcRenderer.invoke('google:disconnectAccount', email),
     sync: () => ipcRenderer.invoke('google:sync')
   },
   // Finance

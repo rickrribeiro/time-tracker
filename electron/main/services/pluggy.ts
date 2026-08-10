@@ -92,14 +92,15 @@ async function get<T>(path: string, key: string): Promise<T> {
 
 /**
  * Fetch every transaction of an account via the cursor-paginated `/v2/transactions`
- * endpoint (the old page-based `/transactions` was deprecated → 410). Pages are 500;
- * `next` is a URL carrying the `after` cursor, null when exhausted.
+ * endpoint (the old page-based `/transactions` was deprecated → 410). Pages are a
+ * fixed 500 (no `pageSize` param — it 400s); `next` is a URL carrying the `after`
+ * cursor, null when exhausted.
  */
 async function fetchAllTransactions(accountId: string, key: string): Promise<PluggyTransaction[]> {
   const out: PluggyTransaction[] = []
   let after: string | null = null
   for (let i = 0; i < 200; i++) {
-    const qs = new URLSearchParams({ accountId, pageSize: '500' })
+    const qs = new URLSearchParams({ accountId })
     if (after) qs.set('after', after)
     const page = await get<{ results: PluggyTransaction[]; next: string | null }>(
       `/v2/transactions?${qs.toString()}`,

@@ -137,6 +137,12 @@ export interface Investment {
   amount: number
   currency: string
 }
+export interface InvestmentHistory {
+  id: number
+  investmentId: number
+  month: string // YYYY-MM
+  amount: number
+}
 
 export interface Trip {
   id: number
@@ -388,7 +394,9 @@ declare global {
       }
       investments: {
         getAll: () => Promise<Investment[]>
+        history: () => Promise<InvestmentHistory[]>
         create: (name: string, type: string | null, amount: number, currency: string) => Promise<Investment>
+        setValue: (investmentId: number, month: string, amount: number) => Promise<void>
         delete: (id: number) => Promise<void>
       }
       pluggy: {

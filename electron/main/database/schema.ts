@@ -107,6 +107,14 @@ export const SCHEMA = `
     currency TEXT NOT NULL DEFAULT 'BRL'
   );
 
+  -- Monthly value snapshot per investment (YYYY-MM). One row per (investmentId, month).
+  CREATE TABLE IF NOT EXISTS investment_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    investmentId INTEGER NOT NULL REFERENCES investments(id) ON DELETE CASCADE,
+    month TEXT NOT NULL,
+    amount REAL NOT NULL DEFAULT 0
+  );
+
   INSERT OR IGNORE INTO categories (id, name, type, color) VALUES (1, 'Salário', 'income', '#22c55e');
   INSERT OR IGNORE INTO categories (id, name, type, color) VALUES (2, 'Alimentação', 'expense', '#f59e0b');
   INSERT OR IGNORE INTO categories (id, name, type, color) VALUES (3, 'Transporte', 'expense', '#3b82f6');

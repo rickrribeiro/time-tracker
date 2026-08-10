@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Account, Category, Transaction, Budget, Investment } from '../../../types'
+import { Account, Category, Transaction, Budget, Investment, InvestmentHistory } from '../../../types'
 import { currentMonth } from '../util'
 
 interface FinanceState {
@@ -10,6 +10,7 @@ interface FinanceState {
   allTransactions: Transaction[] // for reports / evolution
   budgets: Budget[] // for `month`
   investments: Investment[]
+  investmentHistory: InvestmentHistory[] // all-time monthly snapshots
   base: string
   rates: Record<string, number>
 
@@ -27,6 +28,7 @@ interface FinanceState {
   importTransactions: (rows: Omit<Transaction, 'id'>[]) => Promise<number>
   setBudget: (categoryId: number, amount: number) => Promise<void>
   addInvestment: (name: string, type: string | null, amount: number, currency: string) => Promise<void>
+  setInvestmentValue: (investmentId: number, month: string, amount: number) => Promise<void>
   removeInvestment: (id: number) => Promise<void>
 
   categoryName: (id: number | null) => string
@@ -41,6 +43,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
   allTransactions: [],
   budgets: [],
   investments: [],
+  investmentHistory: [],
   base: 'BRL',
   rates: {},
 
@@ -51,7 +54,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
 
   refresh: async () => {
     const month = get().month
-    const [accounts, categories, transactions, allTransactions, budgets, investments, base, ratesRaw] =
+    const [accounts, categories, transactions, allTransactions, budgets, investments, investmentHistory, base, ratesRaw] =
       await Promise.all([
         window.api.accounts.getAll(),
         window.api.categories.getAll(),
@@ -59,6 +62,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
         window.api.transactions.getAll(),
         window.api.budgets.getForMonth(month),
         window.api.investments.getAll(),
+        window.api.investments.history(),
         window.api.settings.get('finance_base'),
         window.api.settings.get('finance_rates')
       ])
@@ -68,7 +72,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch {
       rates = {}
     }
-    set({ accounts, categories, transactions, allTransactions, budgets, investments, base: base || 'BRL', rates })
+    set({ accounts, categories, transactions, allTransactions, budgets, investments, investmentHistory, base: base || 'BRL', rates })
   },
 
   saveFxConfig: async (base, rates) => {
@@ -116,6 +120,10 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
   },
   addInvestment: async (name, type, amount, currency) => {
     await window.api.investments.create(name, type, amount, currency)
+    await get().refresh()
+  },
+  setInvestmentValue: async (investmentId, month, amount) => {
+    await window.api.investments.setValue(investmentId, month, amount)
     await get().refresh()
   },
   removeInvestment: async (id) => {

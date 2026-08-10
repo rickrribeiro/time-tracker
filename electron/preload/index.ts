@@ -154,7 +154,9 @@ const api = {
   },
   investments: {
     getAll: () => ipcRenderer.invoke('investments:getAll'),
+    history: () => ipcRenderer.invoke('investments:history'),
     create: (name: string, type: string | null, amount: number, currency: string) => ipcRenderer.invoke('investments:create', name, type, amount, currency),
+    setValue: (investmentId: number, month: string, amount: number) => ipcRenderer.invoke('investments:setValue', investmentId, month, amount),
     delete: (id: number) => ipcRenderer.invoke('investments:delete', id)
   },
   pluggy: {

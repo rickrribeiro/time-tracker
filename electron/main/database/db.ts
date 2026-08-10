@@ -58,6 +58,32 @@ const MIGRATIONS: Migration[] = [
         // column already exists
       }
     }
+  },
+  {
+    version: 4,
+    label: 'investment_history + backfill current month',
+    run: (db) => {
+      db.run(`CREATE TABLE IF NOT EXISTS investment_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        investmentId INTEGER NOT NULL REFERENCES investments(id) ON DELETE CASCADE,
+        month TEXT NOT NULL,
+        amount REAL NOT NULL DEFAULT 0
+      );`)
+      // Seed one snapshot for the current month from each investment's existing amount,
+      // so the evolution chart has a starting point on already-populated databases.
+      try {
+        const now = new Date()
+        const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        db.run(
+          `INSERT INTO investment_history (investmentId, month, amount)
+           SELECT id, ?, amount FROM investments
+           WHERE id NOT IN (SELECT investmentId FROM investment_history WHERE month = ?);`,
+          [month, month]
+        )
+      } catch {
+        // best-effort backfill
+      }
+    }
   }
 ]
 

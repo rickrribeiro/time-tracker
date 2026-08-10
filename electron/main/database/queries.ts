@@ -814,6 +814,12 @@ export interface DbInvestment {
   amount: number
   currency: string
 }
+export interface DbInvestmentHistory {
+  id: number
+  investmentId: number
+  month: string
+  amount: number
+}
 
 // ── Accounts ──
 export async function getAccounts(): Promise<DbAccount[]> {
@@ -927,17 +933,55 @@ export async function setBudget(categoryId: number, month: string, amount: numbe
 }
 
 // ── Investments ──
+function currentMonthKey(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** Sync investments.amount to the value of the investment's most recent month. */
+function syncInvestmentLatest(db: Awaited<ReturnType<typeof getDb>>, investmentId: number): void {
+  const latest = getOne<DbInvestmentHistory>(
+    db,
+    'SELECT * FROM investment_history WHERE investmentId = ? ORDER BY month DESC LIMIT 1',
+    [investmentId]
+  )
+  if (latest) run(db, 'UPDATE investments SET amount = ? WHERE id = ?', [latest.amount, investmentId])
+}
+
 export async function getInvestments(): Promise<DbInvestment[]> {
   const db = await getDb()
   return getAll<DbInvestment>(db, 'SELECT * FROM investments ORDER BY name')
 }
+export async function getInvestmentHistory(): Promise<DbInvestmentHistory[]> {
+  const db = await getDb()
+  return getAll<DbInvestmentHistory>(db, 'SELECT * FROM investment_history ORDER BY month')
+}
 export async function createInvestment(name: string, type: string | null, amount: number, currency: string): Promise<DbInvestment> {
   const db = await getDb()
   run(db, 'INSERT INTO investments (name, type, amount, currency) VALUES (?, ?, ?, ?)', [name, type, amount, currency])
-  return getOne<DbInvestment>(db, 'SELECT * FROM investments WHERE id = ?', [lastInsertId(db)])!
+  const id = lastInsertId(db)
+  // record the opening value as this month's snapshot
+  run(db, 'INSERT INTO investment_history (investmentId, month, amount) VALUES (?, ?, ?)', [id, currentMonthKey(), amount])
+  return getOne<DbInvestment>(db, 'SELECT * FROM investments WHERE id = ?', [id])!
+}
+/** Upsert an investment's value for a given month, then refresh its latest amount. */
+export async function setInvestmentValue(investmentId: number, month: string, amount: number): Promise<void> {
+  const db = await getDb()
+  const existing = getOne<DbInvestmentHistory>(
+    db,
+    'SELECT * FROM investment_history WHERE investmentId = ? AND month = ?',
+    [investmentId, month]
+  )
+  if (existing) {
+    run(db, 'UPDATE investment_history SET amount = ? WHERE id = ?', [amount, existing.id])
+  } else {
+    run(db, 'INSERT INTO investment_history (investmentId, month, amount) VALUES (?, ?, ?)', [investmentId, month, amount])
+  }
+  syncInvestmentLatest(db, investmentId)
 }
 export async function deleteInvestment(id: number): Promise<void> {
   const db = await getDb()
+  run(db, 'DELETE FROM investment_history WHERE investmentId = ?', [id])
   run(db, 'DELETE FROM investments WHERE id = ?', [id])
 }
 

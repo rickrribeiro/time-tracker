@@ -1461,6 +1461,45 @@ select:focus {
   min-height: 200px;
 }
 
+.study-tree { display: flex; flex-direction: column; }
+.study-node-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.study-node-row:hover { background: var(--bg-hover); }
+.study-node-row.selected { background: var(--accent-dim); }
+.study-status { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+.study-node-title {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.study-node-pct { font-size: 11px; color: var(--text-muted); }
+.study-node-actions { display: none; gap: 2px; }
+.study-node-row:hover .study-node-actions { display: inline-flex; }
+.study-node-actions button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+}
+.study-node-actions button:hover { color: var(--text-primary); }
+.study-node-add { display: flex; gap: 6px; margin: 4px 0; }
+.study-node-add input { flex: 1; }
+
 .flashcard {
   background: var(--bg-secondary);
   border: 1px solid var(--border);

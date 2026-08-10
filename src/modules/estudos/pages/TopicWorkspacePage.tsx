@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { useUIStore } from '../../../store/uiStore'
 import { useStudyStore } from '../store/studyStore'
+import { RoadmapTree } from '../components/RoadmapTree'
 
 export function TopicWorkspacePage(): React.ReactElement {
   const { setPage } = useUIStore()
@@ -43,7 +44,7 @@ export function TopicWorkspacePage(): React.ReactElement {
       <div className="study-workspace">
         <div className="study-col study-col-roadmap">
           <div className="chart-title">🗺 Roadmap</div>
-          <div className="empty-hint">Roadmap em breve.</div>
+          <RoadmapTree />
         </div>
         <div className="study-col study-col-note">
           <div className="chart-title">📝 Anotações</div>

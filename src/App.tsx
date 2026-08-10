@@ -31,6 +31,7 @@ import {
   RecommendationsPage
 } from './modules/travel/pages'
 import { SettingsPage } from './modules/settings/pages/SettingsPage'
+import { LinksPage } from './modules/links/pages/LinksPage'
 import { AIPage } from './modules/ai/pages/AIPage'
 import { SkillsPage } from './modules/ai/pages/SkillsPage'
 import { AgentsPage } from './modules/ai/pages/AgentsPage'
@@ -108,7 +109,8 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
       { id: 'ai-history', label: 'Histórico', icon: '🕐' }
     ]
   },
-  { label: '', items: [{ id: 'settings', label: 'Configurações', icon: '⚙️' }] }
+  { label: '', items: [{ id: 'settings', label: 'Configurações', icon: '⚙️' }] },
+  { label: '', items: [{ id: 'links', label: 'Links', icon: '🔗' }] }
 ]
 
 const PAGES: Record<Page, React.ComponentType> = {
@@ -139,7 +141,8 @@ const PAGES: Record<Page, React.ComponentType> = {
   'ai-agents': AgentsPage,
   'ai-runner': PromptRunnerPage,
   'ai-history': HistoryPage,
-  settings: SettingsPage
+  settings: SettingsPage,
+  links: LinksPage
 }
 
 // Ctrl+1..4 quick nav to the most-used pages

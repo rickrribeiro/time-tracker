@@ -1302,3 +1302,43 @@ export async function deleteExecution(id: string): Promise<void> {
   const db = await getDb()
   run(db, 'DELETE FROM prompt_executions WHERE id = ?', [id])
 }
+
+// ── Links ─────────────────────────────────────────────────────────────────────
+
+export interface DbLink {
+  id: number
+  title: string
+  url: string
+  checked: number
+  createdAt: string
+}
+
+export async function getLinks(): Promise<DbLink[]> {
+  const db = await getDb()
+  return getAll<DbLink>(db, 'SELECT * FROM links ORDER BY id ASC')
+}
+
+export async function createLink(title: string, url: string): Promise<DbLink> {
+  const db = await getDb()
+  run(db, 'INSERT INTO links (title, url, checked, createdAt) VALUES (?, ?, 0, ?)', [
+    title,
+    url,
+    new Date().toISOString()
+  ])
+  return getOne<DbLink>(db, 'SELECT * FROM links WHERE id = ?', [lastInsertId(db)])!
+}
+
+export async function updateLink(id: number, title: string, url: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE links SET title = ?, url = ? WHERE id = ?', [title, url, id])
+}
+
+export async function setLinkChecked(id: number, checked: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE links SET checked = ? WHERE id = ?', [checked, id])
+}
+
+export async function deleteLink(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM links WHERE id = ?', [id])
+}

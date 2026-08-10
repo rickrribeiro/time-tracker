@@ -201,6 +201,14 @@ export interface PromptExecution {
   response: string | null
 }
 
+export interface Link {
+  id: number
+  title: string
+  url: string
+  checked: number
+  createdAt: string
+}
+
 export type Page =
   // Time Tracker (existente)
   | 'timeline'
@@ -238,6 +246,7 @@ export type Page =
   | 'ai-history'
   // Configurações
   | 'settings'
+  | 'links'
 
 declare global {
   interface Window {
@@ -430,6 +439,13 @@ declare global {
         getAll: () => Promise<PromptExecution[]>
         create: (agentId: string | null, skillIds: string, userPrompt: string, finalPrompt: string, response: string | null) => Promise<PromptExecution>
         delete: (id: string) => Promise<void>
+      }
+      links: {
+        getAll: () => Promise<Link[]>
+        create: (title: string, url: string) => Promise<Link>
+        update: (id: number, title: string, url: string) => Promise<void>
+        setChecked: (id: number, checked: number) => Promise<void>
+        delete: (id: number) => Promise<void>
       }
       on: {
         quickCapture: (cb: () => void) => () => void

@@ -208,4 +208,12 @@ export const SCHEMA = `
     finalPrompt TEXT NOT NULL DEFAULT '',
     response TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    checked INTEGER NOT NULL DEFAULT 0,
+    createdAt TEXT NOT NULL
+  );
 `;

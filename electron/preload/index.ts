@@ -211,6 +211,13 @@ const api = {
       ipcRenderer.invoke('executions:create', agentId, skillIds, userPrompt, finalPrompt, response),
     delete: (id: string) => ipcRenderer.invoke('executions:delete', id)
   },
+  links: {
+    getAll: () => ipcRenderer.invoke('links:getAll'),
+    create: (title: string, url: string) => ipcRenderer.invoke('links:create', title, url),
+    update: (id: number, title: string, url: string) => ipcRenderer.invoke('links:update', id, title, url),
+    setChecked: (id: number, checked: number) => ipcRenderer.invoke('links:setChecked', id, checked),
+    delete: (id: number) => ipcRenderer.invoke('links:delete', id)
+  },
   // AI (Claude CLI)
   ai: {
     run: (prompt: string, projectId?: number, model?: string) => ipcRenderer.invoke('ai:run', prompt, projectId, model),

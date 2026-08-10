@@ -239,6 +239,14 @@ const SCHEMA = `
     finalPrompt TEXT NOT NULL DEFAULT '',
     response TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    checked INTEGER NOT NULL DEFAULT 0,
+    createdAt TEXT NOT NULL
+  );
 `;
 const SKILLS = [
   {
@@ -1220,6 +1228,31 @@ async function deleteExecution(id) {
   const db2 = await getDb();
   run(db2, "DELETE FROM prompt_executions WHERE id = ?", [id]);
 }
+async function getLinks() {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM links ORDER BY id ASC");
+}
+async function createLink(title, url) {
+  const db2 = await getDb();
+  run(db2, "INSERT INTO links (title, url, checked, createdAt) VALUES (?, ?, 0, ?)", [
+    title,
+    url,
+    (/* @__PURE__ */ new Date()).toISOString()
+  ]);
+  return getOne(db2, "SELECT * FROM links WHERE id = ?", [lastInsertId(db2)]);
+}
+async function updateLink(id, title, url) {
+  const db2 = await getDb();
+  run(db2, "UPDATE links SET title = ?, url = ? WHERE id = ?", [title, url, id]);
+}
+async function setLinkChecked(id, checked) {
+  const db2 = await getDb();
+  run(db2, "UPDATE links SET checked = ? WHERE id = ?", [checked, id]);
+}
+async function deleteLink(id) {
+  const db2 = await getDb();
+  run(db2, "DELETE FROM links WHERE id = ?", [id]);
+}
 const SENSITIVE_KEYS = /* @__PURE__ */ new Set([
   "github_token",
   "google_client_secret",
@@ -2027,6 +2060,11 @@ electron.ipcMain.handle(
   (_, agentId, skillIds, userPrompt, finalPrompt, response) => createExecution(agentId, skillIds, userPrompt, finalPrompt, response)
 );
 electron.ipcMain.handle("executions:delete", (_, id) => deleteExecution(id));
+electron.ipcMain.handle("links:getAll", () => getLinks());
+electron.ipcMain.handle("links:create", (_, title, url) => createLink(title, url));
+electron.ipcMain.handle("links:update", (_, id, title, url) => updateLink(id, title, url));
+electron.ipcMain.handle("links:setChecked", (_, id, checked) => setLinkChecked(id, checked));
+electron.ipcMain.handle("links:delete", (_, id) => deleteLink(id));
 async function exportJson(defaultName, data) {
   const result = await electron.dialog.showSaveDialog({
     title: "Exportar",

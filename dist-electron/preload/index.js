@@ -153,6 +153,13 @@ const api = {
     create: (agentId, skillIds, userPrompt, finalPrompt, response) => electron.ipcRenderer.invoke("executions:create", agentId, skillIds, userPrompt, finalPrompt, response),
     delete: (id) => electron.ipcRenderer.invoke("executions:delete", id)
   },
+  links: {
+    getAll: () => electron.ipcRenderer.invoke("links:getAll"),
+    create: (title, url) => electron.ipcRenderer.invoke("links:create", title, url),
+    update: (id, title, url) => electron.ipcRenderer.invoke("links:update", id, title, url),
+    setChecked: (id, checked) => electron.ipcRenderer.invoke("links:setChecked", id, checked),
+    delete: (id) => electron.ipcRenderer.invoke("links:delete", id)
+  },
   // AI (Claude CLI)
   ai: {
     run: (prompt, projectId, model) => electron.ipcRenderer.invoke("ai:run", prompt, projectId, model),

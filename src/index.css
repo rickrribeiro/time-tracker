@@ -1816,3 +1816,24 @@ select:focus {
   color: var(--text-primary);
   background: var(--bg-hover);
 }
+
+/* ── Links ───────────────────────────────────────────────────────────────────── */
+.link-title {
+  flex: 0 1 auto;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: left;
+}
+.link-title:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+.link-url {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

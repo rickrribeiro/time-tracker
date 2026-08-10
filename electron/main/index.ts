@@ -84,7 +84,12 @@ import {
   importAgent,
   getExecutions,
   createExecution,
-  deleteExecution
+  deleteExecution,
+  getLinks,
+  createLink,
+  updateLink,
+  setLinkChecked,
+  deleteLink
 } from './database/queries'
 import type { DbTransaction, DbSkill, DbAgent } from './database/queries'
 import { syncGithubIssues, createIssueViaClaude } from './services/github'
@@ -431,6 +436,14 @@ ipcMain.handle('executions:create', (_, agentId: string | null, skillIds: string
   createExecution(agentId, skillIds, userPrompt, finalPrompt, response)
 )
 ipcMain.handle('executions:delete', (_, id: string) => deleteExecution(id))
+
+// ── IPC: Links ────────────────────────────────────────────────────────────────
+
+ipcMain.handle('links:getAll', () => getLinks())
+ipcMain.handle('links:create', (_, title: string, url: string) => createLink(title, url))
+ipcMain.handle('links:update', (_, id: number, title: string, url: string) => updateLink(id, title, url))
+ipcMain.handle('links:setChecked', (_, id: number, checked: number) => setLinkChecked(id, checked))
+ipcMain.handle('links:delete', (_, id: number) => deleteLink(id))
 
 // Per-entity JSON export/import (mirrors app:exportDb using dialog + fs)
 async function exportJson(defaultName: string, data: unknown): Promise<boolean> {

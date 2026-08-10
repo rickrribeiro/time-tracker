@@ -1434,6 +1434,19 @@ select:focus {
   white-space: nowrap;
 }
 
+.note-badge {
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  opacity: 0.75;
+  cursor: pointer;
+}
+.note-badge:hover {
+  opacity: 1;
+  background: var(--bg-hover);
+}
+
 .due-badge {
   font-size: 11px;
   padding: 2px 8px;

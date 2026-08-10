@@ -187,6 +187,18 @@ export function TodoPage(): React.ReactElement {
               >
                 {t.title}
               </span>
+              {t.notes && t.notes.trim() && (
+                <button
+                  className="note-badge"
+                  title={t.notes}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setEditing(t)
+                  }}
+                >
+                  📝
+                </button>
+              )}
               {proj && <span className="project-chip">{proj}</span>}
               {due && <span className={`due-badge ${due.cls}`}>{due.label}</span>}
               <select

@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react'
 import { useFinanceStore } from '../store/financeStore'
 import { MonthNav } from '../components/MonthNav'
-import { formatMoney, sumByCurrency, sumInBase, shiftMonth, monthLabel } from '../util'
+import { formatMoney, sumByCurrency, sumInBase, shiftMonth, monthLabel, portfolioAtMonth } from '../util'
 
 export function FinanceDashboardPage(): React.ReactElement {
-  const { accounts, transactions, allTransactions, budgets, month, base, rates, refresh, categoryName, categoryColor } =
+  const { accounts, transactions, allTransactions, budgets, investments, investmentHistory, month, base, rates, refresh, categoryName, categoryColor } =
     useFinanceStore()
 
   useEffect(() => {
@@ -39,6 +39,13 @@ export function FinanceDashboardPage(): React.ReactElement {
     return { m, exp }
   })
   const evoMax = Math.max(1, ...evolution.map((e) => e.exp))
+
+  // investments: portfolio value per month (carry-forward, converted to base)
+  const portfolio = months.map((m) => ({ m, total: portfolioAtMonth(investments, investmentHistory, m, base, rates) }))
+  const portMax = Math.max(1, ...portfolio.map((p) => p.total))
+  const portfolioNow = portfolio[portfolio.length - 1]?.total ?? 0
+  const portfolioPrev = portfolio[portfolio.length - 2]?.total ?? 0
+  const portfolioDelta = portfolioNow - portfolioPrev
 
   const budgetTotal = budgets.reduce((s, b) => s + b.amount, 0)
   const spentTotal = expense.reduce((s, t) => s + t.amount, 0)
@@ -90,6 +97,15 @@ export function FinanceDashboardPage(): React.ReactElement {
           </div>
           <div className="stat-card-sub">receitas {formatMoney(incomeBase, base)} − gastos {formatMoney(expenseBase, base)}</div>
         </div>
+        <div className="stat-card">
+          <div className="stat-card-label">Investimentos em {base}</div>
+          <div className="stat-card-value" style={{ fontSize: 16 }}>{formatMoney(portfolioNow, base)}</div>
+          {portfolio.length > 1 && (
+            <div className="stat-card-sub" style={{ color: portfolioDelta >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+              {portfolioDelta >= 0 ? '▲' : '▼'} {formatMoney(Math.abs(portfolioDelta), base)} vs. mês anterior
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="chart-section" style={{ marginTop: 16 }}>
@@ -120,6 +136,26 @@ export function FinanceDashboardPage(): React.ReactElement {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="chart-section" style={{ marginTop: 16 }}>
+        <div className="chart-title">Evolução de investimentos (6 meses) · {base}</div>
+        {portfolioNow === 0 && portMax === 1 ? (
+          <div className="empty-hint">Sem investimentos registrados. Adicione em 📈 Investimentos.</div>
+        ) : (
+          <div className="evo-bars">
+            {portfolio.map((p) => (
+              <div key={p.m} className="evo-bar-col">
+                <div
+                  className="evo-bar"
+                  style={{ height: `${(p.total / portMax) * 100}%`, background: 'var(--success)' }}
+                  title={formatMoney(p.total, base)}
+                />
+                <span className="evo-bar-label">{monthLabel(p.m).slice(0, 3)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

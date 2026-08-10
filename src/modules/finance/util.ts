@@ -1,4 +1,4 @@
-import { Transaction } from '../../types'
+import { Transaction, Investment, InvestmentHistory } from '../../types'
 
 /** Current month as YYYY-MM (local). */
 export function currentMonth(): string {
@@ -51,6 +51,37 @@ export function sumInBase(
   rates: Record<string, number>
 ): number {
   return items.reduce((s, t) => s + convertToBase(t.amount, t.currency, base, rates), 0)
+}
+
+/**
+ * Value of an investment for a given month, carrying forward the most recent
+ * snapshot at or before that month (holdings persist until re-entered). null if
+ * the investment had no snapshot yet by then.
+ */
+export function investmentValueAtMonth(
+  history: InvestmentHistory[],
+  investmentId: number,
+  month: string
+): number | null {
+  const rows = history.filter((h) => h.investmentId === investmentId && h.month <= month)
+  if (!rows.length) return null
+  return rows.reduce((a, b) => (b.month > a.month ? b : a)).amount
+}
+
+/** Total portfolio value at a month (carry-forward per investment), converted to base. */
+export function portfolioAtMonth(
+  investments: Investment[],
+  history: InvestmentHistory[],
+  month: string,
+  base: string,
+  rates: Record<string, number>
+): number {
+  let total = 0
+  for (const inv of investments) {
+    const v = investmentValueAtMonth(history, inv.id, month)
+    if (v != null) total += convertToBase(v, inv.currency, base, rates)
+  }
+  return total
 }
 
 export interface ParsedCsvRow {

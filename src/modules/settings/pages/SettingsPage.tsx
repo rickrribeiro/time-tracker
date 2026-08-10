@@ -321,7 +321,14 @@ export function SettingsPage(): React.ReactElement {
               {saved ? '✓ Salvo' : 'Salvar'}
             </button>
           )}
-          <button className="btn btn-secondary btn-sm" onClick={sync} disabled={syncing || (authMode === 'token' && !token.trim())}>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={async () => {
+              await sync()
+              await refresh()
+            }}
+            disabled={syncing || (authMode === 'token' && !token.trim())}
+          >
             {syncing ? 'Sincronizando…' : '🔄 Testar / Sincronizar Issues'}
           </button>
           {lastCount !== null && !error && (
@@ -330,6 +337,11 @@ export function SettingsPage(): React.ReactElement {
         </div>
         {error && (
           <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}>{error}</div>
+        )}
+        {values['github_last_sync'] && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+            Última sincronização: <strong>{fmtLastSync(values['github_last_sync'])}</strong>
+          </div>
         )}
       </div>
 

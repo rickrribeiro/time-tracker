@@ -344,7 +344,11 @@ ipcMain.handle('settings:getAll', async () => {
 // ── IPC: GitHub ───────────────────────────────────────────────────────────────
 
 ipcMain.handle('github:getIssues', () => getGithubIssues())
-ipcMain.handle('github:sync', () => syncGithubIssues())
+ipcMain.handle('github:sync', async () => {
+  const n = await syncGithubIssues()
+  await setSetting('github_last_sync', new Date().toISOString())
+  return n
+})
 ipcMain.handle('github:createLocal', (_, repo: string, title: string, body: string | null) =>
   createLocalIssue(repo, title, body)
 )

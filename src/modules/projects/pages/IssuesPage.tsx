@@ -95,8 +95,14 @@ function IssueCard({ issue, pushing, onPush, onDelete }: CardProps): React.React
   )
 }
 
+function fmtSyncTime(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
 export function IssuesPage(): React.ReactElement {
-  const { issues, refresh, sync, syncing, error, lastCount, createLocal, removeIssue, pushToGithub } =
+  const { issues, refresh, sync, syncing, error, lastCount, lastSyncAt, createLocal, removeIssue, pushToGithub } =
     useGithubStore()
   const { projects, refresh: refreshProjects } = useProjectStore()
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
@@ -275,9 +281,10 @@ export function IssuesPage(): React.ReactElement {
         </div>
       )}
 
-      {lastCount !== null && !error && (
+      {(lastCount !== null || lastSyncAt) && !error && (
         <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>
-          Última sincronização: {lastCount} issues.
+          Última sincronização{lastSyncAt ? `: ${fmtSyncTime(lastSyncAt)}` : ''}
+          {lastCount !== null ? ` · ${lastCount} issues` : ''}
         </p>
       )}
     </div>

@@ -8,6 +8,7 @@ interface GithubState {
   syncing: boolean
   error: string | null
   lastCount: number | null
+  lastSyncAt: string | null // ISO timestamp of the last successful sync
   refresh: () => Promise<void>
   sync: () => Promise<void>
   createLocal: (repo: string, title: string, body: string | null) => Promise<void>
@@ -46,10 +47,14 @@ export const useGithubStore = create<GithubState>((set) => ({
   syncing: false,
   error: null,
   lastCount: null,
+  lastSyncAt: null,
 
   refresh: async () => {
-    const issues = await window.api.github.getIssues()
-    set({ issues })
+    const [issues, lastSyncAt] = await Promise.all([
+      window.api.github.getIssues(),
+      window.api.settings.get('github_last_sync')
+    ])
+    set({ issues, lastSyncAt: lastSyncAt || null })
   },
 
   sync: async () => {
@@ -57,7 +62,8 @@ export const useGithubStore = create<GithubState>((set) => ({
     try {
       const count = await window.api.github.sync()
       const issues = await window.api.github.getIssues()
-      set({ issues, lastCount: count, syncing: false })
+      const lastSyncAt = await window.api.settings.get('github_last_sync')
+      set({ issues, lastCount: count, lastSyncAt: lastSyncAt || null, syncing: false })
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e), syncing: false })
     }

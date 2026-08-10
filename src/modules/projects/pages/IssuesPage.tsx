@@ -99,7 +99,7 @@ export function IssuesPage(): React.ReactElement {
   const { issues, refresh, sync, syncing, error, lastCount, createLocal, removeIssue, pushToGithub } =
     useGithubStore()
   const { projects, refresh: refreshProjects } = useProjectStore()
-  const [projectFilter, setProjectFilter] = useState<number | 'all'>('all')
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [doneFilter, setDoneFilter] = useState<DoneFilter>('week')
 
   // Add-issue form
@@ -119,11 +119,22 @@ export function IssuesPage(): React.ReactElement {
   const linkable = projects
     .map((p) => ({ p, repo: repoFromUrl(p.githubRepoUrl) }))
     .filter((x): x is { p: typeof x.p; repo: string } => !!x.repo)
-  const selectedRepo =
-    projectFilter === 'all' ? null : linkable.find((x) => x.p.id === projectFilter)?.repo ?? null
-  const visible = selectedRepo
-    ? issues.filter((i) => i.repo.toLowerCase() === selectedRepo.toLowerCase())
-    : issues
+
+  function toggleProject(id: number): void {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // repos of the selected projects (empty selection = show all)
+  const selectedRepos = new Set(
+    linkable.filter((x) => selectedIds.has(x.p.id)).map((x) => x.repo.toLowerCase())
+  )
+  const visible =
+    selectedIds.size === 0 ? issues : issues.filter((i) => selectedRepos.has(i.repo.toLowerCase()))
 
   const grouped: Record<BoardColumn, GithubIssue[]> = { backlog: [], 'in-progress': [], blocked: [], done: [] }
   for (const i of visible) {
@@ -166,19 +177,6 @@ export function IssuesPage(): React.ReactElement {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {linkable.length > 0 && (
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            >
-              <option value="all">Todos os projetos</option>
-              {linkable.map((x) => (
-                <option key={x.p.id} value={x.p.id}>
-                  {x.p.name} ({x.repo})
-                </option>
-              ))}
-            </select>
-          )}
           <select value={doneFilter} onChange={(e) => setDoneFilter(e.target.value as DoneFilter)} title="Período das concluídas">
             {DONE_FILTERS.map((f) => (
               <option key={f.key} value={f.key}>Concluídas: {f.label}</option>
@@ -192,6 +190,28 @@ export function IssuesPage(): React.ReactElement {
           </button>
         </div>
       </div>
+
+      {linkable.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 2 }}>Projetos:</span>
+          <button
+            className={`btn btn-sm ${selectedIds.size === 0 ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setSelectedIds(new Set())}
+          >
+            Todos
+          </button>
+          {linkable.map((x) => (
+            <button
+              key={x.p.id}
+              className={`btn btn-sm ${selectedIds.has(x.p.id) ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => toggleProject(x.p.id)}
+              title={x.repo}
+            >
+              {x.p.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {showForm && (
         <div className="chart-section" style={{ marginBottom: 12, maxWidth: 620 }}>

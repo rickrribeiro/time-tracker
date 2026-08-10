@@ -1,5 +1,6 @@
 import http from 'http'
 import crypto from 'crypto'
+import fs from 'fs'
 import { shell } from 'electron'
 import { getSetting, setSetting, replaceGoogleEvents } from '../database/queries'
 import { decodeSecret, encodeSecret } from './secrets'
@@ -7,7 +8,9 @@ import { decodeSecret, encodeSecret } from './secrets'
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 const CALENDAR_API = 'https://www.googleapis.com/calendar/v3'
-const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly'
+// calendar (read) + drive.file (upload app-created backups only)
+const SCOPE =
+  'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.file'
 
 function base64url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -62,6 +65,50 @@ async function addAccount(email: string, refreshToken: string): Promise<void> {
 /** Emails of the connected Google accounts (for the settings UI). */
 export async function listGoogleAccounts(): Promise<string[]> {
   return (await getAccounts()).map((a) => a.email)
+}
+
+/**
+ * Upload a local file to Google Drive (multipart) using a connected account.
+ * Requires the drive.file scope — accounts connected before it was added must
+ * reconnect. Returns the created file's name + shareable link.
+ */
+export async function uploadFileToDrive(
+  filePath: string,
+  fileName: string,
+  email?: string
+): Promise<{ name: string; link: string | null; account: string }> {
+  const accounts = await getAccounts()
+  if (!accounts.length) throw new Error('Nenhuma conta Google conectada.')
+  const acc = (email && accounts.find((a) => a.email === email)) || accounts[0]
+  const token = await accessTokenFor(acc.refreshToken)
+
+  const bytes = fs.readFileSync(filePath)
+  const boundary = 'rickos_' + crypto.randomBytes(8).toString('hex')
+  const meta = JSON.stringify({ name: fileName, mimeType: 'application/x-sqlite3' })
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n`),
+    Buffer.from(`--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`),
+    bytes,
+    Buffer.from(`\r\n--${boundary}--\r\n`)
+  ])
+
+  const res = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body
+    }
+  )
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    if (res.status === 403 || /insufficient|scope/i.test(t)) {
+      throw new Error('Sem permissão de Drive nesta conta. Reconecte-a em Configurações (escopo drive.file).')
+    }
+    throw new Error(`Upload ao Drive falhou (${res.status}). ${t.slice(0, 120)}`)
+  }
+  const j = (await res.json()) as { name?: string; webViewLink?: string }
+  return { name: j.name || fileName, link: j.webViewLink ?? null, account: acc.email }
 }
 
 /**

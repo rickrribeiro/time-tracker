@@ -97,7 +97,7 @@ import {
 import type { DbTransaction, DbSkill, DbAgent } from './database/queries'
 import { syncGithubIssues, createIssueViaClaude } from './services/github'
 import { runClaude } from './services/claude'
-import { connectGoogle, googleConnected, listGoogleAccounts, disconnectGoogle, disconnectGoogleAccount, syncGoogleCalendar } from './services/google'
+import { connectGoogle, googleConnected, listGoogleAccounts, disconnectGoogle, disconnectGoogleAccount, syncGoogleCalendar, uploadFileToDrive } from './services/google'
 import { syncPluggy, pluggyConfigured, createConnectToken } from './services/pluggy'
 import { searchFlightPrice, refreshWatchPrice } from './services/flights'
 import { encodeSecret, decodeSecret } from './services/secrets'
@@ -710,18 +710,64 @@ ipcMain.handle('app:exportDb', async () => {
   await getDb()
   saveDb()
   const dbPath = join(app.getPath('userData'), 'timetracker.db')
-  const options = {
-    title: 'Export Database',
-    defaultPath: 'timetracker_snapshot.sqlite',
-    buttonLabel: 'Export',
-    filters: [{ name: 'SQLite Database', extensions: ['sqlite', 'db'] }]
-  }
-  const result = await dialog.showSaveDialog(options)
-  if (!result.canceled && result.filePath) {
+
+  // Ask where to send the backup: local file or Google Drive (if connected).
+  const connected = await googleConnected()
+  const buttons = connected
+    ? ['Baixar localmente', 'Google Drive', 'Cancelar']
+    : ['Baixar localmente', 'Cancelar']
+  const choice = await dialog.showMessageBox({
+    type: 'question',
+    message: 'Exportar backup do banco',
+    detail: connected
+      ? 'Escolha o destino do backup.'
+      : 'Dica: conecte o Google em Configurações para habilitar o envio ao Drive.',
+    buttons,
+    defaultId: 0,
+    cancelId: buttons.length - 1
+  })
+  const picked = buttons[choice.response]
+
+  if (picked === 'Baixar localmente') {
+    const result = await dialog.showSaveDialog({
+      title: 'Exportar banco',
+      defaultPath: 'timetracker_snapshot.sqlite',
+      buttonLabel: 'Exportar',
+      filters: [{ name: 'SQLite Database', extensions: ['sqlite', 'db'] }]
+    })
+    if (result.canceled || !result.filePath) return { ok: false }
     fs.copyFileSync(dbPath, result.filePath)
-    return true
+    return { ok: true, target: 'local', message: `Backup salvo em ${result.filePath}` }
   }
-  return false
+
+  if (picked === 'Google Drive') {
+    try {
+      const accounts = await listGoogleAccounts()
+      let email: string | undefined = accounts[0]
+      if (accounts.length > 1) {
+        const accBtns = [...accounts, 'Cancelar']
+        const pick = await dialog.showMessageBox({
+          type: 'question',
+          message: 'Enviar para qual conta Google?',
+          buttons: accBtns,
+          defaultId: 0,
+          cancelId: accBtns.length - 1
+        })
+        if (accBtns[pick.response] === 'Cancelar') return { ok: false }
+        email = accBtns[pick.response]
+      }
+      const now = new Date()
+      const pad = (n: number): string => String(n).padStart(2, '0')
+      const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`
+      const fileName = `timetracker_snapshot_${stamp}.sqlite`
+      const r = await uploadFileToDrive(dbPath, fileName, email)
+      return { ok: true, target: 'drive', message: `Enviado ao Google Drive (${r.account}): ${r.name}`, link: r.link }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  return { ok: false }
 })
 
 ipcMain.handle('app:importDb', async (event) => {

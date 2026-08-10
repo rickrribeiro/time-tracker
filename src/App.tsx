@@ -271,12 +271,11 @@ export default function App(): React.ReactElement {
           <button
             className="nav-btn export-btn"
             onClick={async () => {
-              const success = await window.api.app.exportDb()
-              if (success) {
-                alert('Database exported successfully!')
-              }
+              const res = await window.api.app.exportDb()
+              if (res.ok) alert(res.message || 'Backup exportado!')
+              else if (res.error) alert('Falha ao exportar: ' + res.error)
             }}
-            title="Export Database Snapshot"
+            title="Exportar backup (local ou Google Drive)"
             style={{ marginTop: '8px' }}
           >
             <span className="nav-icon">💾</span>

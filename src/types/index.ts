@@ -476,7 +476,7 @@ declare global {
         calendarUpdated: (cb: () => void) => () => void
       }
       app: {
-        exportDb: () => Promise<boolean>
+        exportDb: () => Promise<{ ok: boolean; target?: 'local' | 'drive'; message?: string; error?: string; link?: string | null }>
         importDb: () => Promise<boolean>
         openExternal: (url: string) => Promise<void>
       }

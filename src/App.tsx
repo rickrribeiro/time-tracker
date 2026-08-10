@@ -12,6 +12,9 @@ import { HomePage } from './modules/home/pages/HomePage'
 import { InboxPage } from './modules/inbox/pages/InboxPage'
 import { TodoPage } from './modules/todo/pages/TodoPage'
 import { BrainDumpPage } from './modules/braindump/pages/BrainDumpPage'
+import { EstudosDashboardPage } from './modules/estudos/pages/EstudosDashboardPage'
+import { TopicWorkspacePage } from './modules/estudos/pages/TopicWorkspacePage'
+import { RevisoesPage } from './modules/estudos/pages/RevisoesPage'
 import { ProjectsPage } from './modules/projects/pages/ProjectsPage'
 import { IssuesPage } from './modules/projects/pages/IssuesPage'
 import { HabitsPage } from './modules/habits/pages/HabitsPage'
@@ -70,6 +73,14 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
       { id: 'knowledge', label: 'Base de Conhecimento', icon: '📚' }
     ]
   },
+  {
+    label: 'Estudos',
+    groupIcon: '🎓',
+    items: [
+      { id: 'estudos', label: 'Dashboard', icon: '🎓' },
+      { id: 'estudos-review', label: 'Revisões', icon: '🔁' }
+    ]
+  },
    {
     label: 'Finanças',
     groupIcon: '💰',
@@ -126,6 +137,9 @@ const PAGES: Record<Page, React.ComponentType> = {
   inbox: InboxPage,
   todo: TodoPage,
   braindump: BrainDumpPage,
+  estudos: EstudosDashboardPage,
+  'estudos-topic': TopicWorkspacePage,
+  'estudos-review': RevisoesPage,
   projects: ProjectsPage,
   issues: IssuesPage,
   habits: HabitsPage,

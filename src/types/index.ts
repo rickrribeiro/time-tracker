@@ -282,6 +282,10 @@ export type Page =
   | 'braindump'
   | 'habits'
   | 'knowledge'
+  // Estudos (Learning OS)
+  | 'estudos'
+  | 'estudos-topic'
+  | 'estudos-review'
   // Projetos
   | 'projects'
   | 'issues'

@@ -11,6 +11,7 @@ const TABS_KEY = 'rickos:promptRunnerTabs'
 
 interface RunnerTab {
   id: string
+  title: string
   agentId: string | null
   projectId: number | null
   skillIds: string[]
@@ -25,6 +26,7 @@ interface RunnerTab {
 function makeTab(p: Partial<RunnerTab> = {}): RunnerTab {
   return {
     id: crypto.randomUUID(),
+    title: '',
     agentId: null,
     projectId: null,
     skillIds: [],
@@ -45,6 +47,7 @@ function loadTabs(): RunnerTab[] {
       tabs = raw.map((t) =>
         makeTab({
           id: typeof t.id === 'string' ? t.id : undefined,
+          title: t.title ?? '',
           agentId: t.agentId ?? null,
           projectId: t.projectId ?? null,
           skillIds: Array.isArray(t.skillIds) ? t.skillIds : [],
@@ -79,6 +82,13 @@ export function PromptRunnerPage(): React.ReactElement {
   const [search, setSearch] = useState('')
   const [model, setModel] = useState('')
   const [toast, setToast] = useState('')
+  const [editingTabId, setEditingTabId] = useState<string | null>(null)
+  const [titleDraft, setTitleDraft] = useState('')
+
+  function commitTitle(id: string): void {
+    patchTab(id, { title: titleDraft.trim() })
+    setEditingTabId(null)
+  }
 
   useEffect(() => {
     refreshSkills()
@@ -121,7 +131,7 @@ export function PromptRunnerPage(): React.ReactElement {
 
   // persist tab config + runId (so an in-progress run can be reconnected after navigation)
   useEffect(() => {
-    const slim = tabs.map((t) => ({ id: t.id, agentId: t.agentId, projectId: t.projectId, skillIds: t.skillIds, userPrompt: t.userPrompt, runId: t.runId }))
+    const slim = tabs.map((t) => ({ id: t.id, title: t.title, agentId: t.agentId, projectId: t.projectId, skillIds: t.skillIds, userPrompt: t.userPrompt, runId: t.runId }))
     localStorage.setItem(TABS_KEY, JSON.stringify(slim))
   }, [tabs])
 
@@ -205,6 +215,7 @@ export function PromptRunnerPage(): React.ReactElement {
   }
 
   function tabTitle(t: RunnerTab, i: number): string {
+    if (t.title.trim()) return t.title.trim()
     const base = t.userPrompt.trim().split('\n')[0].slice(0, 16)
     return base || `Aba ${i + 1}`
   }
@@ -237,7 +248,27 @@ export function PromptRunnerPage(): React.ReactElement {
         {tabs.map((t, i) => (
           <div key={t.id} className={`runner-tab ${t.id === activeId ? 'active' : ''}`} onClick={() => setActiveId(t.id)}>
             {t.running && <span className="active-task-dot" style={{ width: 7, height: 7 }} />}
-            <span>{tabTitle(t, i)}</span>
+            {editingTabId === t.id ? (
+              <input
+                className="runner-tab-input"
+                autoFocus
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitTitle(t.id)
+                  else if (e.key === 'Escape') setEditingTabId(null)
+                }}
+                onBlur={() => commitTitle(t.id)}
+              />
+            ) : (
+              <span
+                onDoubleClick={(e) => { e.stopPropagation(); setEditingTabId(t.id); setTitleDraft(t.title || tabTitle(t, i)) }}
+                title="Duplo clique para renomear"
+              >
+                {tabTitle(t, i)}
+              </span>
+            )}
             <button className="runner-tab-close" onClick={(e) => { e.stopPropagation(); closeTab(t.id) }} title="Fechar aba">✕</button>
           </div>
         ))}

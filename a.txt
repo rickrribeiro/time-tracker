@@ -1,0 +1,22 @@
+### AGENTE
+Você é um estrategista de produto. Foque em impacto, escopo e clareza.
+
+### SKILL: Planejamento de Projeto
+Transforme o objetivo a seguir em um plano com marcos, tarefas priorizadas e riscos. Formate como checklist.
+
+### PROMPT DO USUÁRIO
+Quero fazer o planejamento para a execução desse projeto
+deve ser um assistente de apostas de lol que da a probabilidade de qual time vai vencer através dos dados em tempo real da partida.
+O usuário deve ir vendo as estatisticas em tempo real, com o cruzamento de dados, exemplo: os times que mataram um dragão antes dos 15 minutos ganharam 55% dos jogos... vai precisar salvar bastante dados de partidas, precisa ser otimizado.
+links de sites com dados
+https://gol.gg/esports/home/
+https://lol.fandom.com/wiki/League_of_Legends_Esports_Wiki
+https://andydanger.github.io/live-lol-esports/#/
+https://github.com/AndyDanger/live-lol-esports
+
+no momento não quero que desenvolva nada, quero que crie a issue no github com o planejamento total do projeto, para eu revisar e, a partir dela, criar as sub issues de desenvolvimento
+
+faça em tasks separadas
+- quero poder colocar um nome nas abas do prompt runner
+- nos habitos quero ter um stats lá que eu possa ver meio que uma planilha de cada mes dos dias e nos habitos que eu fiz, e alguns dados que possam me ajudar a melhorar os habitos, ex: aos sabaos só completo 50% e terças 100%. Colocar isso na mesma pagina dos habitos, em baixo 
+- no prompt runner não quero o timeout de "Tempo esgotado (120s) executando o Claude CLI.", tem tasks que demoram mais. Seria legal eu conseguir ir acompanhando o que o claude ta fazendo, o pensamento dele para saber qeu ainda ta processando

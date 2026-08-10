@@ -50,6 +50,8 @@ export function SettingsPage(): React.ReactElement {
   // IA (Claude CLI)
   const [claudeCmd, setClaudeCmd] = useState('claude')
   const [claudeSaved, setClaudeSaved] = useState(false)
+  const [allowedTools, setAllowedTools] = useState('')
+  const [toolsSaved, setToolsSaved] = useState(false)
 
   // Skyscanner (RapidAPI)
   const [skyKey, setSkyKey] = useState('')
@@ -94,6 +96,7 @@ export function SettingsPage(): React.ReactElement {
     setPClientSecret(values.pluggy_client_secret ?? '')
     setPItemId(values.pluggy_item_id ?? '')
     setClaudeCmd(values.claude_command ?? 'claude')
+    setAllowedTools(values.claude_allowed_tools ?? '')
     setSkyKey(values.skyscanner_rapidapi_key ?? '')
     setSkyHost(values.skyscanner_rapidapi_host ?? '')
     setAuthMode((values.github_auth_mode as 'token' | 'ssh') || 'token')
@@ -107,6 +110,7 @@ export function SettingsPage(): React.ReactElement {
     values.pluggy_client_secret,
     values.pluggy_item_id,
     values.claude_command,
+    values.claude_allowed_tools,
     values.skyscanner_rapidapi_key,
     values.skyscanner_rapidapi_host
   ])
@@ -122,6 +126,12 @@ export function SettingsPage(): React.ReactElement {
     await set('claude_command', claudeCmd.trim() || 'claude')
     setClaudeSaved(true)
     setTimeout(() => setClaudeSaved(false), 2000)
+  }
+
+  async function saveAllowedTools(): Promise<void> {
+    await set('claude_allowed_tools', allowedTools.trim())
+    setToolsSaved(true)
+    setTimeout(() => setToolsSaved(false), 2000)
   }
 
   async function savePluggy(): Promise<void> {
@@ -463,6 +473,24 @@ export function SettingsPage(): React.ReactElement {
         </div>
         <div style={{ marginTop: 12 }}>
           <button className="btn btn-primary btn-sm" onClick={saveClaudeCmd}>{claudeSaved ? '✓ Salvo' : 'Salvar comando'}</button>
+        </div>
+
+        <div className="editor-field" style={{ marginTop: 16 }}>
+          <label>Ferramentas permitidas</label>
+          <input
+            type="text"
+            placeholder="Bash(gh:*) Bash(git:*) Read Write Edit Glob Grep"
+            value={allowedTools}
+            onChange={(e) => setAllowedTools(e.target.value)}
+          />
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+          O que o Claude pode executar sem pedir aprovação no Prompt Runner/Assistente. Vazio = usa o
+          padrão (<code>gh</code>, <code>git</code> e arquivos). Use <code>Bash</code> para liberar
+          qualquer comando, ou deixe só <code>Read Grep</code> para modo leitura.
+        </p>
+        <div style={{ marginTop: 8 }}>
+          <button className="btn btn-primary btn-sm" onClick={saveAllowedTools}>{toolsSaved ? '✓ Salvo' : 'Salvar ferramentas'}</button>
         </div>
       </div>
 

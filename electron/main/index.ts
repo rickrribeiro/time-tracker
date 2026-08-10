@@ -542,6 +542,46 @@ async function resolveModel(model?: string): Promise<string> {
   return (model || (await getSetting('claude_model')) || '').trim()
 }
 
+// Tools the local Claude may use without an approval prompt (headless `-p` blocks
+// everything else). Default lets it run gh/git and touch files; override via setting.
+const DEFAULT_ALLOWED_TOOLS = 'Bash(gh:*) Bash(git:*) Read Write Edit Glob Grep'
+
+async function resolveAllowedToolsArgs(): Promise<string[]> {
+  const tools = ((await getSetting('claude_allowed_tools')) || DEFAULT_ALLOWED_TOOLS).trim()
+  return tools ? ['--allowedTools', tools] : []
+}
+
+/** Extract `owner/repo` from an https or ssh GitHub URL, else null. */
+function parseRepoSlug(url: string | null): string | null {
+  if (!url) return null
+  const m = url.trim().match(/github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/i)
+  return m ? m[1] : null
+}
+
+/**
+ * Prompt header describing the selected project so the local Claude targets the
+ * right repo. The working directory is the RickOS app (its only remote is
+ * `time-tracker`), so we must tell it the project's repo explicitly and to pass
+ * `--repo` to gh — otherwise it would create issues in the wrong repository.
+ */
+async function buildProjectContext(projectId?: number | null): Promise<string> {
+  if (projectId == null) return ''
+  const p = (await getProjects()).find((x) => x.id === projectId)
+  if (!p) return ''
+  const slug = parseRepoSlug(p.githubRepoUrl)
+  const lines = ['### CONTEXTO DO PROJETO', `Projeto: ${p.name}`]
+  if (p.description) lines.push(`Descrição: ${p.description}`)
+  if (p.githubRepoUrl) lines.push(`Repositório GitHub: ${p.githubRepoUrl}`)
+  if (slug) {
+    lines.push(
+      `Repositório de destino para git/gh: ${slug}`,
+      `IMPORTANTE: sempre use --repo ${slug} nos comandos gh (ex.: gh issue create --repo ${slug} ...).`,
+      'NÃO use o remote da pasta atual — o diretório de trabalho é o app RickOS, não este projeto.'
+    )
+  }
+  return lines.join('\n') + '\n\n'
+}
+
 ipcMain.handle('ai:run', async (_, prompt: string, projectId?: number, model?: string) => {
   return runClaude(prompt, await resolveClaudeCommand(projectId), { model: await resolveModel(model) })
 })
@@ -578,9 +618,12 @@ ipcMain.handle('ai:start', async (_, params: AiStartParams) => {
   aiRuns.set(runId, run)
   const command = await resolveClaudeCommand(params.projectId ?? undefined)
   const model = await resolveModel(params.model)
+  const context = await buildProjectContext(params.projectId)
+  const extraArgs = await resolveAllowedToolsArgs()
 
-  runClaude(params.prompt, command, {
+  runClaude(context + params.prompt, command, {
     model,
+    extraArgs, // libera gh/git/arquivos para o Claude executar (ex.: criar issue)
     timeoutMs: 0, // sem timeout: tarefas podem demorar
     streamJson: true, // transmite texto/pensamento/uso de ferramentas ao vivo
     onChunk: (text) => {
@@ -623,8 +666,11 @@ ipcMain.handle('ai:getRun', (_, runId: string) => {
 // One-shot streaming (used by the Assistente page).
 ipcMain.handle('ai:runStream', async (event, prompt: string, projectId?: number, model?: string, runId?: string) => {
   const command = await resolveClaudeCommand(projectId)
-  return runClaude(prompt, command, {
+  const context = await buildProjectContext(projectId)
+  const extraArgs = await resolveAllowedToolsArgs()
+  return runClaude(context + prompt, command, {
     model: await resolveModel(model),
+    extraArgs,
     onChunk: (text) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:chunk', { runId, text })
     }

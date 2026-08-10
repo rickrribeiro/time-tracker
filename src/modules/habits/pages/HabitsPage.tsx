@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Habit } from '../../../types'
 import { useHabitStore } from '../store/habitStore'
+import { HabitStats } from '../components/HabitStats'
 
 const SUGGESTED = ['Academia', 'Estudar japonês', 'Meditar', 'Dormir antes de 00:00', 'Sem álcool', 'Revisar TODO']
 
@@ -146,6 +147,8 @@ export function HabitsPage(): React.ReactElement {
           )
         })}
       </div>
+
+      <HabitStats />
 
       {editing && <HabitEditor habit={editing} onClose={() => setEditing(null)} />}
     </div>

@@ -11,6 +11,7 @@ import { TasksListPage } from './modules/timetracker/pages/TasksListPage'
 import { HomePage } from './modules/home/pages/HomePage'
 import { InboxPage } from './modules/inbox/pages/InboxPage'
 import { TodoPage } from './modules/todo/pages/TodoPage'
+import { BrainDumpPage } from './modules/braindump/pages/BrainDumpPage'
 import { ProjectsPage } from './modules/projects/pages/ProjectsPage'
 import { IssuesPage } from './modules/projects/pages/IssuesPage'
 import { HabitsPage } from './modules/habits/pages/HabitsPage'
@@ -64,6 +65,7 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
     items: [
       { id: 'inbox', label: 'Inbox', icon: '📥' },
       { id: 'todo', label: 'TODO', icon: '✅' },
+      { id: 'braindump', label: 'Brain Dump', icon: '🧠' },
       { id: 'habits', label: 'Hábitos', icon: '🔥' },
       { id: 'knowledge', label: 'Base de Conhecimento', icon: '📚' }
     ]
@@ -123,6 +125,7 @@ const PAGES: Record<Page, React.ComponentType> = {
   home: HomePage,
   inbox: InboxPage,
   todo: TodoPage,
+  braindump: BrainDumpPage,
   projects: ProjectsPage,
   issues: IssuesPage,
   habits: HabitsPage,

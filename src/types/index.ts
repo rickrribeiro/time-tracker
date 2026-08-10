@@ -228,6 +228,7 @@ export type Page =
   // Organização
   | 'inbox'
   | 'todo'
+  | 'braindump'
   | 'habits'
   | 'knowledge'
   // Projetos

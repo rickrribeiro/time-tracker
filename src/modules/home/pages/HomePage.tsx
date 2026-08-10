@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useUIStore } from '../../../store/uiStore'
 import { useTaskStore } from '../../timetracker/store/taskStore'
 import { useTodoStore } from '../../todo/store/todoStore'
 import { useHabitStore } from '../../habits/store/habitStore'
@@ -18,6 +19,7 @@ function fmtHours(minutes: number): string {
 }
 
 export function HomePage(): React.ReactElement {
+  const { setPage } = useUIStore()
   const { activeTask, refreshActive } = useTaskStore()
   const { todos, refresh: refreshTodos } = useTodoStore()
   const { habits, isDone, refresh: refreshHabits } = useHabitStore()
@@ -76,6 +78,15 @@ export function HomePage(): React.ReactElement {
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{localDateStr(new Date())}</p>
         </div>
       </div>
+
+      <button className="braindump-cta" onClick={() => setPage('braindump')}>
+        <span className="braindump-cta-icon">🧠</span>
+        <span className="braindump-cta-text">
+          <strong>Despejar minha cabeça</strong>
+          <span>Escreva tudo que está pensando · a IA vira tarefas, projetos e agenda</span>
+        </span>
+        <span className="braindump-cta-arrow">→</span>
+      </button>
 
       {/* ── Hoje ── */}
       <div className="dash-section">

@@ -3,6 +3,7 @@ import { useSettingsStore } from '../store/settingsStore'
 import { useGithubStore } from '../../projects/store/githubStore'
 import { useCalendarStore } from '../../calendar/store/calendarStore'
 import { useFinanceStore } from '../../finance/store/financeStore'
+import { PluggyConnect } from 'react-pluggy-connect'
 
 const FX_CURRENCIES = ['BRL', 'USD', 'JPY', 'EUR']
 
@@ -21,6 +22,7 @@ export function SettingsPage(): React.ReactElement {
   const [pItemId, setPItemId] = useState('')
   const [pBusy, setPBusy] = useState(false)
   const [pMsg, setPMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [connectToken, setConnectToken] = useState<string | null>(null)
 
   const [token, setToken] = useState('')
   const [username, setUsername] = useState('')
@@ -114,6 +116,36 @@ export function SettingsPage(): React.ReactElement {
     await set('pluggy_client_secret', pClientSecret.trim())
     await set('pluggy_item_id', pItemId.trim())
     setPMsg({ text: 'Credenciais salvas (criptografadas) ✓', ok: true })
+  }
+
+  async function connectBank(): Promise<void> {
+    // persist creds (needed to mint the connect token) then open the widget
+    await set('pluggy_client_id', pClientId.trim())
+    await set('pluggy_client_secret', pClientSecret.trim())
+    setPMsg(null)
+    try {
+      const t = await window.api.pluggy.connectToken()
+      setConnectToken(t)
+    } catch (e) {
+      setPMsg({ text: e instanceof Error ? e.message : String(e), ok: false })
+    }
+  }
+
+  async function onBankConnected(itemId: string): Promise<void> {
+    setConnectToken(null)
+    setPItemId(itemId)
+    await set('pluggy_item_id', itemId)
+    setPBusy(true)
+    setPMsg(null)
+    try {
+      const r = await window.api.pluggy.sync()
+      await refreshFinance()
+      setPMsg({ text: `Banco conectado! ${r.imported} importadas, ${r.skipped} já existiam.`, ok: true })
+    } catch (e) {
+      setPMsg({ text: e instanceof Error ? e.message : String(e), ok: false })
+    } finally {
+      setPBusy(false)
+    }
   }
 
   async function syncPluggy(): Promise<void> {
@@ -345,7 +377,14 @@ export function SettingsPage(): React.ReactElement {
           <label>Item ID (banco conectado)</label>
           <input type="text" value={pItemId} onChange={(e) => setPItemId(e.target.value)} />
         </div>
-        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+        <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={connectBank}
+            disabled={pBusy || !pClientId.trim() || !pClientSecret.trim()}
+          >
+            🏦 Conectar banco
+          </button>
           <button
             className="btn btn-secondary btn-sm"
             onClick={savePluggy}
@@ -354,17 +393,34 @@ export function SettingsPage(): React.ReactElement {
             💾 Salvar credenciais
           </button>
           <button
-            className="btn btn-primary btn-sm"
+            className="btn btn-secondary btn-sm"
             onClick={syncPluggy}
             disabled={pBusy || !pClientId.trim() || !pClientSecret.trim() || !pItemId.trim()}
           >
             {pBusy ? 'Importando…' : '🔄 Importar transações'}
           </button>
         </div>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+          <strong>Conectar banco</strong> abre o Pluggy Connect para vincular sua conta (gera o Item
+          automaticamente). Depois, o Item ID fica salvo e o import roda sozinho.
+        </p>
         {pMsg && (
           <div style={{ fontSize: 12, color: pMsg.ok ? 'var(--success)' : 'var(--danger)', marginTop: 8 }}>{pMsg.text}</div>
         )}
       </div>
+
+      {connectToken && (
+        <PluggyConnect
+          connectToken={connectToken}
+          includeSandbox={true}
+          onSuccess={(data) => onBankConnected(data.item.id)}
+          onError={(err) => {
+            setConnectToken(null)
+            setPMsg({ text: `Pluggy Connect: ${err?.message || 'falha na conexão'}`, ok: false })
+          }}
+          onClose={() => setConnectToken(null)}
+        />
+      )}
 
       <div className="chart-section" style={{ maxWidth: 560, marginTop: 16 }}>
         <div className="chart-title">🤖 IA (Claude CLI)</div>

@@ -1688,6 +1688,29 @@ async function apiKey() {
   }
   return json.apiKey;
 }
+async function createConnectToken() {
+  const key = await apiKey();
+  let res;
+  try {
+    res = await fetch(`${PLUGGY_API}/connect_token`, {
+      method: "POST",
+      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
+  } catch (e) {
+    throw new Error(`Sem conexão com o Pluggy: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const body = await res.text().catch(() => "");
+  let json = {};
+  try {
+    json = JSON.parse(body);
+  } catch {
+  }
+  if (!res.ok || !json.accessToken) {
+    throw new Error(`Falha ao criar connect token (${res.status}). ${json.message || body.slice(0, 160)}`);
+  }
+  return json.accessToken;
+}
 async function get(path2, key) {
   const res = await fetch(`${PLUGGY_API}${path2}`, { headers: { "X-API-KEY": key } });
   if (!res.ok) {
@@ -2006,6 +2029,7 @@ electron.ipcMain.handle("investments:create", (_, name, type, amount, currency) 
 electron.ipcMain.handle("investments:delete", (_, id) => deleteInvestment(id));
 electron.ipcMain.handle("pluggy:sync", () => syncPluggy());
 electron.ipcMain.handle("pluggy:status", () => pluggyConfigured());
+electron.ipcMain.handle("pluggy:connectToken", () => createConnectToken());
 electron.ipcMain.handle("trips:getAll", () => getTrips());
 electron.ipcMain.handle(
   "trips:create",

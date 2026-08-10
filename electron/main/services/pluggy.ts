@@ -52,6 +52,35 @@ async function apiKey(): Promise<string> {
   return json.apiKey
 }
 
+/**
+ * Create a Pluggy Connect token (server-side) so the renderer can open the
+ * Pluggy Connect widget and let the user link a bank (which yields an itemId).
+ */
+export async function createConnectToken(): Promise<string> {
+  const key = await apiKey()
+  let res: Response
+  try {
+    res = await fetch(`${PLUGGY_API}/connect_token`, {
+      method: 'POST',
+      headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    })
+  } catch (e) {
+    throw new Error(`Sem conexão com o Pluggy: ${e instanceof Error ? e.message : String(e)}`)
+  }
+  const body = await res.text().catch(() => '')
+  let json: { accessToken?: string; message?: string } = {}
+  try {
+    json = JSON.parse(body)
+  } catch {
+    // non-JSON
+  }
+  if (!res.ok || !json.accessToken) {
+    throw new Error(`Falha ao criar connect token (${res.status}). ${json.message || body.slice(0, 160)}`)
+  }
+  return json.accessToken
+}
+
 async function get<T>(path: string, key: string): Promise<T> {
   const res = await fetch(`${PLUGGY_API}${path}`, { headers: { 'X-API-KEY': key } })
   if (!res.ok) {

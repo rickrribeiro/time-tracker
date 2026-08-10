@@ -95,7 +95,7 @@ import type { DbTransaction, DbSkill, DbAgent } from './database/queries'
 import { syncGithubIssues, createIssueViaClaude } from './services/github'
 import { runClaude } from './services/claude'
 import { connectGoogle, googleConnected, disconnectGoogle, syncGoogleCalendar } from './services/google'
-import { syncPluggy, pluggyConfigured } from './services/pluggy'
+import { syncPluggy, pluggyConfigured, createConnectToken } from './services/pluggy'
 import { searchFlightPrice, refreshWatchPrice } from './services/flights'
 import { encodeSecret, decodeSecret } from './services/secrets'
 
@@ -382,6 +382,7 @@ ipcMain.handle('investments:delete', (_, id: number) => deleteInvestment(id))
 
 ipcMain.handle('pluggy:sync', () => syncPluggy())
 ipcMain.handle('pluggy:status', () => pluggyConfigured())
+ipcMain.handle('pluggy:connectToken', () => createConnectToken())
 
 // ── IPC: Travel ───────────────────────────────────────────────────────────────
 

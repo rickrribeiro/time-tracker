@@ -394,6 +394,7 @@ declare global {
       pluggy: {
         sync: () => Promise<{ imported: number; skipped: number }>
         status: () => Promise<boolean>
+        connectToken: () => Promise<string>
       }
       trips: {
         getAll: () => Promise<Trip[]>

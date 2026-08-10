@@ -159,7 +159,8 @@ const api = {
   },
   pluggy: {
     sync: () => ipcRenderer.invoke('pluggy:sync'),
-    status: () => ipcRenderer.invoke('pluggy:status')
+    status: () => ipcRenderer.invoke('pluggy:status'),
+    connectToken: () => ipcRenderer.invoke('pluggy:connectToken')
   },
   trips: {
     getAll: () => ipcRenderer.invoke('trips:getAll'),

@@ -110,7 +110,8 @@ const api = {
   },
   pluggy: {
     sync: () => electron.ipcRenderer.invoke("pluggy:sync"),
-    status: () => electron.ipcRenderer.invoke("pluggy:status")
+    status: () => electron.ipcRenderer.invoke("pluggy:status"),
+    connectToken: () => electron.ipcRenderer.invoke("pluggy:connectToken")
   },
   trips: {
     getAll: () => electron.ipcRenderer.invoke("trips:getAll"),

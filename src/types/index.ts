@@ -48,6 +48,7 @@ export interface Todo {
   dueDate: string | null
   projectId: number | null
   source: string // manual | quick-capture | github
+  aiGenerated: number // 0 | 1 — created by AI
   createdAt: string
 }
 
@@ -306,7 +307,8 @@ declare global {
           source: string,
           priority?: number,
           dueDate?: string | null,
-          projectId?: number | null
+          projectId?: number | null,
+          aiGenerated?: number
         ) => Promise<Todo>
         update: (
           id: number,

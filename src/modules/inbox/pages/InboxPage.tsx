@@ -4,18 +4,25 @@ import { useTodoStore } from '../../todo/store/todoStore'
 import { useProjectStore } from '../../projects/store/projectStore'
 import { TodoEditor } from '../../todo/components/TodoEditor'
 
+type SourceFilter = 'all' | 'ai' | 'manual'
+
 export function InboxPage(): React.ReactElement {
   const { todos, refresh, create, setStatus, remove } = useTodoStore()
   const { refresh: refreshProjects } = useProjectStore()
   const [text, setText] = useState('')
   const [processing, setProcessing] = useState<Todo | null>(null)
+  const [filter, setFilter] = useState<SourceFilter>('all')
 
   useEffect(() => {
     refresh()
     refreshProjects()
   }, [])
 
-  const items = todos.filter((t) => t.status === 'inbox')
+  const inboxItems = todos.filter((t) => t.status === 'inbox')
+  const aiCount = inboxItems.filter((t) => t.aiGenerated === 1).length
+  const items = inboxItems.filter((t) =>
+    filter === 'all' ? true : filter === 'ai' ? t.aiGenerated === 1 : t.aiGenerated !== 1
+  )
 
   async function handleAdd(): Promise<void> {
     const v = text.trim()
@@ -33,7 +40,19 @@ export function InboxPage(): React.ReactElement {
             Capture agora, processe depois. Atalho global: Ctrl+Shift+Space.
           </p>
         </div>
-        <span className="inbox-count">{items.length}</span>
+        <span className="inbox-count">{inboxItems.length}</span>
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
+        {(['all', 'ai', 'manual'] as SourceFilter[]).map((f) => (
+          <button
+            key={f}
+            className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setFilter(f)}
+          >
+            {f === 'all' ? `Todos (${inboxItems.length})` : f === 'ai' ? `🤖 IA (${aiCount})` : `✍️ Manual (${inboxItems.length - aiCount})`}
+          </button>
+        ))}
       </div>
 
       <div className="quick-add-row">
@@ -55,6 +74,7 @@ export function InboxPage(): React.ReactElement {
         {items.map((t) => (
           <div key={t.id} className="list-row">
             <span className="list-row-title">
+              {t.aiGenerated === 1 && <span className="project-chip" title="Gerado por IA" style={{ marginRight: 6 }}>🤖 IA</span>}
               {t.title}
               {t.notes && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-muted)' }}>📝 {t.notes}</span>}
             </span>

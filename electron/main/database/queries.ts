@@ -412,6 +412,7 @@ export interface DbTodo {
   dueDate: string | null
   projectId: number | null
   source: string
+  aiGenerated: number
   createdAt: string
 }
 
@@ -450,14 +451,15 @@ export async function createTodo(
   source: string,
   priority = 0,
   dueDate: string | null = null,
-  projectId: number | null = null
+  projectId: number | null = null,
+  aiGenerated = 0
 ): Promise<DbTodo> {
   const db = await getDb()
   const createdAt = new Date().toISOString()
   run(
     db,
-    'INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [title, notes, status, priority, dueDate, projectId, source, createdAt]
+    'INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [title, notes, status, priority, dueDate, projectId, source, aiGenerated, createdAt]
   )
   const id = lastInsertId(db)
   return getOne<DbTodo>(db, 'SELECT * FROM todos WHERE id = ?', [id])!

@@ -54,8 +54,9 @@ const api = {
       source: string,
       priority = 0,
       dueDate: string | null = null,
-      projectId: number | null = null
-    ) => ipcRenderer.invoke('todos:create', title, notes, status, source, priority, dueDate, projectId),
+      projectId: number | null = null,
+      aiGenerated = 0
+    ) => ipcRenderer.invoke('todos:create', title, notes, status, source, priority, dueDate, projectId, aiGenerated),
     update: (
       id: number,
       title: string,

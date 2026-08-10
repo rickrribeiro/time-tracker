@@ -95,6 +95,17 @@ const MIGRATIONS: Migration[] = [
         // column already exists
       }
     }
+  },
+  {
+    version: 6,
+    label: 'todos.aiGenerated',
+    run: (db) => {
+      try {
+        db.run('ALTER TABLE todos ADD COLUMN aiGenerated INTEGER NOT NULL DEFAULT 0;')
+      } catch {
+        // column already exists
+      }
+    }
   }
 ]
 

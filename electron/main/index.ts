@@ -258,8 +258,9 @@ ipcMain.handle(
     source: string,
     priority: number,
     dueDate: string | null,
-    projectId: number | null
-  ) => createTodo(title, notes, status, source, priority, dueDate, projectId)
+    projectId: number | null,
+    aiGenerated?: number
+  ) => createTodo(title, notes, status, source, priority, dueDate, projectId, aiGenerated ?? 0)
 )
 
 ipcMain.handle(

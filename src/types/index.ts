@@ -434,6 +434,7 @@ declare global {
           agentId?: string | null
           skillIds?: string
           userPrompt?: string
+          save?: boolean
         }) => Promise<string>
         getRun: (runId: string) => Promise<{ status: 'running' | 'done' | 'error' | 'cancelled'; output: string; error: string | null } | null>
         cancel: (runId: string) => Promise<boolean>

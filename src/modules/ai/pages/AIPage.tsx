@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useTodoStore } from '../../todo/store/todoStore'
 import { useHabitStore } from '../../habits/store/habitStore'
 import { useCalendarStore } from '../../calendar/store/calendarStore'
@@ -20,6 +20,8 @@ interface Ctx {
   weekHours: string
   profile: string
 }
+
+const RUN_KEY = 'rickos:assistantRun'
 
 const list = (items: string[]): string => items.map((t) => `- ${t}`).join('\n') || '(nenhum)'
 
@@ -99,6 +101,9 @@ export function AIPage(): React.ReactElement {
   const [model, setModel] = useState('')
   const [weekMinutes, setWeekMinutes] = useState(0)
   const [kb, setKb] = useState(DEFAULT_KNOWLEDGE)
+  const [runId, setRunId] = useState<string | null>(null)
+  // current run id readable inside the stable onChunk/onDone listeners
+  const runIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     rT()
@@ -115,10 +120,61 @@ export function AIPage(): React.ReactElement {
       .daily(localDayStartISO(localDateStr(monday)), localDayEndISO(localDateStr(now)))
       .then((rows) => setWeekMinutes(rows.reduce((s, r) => s + r.totalMinutes, 0)))
 
-    // Stream tokens into the output as they arrive.
-    const off = window.api.ai.onChunk((_runId, text) => setOutput((o) => o + text))
-    return off
+    // Restore the last prompt/output and reconnect to a run still owned by main
+    // (background runs survive navigating away from this page).
+    try {
+      const saved = JSON.parse(localStorage.getItem(RUN_KEY) || 'null')
+      if (saved) {
+        if (typeof saved.prompt === 'string') setPrompt(saved.prompt)
+        if (typeof saved.output === 'string') setOutput(saved.output)
+        if (typeof saved.runId === 'string') {
+          runIdRef.current = saved.runId
+          setRunId(saved.runId)
+          setRunning(true)
+          window.api.ai.getRun(saved.runId).then((r) => {
+            if (!r) {
+              runIdRef.current = null
+              setRunId(null)
+              setRunning(false)
+            } else if (r.status === 'running') {
+              setRunning(true)
+              setOutput(r.output)
+            } else {
+              runIdRef.current = null
+              setRunId(null)
+              setRunning(false)
+              setOutput(r.output)
+              setError(r.error ?? '')
+            }
+          })
+        }
+      }
+    } catch {
+      // ignore corrupt state
+    }
+
+    // Stream tokens / finalize by matching the current run id.
+    const offChunk = window.api.ai.onChunk((rid, text) => {
+      if (rid && rid === runIdRef.current) setOutput((o) => o + text)
+    })
+    const offDone = window.api.ai.onDone(({ runId: rid, ok, output: out, error: err }) => {
+      if (rid !== runIdRef.current) return
+      runIdRef.current = null
+      setRunId(null)
+      setRunning(false)
+      setOutput(out)
+      setError(ok ? '' : err ?? '')
+    })
+    return () => {
+      offChunk()
+      offDone()
+    }
   }, [])
+
+  // persist prompt/output/runId so returning to the page restores/reconnects
+  useEffect(() => {
+    localStorage.setItem(RUN_KEY, JSON.stringify({ prompt, output, runId }))
+  }, [prompt, output, runId])
 
   function changeModel(m: string): void {
     setModel(m)
@@ -136,17 +192,35 @@ export function AIPage(): React.ReactElement {
 
   async function run(text: string): Promise<void> {
     if (!text.trim()) return
-    setRunning(true)
+    // replace any in-flight run (lets a new quick-action overwrite the current one)
+    const prev = runIdRef.current
+    if (prev) {
+      runIdRef.current = null
+      try {
+        await window.api.ai.cancel(prev)
+      } catch {
+        // ignore
+      }
+    }
     setError('')
     setOutput('')
+    setRunning(true)
     try {
-      const result = await window.api.ai.runStream(text, undefined, model)
-      setOutput(result) // canonical final (trimmed), replaces the streamed buffer
+      // main owns the run → it keeps going (and streams) even if we leave the page.
+      // save:false → don't clutter the Prompt Runner history with assistant runs.
+      const rid = await window.api.ai.start({ prompt: text, model, save: false })
+      runIdRef.current = rid
+      setRunId(rid)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
+      runIdRef.current = null
+      setRunId(null)
       setRunning(false)
+      setError(e instanceof Error ? e.message : String(e))
     }
+  }
+
+  async function cancel(): Promise<void> {
+    if (runIdRef.current) await window.api.ai.cancel(runIdRef.current)
   }
 
   return (
@@ -165,7 +239,6 @@ export function AIPage(): React.ReactElement {
           <button
             key={a.key}
             className="btn btn-secondary btn-sm"
-            disabled={running}
             onClick={() => {
               const p = a.build(ctx)
               setPrompt(p)
@@ -185,11 +258,15 @@ export function AIPage(): React.ReactElement {
         style={{ width: '100%', resize: 'vertical' }}
       />
       <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button className="btn btn-primary" disabled={running || !prompt.trim()} onClick={() => run(prompt)}>
-          {running ? 'Executando…' : 'Executar'}
-        </button>
+        {running ? (
+          <button className="btn btn-danger" onClick={cancel}>⏹ Cancelar</button>
+        ) : (
+          <button className="btn btn-primary" disabled={!prompt.trim()} onClick={() => run(prompt)}>
+            Executar
+          </button>
+        )}
         <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>Modelo:</label>
-        <select value={model} onChange={(e) => changeModel(e.target.value)} disabled={running}>
+        <select value={model} onChange={(e) => changeModel(e.target.value)}>
           <option value="">Padrão</option>
           <option value="sonnet">Sonnet</option>
           <option value="opus">Opus</option>
@@ -203,10 +280,10 @@ export function AIPage(): React.ReactElement {
         </div>
       )}
 
-      {output && (
+      {(output || running) && (
         <div className="chart-section" style={{ marginTop: 12 }}>
-          <div className="chart-title">Resposta</div>
-          <pre className="ai-output">{output}</pre>
+          <div className="chart-title">Resposta{running ? ' — executando…' : ''}</div>
+          <pre className="ai-output">{output || '…'}</pre>
         </div>
       )}
     </div>

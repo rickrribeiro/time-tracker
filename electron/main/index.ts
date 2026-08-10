@@ -617,6 +617,7 @@ interface AiStartParams {
   agentId?: string | null
   skillIds?: string
   userPrompt?: string
+  save?: boolean // persist an execution in the AI history (default true)
 }
 
 // Start a run in the background: returns runId immediately. Output accumulates in main,
@@ -647,10 +648,12 @@ ipcMain.handle('ai:start', async (_, params: AiStartParams) => {
     .then(async (result) => {
       run.status = 'done'
       run.output = result
-      try {
-        await createExecution(params.agentId ?? null, params.skillIds ?? '[]', params.userPrompt ?? '', params.prompt, result)
-      } catch {
-        // saving is best-effort
+      if (params.save !== false) {
+        try {
+          await createExecution(params.agentId ?? null, params.skillIds ?? '[]', params.userPrompt ?? '', params.prompt, result)
+        } catch {
+          // saving is best-effort
+        }
       }
       broadcast('ai:done', { runId, ok: true, output: result, error: null })
     })

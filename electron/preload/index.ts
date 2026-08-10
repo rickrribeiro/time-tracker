@@ -229,6 +229,7 @@ const api = {
     runStream: (prompt: string, projectId?: number, model?: string, runId?: string) =>
       ipcRenderer.invoke('ai:runStream', prompt, projectId, model, runId),
     start: (params: {
+      save?: boolean
       prompt: string
       projectId?: number | null
       model?: string

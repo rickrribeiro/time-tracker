@@ -461,6 +461,7 @@ declare global {
       }
       on: {
         quickCapture: (cb: () => void) => () => void
+        calendarUpdated: (cb: () => void) => () => void
       }
       app: {
         exportDb: () => Promise<boolean>

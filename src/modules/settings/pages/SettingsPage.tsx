@@ -325,6 +325,11 @@ export function SettingsPage(): React.ReactElement {
         {gMsg && (
           <div style={{ fontSize: 12, color: gMsg.ok ? 'var(--success)' : 'var(--danger)', marginTop: 8 }}>{gMsg.text}</div>
         )}
+        {gConnected && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+            ⏱️ Sincroniza automaticamente 1×/dia (na abertura do app, se passou 24h).
+          </div>
+        )}
       </div>
 
       <div className="chart-section" style={{ maxWidth: 560, marginTop: 16 }}>

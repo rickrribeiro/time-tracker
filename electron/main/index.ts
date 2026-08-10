@@ -128,6 +128,22 @@ function createWindow(): void {
   }
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Sync the Google Calendar at most once every 24h (if connected). */
+async function maybeAutoSyncGoogle(): Promise<void> {
+  try {
+    if (!(await googleConnected())) return
+    const last = await getSetting('google_last_autosync')
+    if (last && Date.now() - new Date(last).getTime() < DAY_MS) return
+    const n = await syncGoogleCalendar()
+    await setSetting('google_last_autosync', new Date().toISOString())
+    broadcast('calendar:updated', { source: 'google', count: n })
+  } catch {
+    // network/auth error — leave the timestamp so it retries on the next check
+  }
+}
+
 app.whenReady().then(() => {
   createWindow()
 
@@ -140,6 +156,10 @@ app.whenReady().then(() => {
     win.focus()
     win.webContents.send('quick-capture:open')
   })
+
+  // Daily Google Calendar auto-sync: shortly after boot, then re-check every 6h.
+  setTimeout(() => void maybeAutoSyncGoogle(), 8000)
+  setInterval(() => void maybeAutoSyncGoogle(), 6 * 60 * 60 * 1000)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -251,6 +251,11 @@ const api = {
       const listener = (): void => cb()
       ipcRenderer.on('quick-capture:open', listener)
       return () => ipcRenderer.removeListener('quick-capture:open', listener)
+    },
+    calendarUpdated: (cb: () => void) => {
+      const listener = (): void => cb()
+      ipcRenderer.on('calendar:updated', listener)
+      return () => ipcRenderer.removeListener('calendar:updated', listener)
     }
   },
   // App

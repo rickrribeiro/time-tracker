@@ -14,6 +14,8 @@ export function UpcomingMeetings(): React.ReactElement {
 
   useEffect(() => {
     refresh()
+    // refresh when the daily Google auto-sync updates events
+    return window.api.on.calendarUpdated(() => refresh())
   }, [])
 
   async function handleAdd(): Promise<void> {
@@ -50,7 +52,7 @@ export function UpcomingMeetings(): React.ReactElement {
 
       <div className="list-stack" style={{ marginTop: 8 }}>
         {upcoming.length === 0 && (
-          <div className="empty-hint">Sem eventos. Adicione manualmente (sync Google em breve).</div>
+          <div className="empty-hint">Sem eventos. Adicione manualmente ou conecte o Google (sync automático 1×/dia).</div>
         )}
         {upcoming.map((e) => (
           <div key={e.id} className="list-row">

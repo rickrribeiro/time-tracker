@@ -68,15 +68,7 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
       { id: 'knowledge', label: 'Base de Conhecimento', icon: '📚' }
     ]
   },
-  {
-    label: 'Projetos',
-    groupIcon: '📁',
-    items: [
-      { id: 'projects', label: 'Projetos', icon: '🗂' },
-      { id: 'issues', label: 'Issues (Kanban)', icon: '📌' }
-    ]
-  },
-  {
+   {
     label: 'Finanças',
     groupIcon: '💰',
     items: [
@@ -87,6 +79,15 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
       { id: 'reports', label: 'Relatórios', icon: '🧾' }
     ]
   },
+  {
+    label: 'Projetos',
+    groupIcon: '📁',
+    items: [
+      { id: 'projects', label: 'Projetos', icon: '🗂' },
+      { id: 'issues', label: 'Issues (Kanban)', icon: '📌' }
+    ]
+  },
+  
   {
     label: 'Viagens',
     groupIcon: '✈️',

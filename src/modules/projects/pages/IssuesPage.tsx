@@ -117,6 +117,7 @@ export function IssuesPage(): React.ReactElement {
   }, [])
 
   const linkable = projects
+    .filter((p) => p.archived !== 1)
     .map((p) => ({ p, repo: repoFromUrl(p.githubRepoUrl) }))
     .filter((x): x is { p: typeof x.p; repo: string } => !!x.repo)
 

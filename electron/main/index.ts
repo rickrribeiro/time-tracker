@@ -547,6 +547,8 @@ ipcMain.handle('ai:start', async (_, params: AiStartParams) => {
 
   runClaude(params.prompt, command, {
     model,
+    timeoutMs: 0, // sem timeout: tarefas podem demorar
+    streamJson: true, // transmite texto/pensamento/uso de ferramentas ao vivo
     onChunk: (text) => {
       run.output += text
       broadcast('ai:chunk', { runId, text })

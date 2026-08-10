@@ -1296,18 +1296,21 @@ function attempt(bin, prompt, viaShell, opts = {}) {
     const env = { ...process.env, PATH: buildPath() };
     const model = opts.model?.trim();
     const extra = opts.extraArgs ?? [];
+    const streamJson = !!opts.streamJson;
+    const jsonArgs = streamJson ? ["--output-format", "stream-json", "--verbose", "--include-partial-messages"] : [];
+    const jsonShell = streamJson ? " --output-format stream-json --verbose --include-partial-messages" : "";
     const stdio = ["ignore", "pipe", "pipe"];
     let child;
     if (viaShell) {
       const shell = process.env.SHELL || "/bin/zsh";
       const modelPart = model ? ' --model "$RICKOS_MODEL"' : "";
       const extraPart = extra.length ? " " + extra.map(shquote).join(" ") : "";
-      child = child_process.spawn(shell, ["-ilc", `${bin}${extraPart}${modelPart} -p "$RICKOS_PROMPT"`], {
+      child = child_process.spawn(shell, ["-ilc", `${bin}${extraPart}${modelPart}${jsonShell} -p "$RICKOS_PROMPT"`], {
         env: { ...env, RICKOS_PROMPT: prompt, RICKOS_MODEL: model || "" },
         stdio
       });
     } else {
-      const args = [...extra, ...model ? ["--model", model] : [], "-p", prompt];
+      const args = [...extra, ...model ? ["--model", model] : [], ...jsonArgs, "-p", prompt];
       child = child_process.spawn(bin, args, { env, stdio });
     }
     opts.registerChild?.(() => {
@@ -1319,30 +1322,77 @@ function attempt(bin, prompt, viaShell, opts = {}) {
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const timer = setTimeout(() => {
+    let lineBuf = "";
+    let assistantText = "";
+    let finalText = null;
+    const processLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      let evt;
+      try {
+        evt = JSON.parse(trimmed);
+      } catch {
+        return;
+      }
+      if (evt.type === "stream_event" && evt.event) {
+        const ev = evt.event;
+        if (ev.type === "content_block_start" && ev.content_block) {
+          if (ev.content_block.type === "thinking") opts.onChunk?.("\n💭 ");
+          else if (ev.content_block.type === "tool_use") opts.onChunk?.(`
+🔧 ${ev.content_block.name || "tool"} `);
+        } else if (ev.type === "content_block_delta" && ev.delta) {
+          if (ev.delta.type === "text_delta" && ev.delta.text) {
+            assistantText += ev.delta.text;
+            opts.onChunk?.(ev.delta.text);
+          } else if (ev.delta.type === "thinking_delta" && ev.delta.thinking) {
+            opts.onChunk?.(ev.delta.thinking);
+          }
+        }
+      } else if (evt.type === "result" && typeof evt.result === "string") {
+        finalText = evt.result;
+      }
+    };
+    const timeoutMs = opts.timeoutMs ?? TIMEOUT_MS;
+    const timer = timeoutMs > 0 ? setTimeout(() => {
       if (settled) return;
       settled = true;
       child.kill("SIGKILL");
-      reject(new Error("Tempo esgotado (120s) executando o Claude CLI."));
-    }, TIMEOUT_MS);
+      reject(new Error(`Tempo esgotado (${Math.round(timeoutMs / 1e3)}s) executando o Claude CLI.`));
+    }, timeoutMs) : null;
+    const clear = () => {
+      if (timer) clearTimeout(timer);
+    };
     child.stdout.on("data", (d) => {
       const text = d.toString();
       stdout += text;
-      opts.onChunk?.(text);
+      if (streamJson) {
+        lineBuf += text;
+        let idx;
+        while ((idx = lineBuf.indexOf("\n")) >= 0) {
+          processLine(lineBuf.slice(0, idx));
+          lineBuf = lineBuf.slice(idx + 1);
+        }
+      } else {
+        opts.onChunk?.(text);
+      }
     });
     child.stderr.on("data", (d) => stderr += d.toString());
     child.on("error", (err) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      clear();
       reject(err);
     });
     child.on("close", (code) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
-      if (code === 0) resolve(stdout.trim());
-      else reject(new Error(stderr.trim() || `Claude CLI saiu com código ${code}.`));
+      clear();
+      if (streamJson && lineBuf.trim()) processLine(lineBuf);
+      if (code === 0) {
+        resolve(streamJson ? finalText ?? (assistantText.trim() || stdout.trim()) : stdout.trim());
+      } else {
+        reject(new Error(stderr.trim() || (streamJson ? finalText ?? "" : "") || `Claude CLI saiu com código ${code}.`));
+      }
     });
   });
 }
@@ -2172,6 +2222,10 @@ electron.ipcMain.handle("ai:start", async (_, params) => {
   const model = await resolveModel(params.model);
   runClaude(params.prompt, command, {
     model,
+    timeoutMs: 0,
+    // sem timeout: tarefas podem demorar
+    streamJson: true,
+    // transmite texto/pensamento/uso de ferramentas ao vivo
     onChunk: (text) => {
       run2.output += text;
       broadcast("ai:chunk", { runId, text });

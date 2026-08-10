@@ -3,6 +3,7 @@ import { useUIStore } from '../../../store/uiStore'
 import { useStudyStore } from '../store/studyStore'
 import { RoadmapTree } from '../components/RoadmapTree'
 import { NoteEditor } from '../components/NoteEditor'
+import { FlashcardPanel } from '../components/FlashcardPanel'
 
 export function TopicWorkspacePage(): React.ReactElement {
   const { setPage } = useUIStore()
@@ -53,7 +54,7 @@ export function TopicWorkspacePage(): React.ReactElement {
         </div>
         <div className="study-col study-col-cards">
           <div className="chart-title">🃏 Flashcards</div>
-          <div className="empty-hint">Flashcards em breve.</div>
+          <FlashcardPanel />
         </div>
       </div>
     </div>

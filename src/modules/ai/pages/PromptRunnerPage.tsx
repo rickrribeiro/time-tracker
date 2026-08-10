@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSkillStore, parseTags } from '../store/skillStore'
 import { useAgentStore } from '../store/agentStore'
 import { useProjectStore } from '../../projects/store/projectStore'
@@ -21,6 +21,7 @@ interface RunnerTab {
   running: boolean
   runId: string | null
   error: string
+  unseen: boolean // finished run not yet viewed (tab wasn't active when it completed)
 }
 
 function makeTab(p: Partial<RunnerTab> = {}): RunnerTab {
@@ -35,6 +36,7 @@ function makeTab(p: Partial<RunnerTab> = {}): RunnerTab {
     running: false,
     runId: null,
     error: '',
+    unseen: false,
     ...p
   }
 }
@@ -80,10 +82,23 @@ export function PromptRunnerPage(): React.ReactElement {
   const [tabs, setTabs] = useState<RunnerTab[]>(loadTabs)
   const [activeId, setActiveId] = useState<string>(tabs[0].id)
   const [search, setSearch] = useState('')
+  const [showAllSkills, setShowAllSkills] = useState(false)
   const [model, setModel] = useState('')
   const [toast, setToast] = useState('')
   const [editingTabId, setEditingTabId] = useState<string | null>(null)
   const [titleDraft, setTitleDraft] = useState('')
+
+  // current active tab id readable inside stable event listeners (ai:done)
+  const activeIdRef = useRef(activeId)
+  useEffect(() => {
+    activeIdRef.current = activeId
+  }, [activeId])
+
+  /** Select a tab and clear its "finished-unseen" flag. */
+  function selectTab(id: string): void {
+    setActiveId(id)
+    setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, unseen: false } : t)))
+  }
 
   function commitTitle(id: string): void {
     patchTab(id, { title: titleDraft.trim() })
@@ -107,7 +122,8 @@ export function PromptRunnerPage(): React.ReactElement {
               if (x.id !== t.id || x.runId !== rid) return x
               if (!r) return { ...x, runId: null, running: false }
               if (r.status === 'running') return { ...x, running: true, output: r.output }
-              return { ...x, running: false, runId: null, output: r.output, error: r.error ?? '' }
+              // finished while we were away → flag as unseen unless this tab is active
+              return { ...x, running: false, runId: null, output: r.output, error: r.error ?? '', unseen: x.id !== activeIdRef.current }
             })
           )
         })
@@ -120,7 +136,13 @@ export function PromptRunnerPage(): React.ReactElement {
       setTabs((prev) => prev.map((t) => (t.runId === runId ? { ...t, output: t.output + text } : t)))
     })
     const offDone = window.api.ai.onDone(({ runId, ok, output, error }) => {
-      setTabs((prev) => prev.map((t) => (t.runId === runId ? { ...t, running: false, runId: null, output, error: ok ? '' : error ?? '' } : t)))
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.runId === runId
+            ? { ...t, running: false, runId: null, output, error: ok ? '' : error ?? '', unseen: t.id !== activeIdRef.current }
+            : t
+        )
+      )
     })
     return () => {
       offChunk()
@@ -148,10 +170,15 @@ export function PromptRunnerPage(): React.ReactElement {
 
   const finalPrompt = composeFor(active)
 
+  const activeAgent = useMemo(() => agents.find((a) => a.id === active.agentId) ?? null, [agents, active.agentId])
+  const agentSkillIds = useMemo(() => (activeAgent ? parseTags(activeAgent.defaultSkillIds) : []), [activeAgent])
+
   const filteredSkills = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return skills.filter((s) => !q || s.name.toLowerCase().includes(q) || parseTags(s.tags).some((t) => t.includes(q)))
-  }, [skills, search])
+    // when an agent is selected, restrict to its default skills unless "ver todas" is on
+    const base = activeAgent && !showAllSkills ? skills.filter((s) => agentSkillIds.includes(s.id)) : skills
+    return base.filter((s) => !q || s.name.toLowerCase().includes(q) || parseTags(s.tags).some((t) => t.includes(q)))
+  }, [skills, search, activeAgent, agentSkillIds, showAllSkills])
 
   function flash(m: string): void {
     setToast(m)
@@ -246,8 +273,14 @@ export function PromptRunnerPage(): React.ReactElement {
       {/* Tabs */}
       <div className="runner-tabs">
         {tabs.map((t, i) => (
-          <div key={t.id} className={`runner-tab ${t.id === activeId ? 'active' : ''}`} onClick={() => setActiveId(t.id)}>
+          <div
+            key={t.id}
+            className={`runner-tab ${t.id === activeId ? 'active' : ''} ${t.running ? 'running' : ''} ${t.unseen ? 'unseen' : ''}`}
+            onClick={() => selectTab(t.id)}
+            title={t.running ? 'Executando…' : t.unseen ? 'Execução concluída (não vista)' : undefined}
+          >
             {t.running && <span className="active-task-dot" style={{ width: 7, height: 7 }} />}
+            {!t.running && t.unseen && <span className="runner-tab-unseen-dot" />}
             {editingTabId === t.id ? (
               <input
                 className="runner-tab-input"
@@ -295,12 +328,23 @@ export function PromptRunnerPage(): React.ReactElement {
             </div>
           </div>
           <input type="text" placeholder="🔍 Buscar skills…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ margin: '8px 0' }} />
-          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn btn-secondary btn-sm" onClick={() => patchActive({ skillIds: favSkillIds })}>★ Favoritas</button>
             <button className="btn btn-secondary btn-sm" onClick={() => patchActive({ skillIds: [] })}>Limpar</button>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center' }}>{active.skillIds.length} sel.</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{active.skillIds.length} sel.</span>
+            {activeAgent && (
+              <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', color: 'var(--text-muted)' }}>
+                <input type="checkbox" checked={showAllSkills} onChange={(e) => setShowAllSkills(e.target.checked)} />
+                Ver todas
+              </label>
+            )}
           </div>
           <div className="skill-checklist" style={{ flex: 1, minHeight: 200 }}>
+            {filteredSkills.length === 0 && (
+              <div className="empty-hint" style={{ fontSize: 12 }}>
+                {activeAgent && !showAllSkills ? 'Este agente não tem skills padrão. Marque “Ver todas”.' : 'Nenhuma skill.'}
+              </div>
+            )}
             {filteredSkills.map((s) => (
               <label key={s.id} className="skill-check-row">
                 <input type="checkbox" checked={active.skillIds.includes(s.id)} onChange={() => toggleSkill(active.id, s.id)} />

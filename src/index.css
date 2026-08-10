@@ -1923,6 +1923,24 @@ select:focus {
   color: var(--accent-hover);
   border-color: var(--accent);
 }
+/* status accents: running (amber) and finished-unseen (green) */
+.runner-tab.running {
+  border-color: var(--warning, #f59e0b);
+}
+.runner-tab.unseen {
+  border-color: var(--success);
+  color: var(--success);
+}
+.runner-tab.unseen:not(.active) {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+}
+.runner-tab-unseen-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+}
 .runner-tab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .runner-tab-close {
   color: var(--text-muted);

@@ -1,6 +1,16 @@
 import { create } from 'zustand'
 import { Account, Category, Transaction, Budget, Investment, InvestmentHistory } from '../../../types'
-import { currentMonth } from '../util'
+import { currentMonth, setMoneyHidden } from '../util'
+
+const HIDDEN_KEY = 'rickos:financeHidden'
+const initialHidden = ((): boolean => {
+  try {
+    return localStorage.getItem(HIDDEN_KEY) === '1'
+  } catch {
+    return false
+  }
+})()
+setMoneyHidden(initialHidden) // keep formatMoney in sync from first render
 
 interface FinanceState {
   month: string
@@ -13,8 +23,10 @@ interface FinanceState {
   investmentHistory: InvestmentHistory[] // all-time monthly snapshots
   base: string
   rates: Record<string, number>
+  hidden: boolean // privacy mode: mask money values
 
   setMonth: (m: string) => void
+  toggleHidden: () => void
   refresh: () => Promise<void>
   saveFxConfig: (base: string, rates: Record<string, number>) => Promise<void>
 
@@ -46,10 +58,22 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
   investmentHistory: [],
   base: 'BRL',
   rates: {},
+  hidden: initialHidden,
 
   setMonth: (m) => {
     set({ month: m })
     get().refresh()
+  },
+
+  toggleHidden: () => {
+    const next = !get().hidden
+    setMoneyHidden(next)
+    try {
+      localStorage.setItem(HIDDEN_KEY, next ? '1' : '0')
+    } catch {
+      // ignore storage errors
+    }
+    set({ hidden: next })
   },
 
   refresh: async () => {

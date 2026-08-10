@@ -20,8 +20,15 @@ export function monthLabel(month: string): string {
 
 const SYMBOL: Record<string, string> = { BRL: 'R$', USD: '$', JPY: '¥', EUR: '€' }
 
+// Privacy mode: when on, formatMoney masks amounts (kept in sync by financeStore).
+let moneyHidden = false
+export function setMoneyHidden(v: boolean): void {
+  moneyHidden = v
+}
+
 export function formatMoney(amount: number, currency = 'BRL'): string {
   const sym = SYMBOL[currency] ?? currency + ' '
+  if (moneyHidden) return `${sym} ••••`
   return `${sym}${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 

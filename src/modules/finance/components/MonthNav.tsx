@@ -3,18 +3,27 @@ import { useFinanceStore } from '../store/financeStore'
 import { monthLabel, shiftMonth } from '../util'
 
 export function MonthNav(): React.ReactElement {
-  const { month, setMonth } = useFinanceStore()
+  const { month, setMonth, hidden, toggleHidden } = useFinanceStore()
   return (
-    <div className="date-nav">
-      <button className="date-nav-btn" onClick={() => setMonth(shiftMonth(month, -1))}>
-        ‹
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <button
+        className="date-nav-btn"
+        onClick={toggleHidden}
+        title={hidden ? 'Mostrar valores' : 'Ocultar valores'}
+      >
+        {hidden ? '🙈' : '👁'}
       </button>
-      <span className="date-display" style={{ minWidth: 160, textTransform: 'capitalize' }}>
-        {monthLabel(month)}
-      </span>
-      <button className="date-nav-btn" onClick={() => setMonth(shiftMonth(month, 1))}>
-        ›
-      </button>
+      <div className="date-nav">
+        <button className="date-nav-btn" onClick={() => setMonth(shiftMonth(month, -1))}>
+          ‹
+        </button>
+        <span className="date-display" style={{ minWidth: 160, textTransform: 'capitalize' }}>
+          {monthLabel(month)}
+        </span>
+        <button className="date-nav-btn" onClick={() => setMonth(shiftMonth(month, 1))}>
+          ›
+        </button>
+      </div>
     </div>
   )
 }

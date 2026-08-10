@@ -7,6 +7,19 @@ import { PluggyConnect } from 'react-pluggy-connect'
 
 const FX_CURRENCIES = ['BRL', 'USD', 'JPY', 'EUR']
 
+function fmtLastSync(iso?: string): string {
+  if (!iso) return 'nunca'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return 'nunca'
+  return d.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 export function SettingsPage(): React.ReactElement {
   const { values, refresh, set } = useSettingsStore()
   const { sync, syncing, error, lastCount } = useGithubStore()
@@ -155,6 +168,7 @@ export function SettingsPage(): React.ReactElement {
     try {
       const r = await window.api.pluggy.sync()
       await refreshFinance()
+      await refresh()
       setPMsg({ text: `${r.imported} importadas, ${r.skipped} já existiam.`, ok: true })
     } catch (e) {
       setPMsg({ text: e instanceof Error ? e.message : String(e), ok: false })
@@ -197,6 +211,7 @@ export function SettingsPage(): React.ReactElement {
     try {
       const n = await window.api.google.sync()
       await refreshEvents()
+      await refresh()
       setGMsg({ text: `${n} eventos sincronizados.`, ok: true })
     } catch (e) {
       setGMsg({ text: e instanceof Error ? e.message : String(e), ok: false })
@@ -328,6 +343,7 @@ export function SettingsPage(): React.ReactElement {
         {gConnected && (
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
             ⏱️ Sincroniza automaticamente 1×/dia (na abertura do app, se passou 24h).
+            <br />Última sincronização: <strong>{fmtLastSync(values['google_last_sync'])}</strong>
           </div>
         )}
       </div>
@@ -412,6 +428,9 @@ export function SettingsPage(): React.ReactElement {
         {pMsg && (
           <div style={{ fontSize: 12, color: pMsg.ok ? 'var(--success)' : 'var(--danger)', marginTop: 8 }}>{pMsg.text}</div>
         )}
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+          Última sincronização: <strong>{fmtLastSync(values['pluggy_last_sync'])}</strong>
+        </div>
       </div>
 
       {connectToken && (
@@ -464,6 +483,9 @@ export function SettingsPage(): React.ReactElement {
         </div>
         <div style={{ marginTop: 12 }}>
           <button className="btn btn-primary btn-sm" onClick={saveSky}>{skySaved ? '✓ Salvo' : 'Salvar'}</button>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+          Última busca de voos: <strong>{fmtLastSync(values['skyscanner_last_sync'])}</strong>
         </div>
       </div>
     </div>

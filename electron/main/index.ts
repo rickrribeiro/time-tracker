@@ -134,10 +134,10 @@ const DAY_MS = 24 * 60 * 60 * 1000
 async function maybeAutoSyncGoogle(): Promise<void> {
   try {
     if (!(await googleConnected())) return
-    const last = await getSetting('google_last_autosync')
+    const last = await getSetting('google_last_sync')
     if (last && Date.now() - new Date(last).getTime() < DAY_MS) return
     const n = await syncGoogleCalendar()
-    await setSetting('google_last_autosync', new Date().toISOString())
+    await setSetting('google_last_sync', new Date().toISOString())
     broadcast('calendar:updated', { source: 'google', count: n })
   } catch {
     // network/auth error — leave the timestamp so it retries on the next check
@@ -369,7 +369,11 @@ ipcMain.handle('calendar:delete', (_, id: number) => deleteCalendarEvent(id))
 ipcMain.handle('google:connect', () => connectGoogle())
 ipcMain.handle('google:status', () => googleConnected())
 ipcMain.handle('google:disconnect', () => disconnectGoogle())
-ipcMain.handle('google:sync', () => syncGoogleCalendar())
+ipcMain.handle('google:sync', async () => {
+  const n = await syncGoogleCalendar()
+  await setSetting('google_last_sync', new Date().toISOString())
+  return n
+})
 
 // ── IPC: Finance ──────────────────────────────────────────────────────────────
 
@@ -401,7 +405,11 @@ ipcMain.handle('investments:delete', (_, id: number) => deleteInvestment(id))
 
 // ── IPC: Open Finance (Pluggy) ────────────────────────────────────────────────
 
-ipcMain.handle('pluggy:sync', () => syncPluggy())
+ipcMain.handle('pluggy:sync', async () => {
+  const r = await syncPluggy()
+  await setSetting('pluggy_last_sync', new Date().toISOString())
+  return r
+})
 ipcMain.handle('pluggy:status', () => pluggyConfigured())
 ipcMain.handle('pluggy:connectToken', () => createConnectToken())
 
@@ -421,10 +429,16 @@ ipcMain.handle('flights:create', (_, tripId: number | null, origin: string | nul
   createFlightWatch(tripId, origin, destination, price, currency, new Date().toISOString())
 )
 ipcMain.handle('flights:delete', (_, id: number) => deleteFlightWatch(id))
-ipcMain.handle('flights:search', (_, origin: string, destination: string, currency: string, date?: string | null) =>
-  searchFlightPrice(origin, destination, currency, date)
-)
-ipcMain.handle('flights:refreshWatch', (_, id: number) => refreshWatchPrice(id))
+ipcMain.handle('flights:search', async (_, origin: string, destination: string, currency: string, date?: string | null) => {
+  const r = await searchFlightPrice(origin, destination, currency, date)
+  await setSetting('skyscanner_last_sync', new Date().toISOString())
+  return r
+})
+ipcMain.handle('flights:refreshWatch', async (_, id: number) => {
+  const r = await refreshWatchPrice(id)
+  await setSetting('skyscanner_last_sync', new Date().toISOString())
+  return r
+})
 
 ipcMain.handle('tripDocs:get', (_, tripId: number) => getTripDocuments(tripId))
 ipcMain.handle('tripDocs:set', (_, tripId: number, item: string, checked: number) =>

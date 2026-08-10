@@ -217,6 +217,56 @@ export interface Link {
   createdAt: string
 }
 
+export interface StudyTopic {
+  id: number
+  name: string
+  category: string | null
+  status: string // studying | planned | paused | completed
+  targetDate: string | null
+  priority: number
+  color: string
+  createdAt: string
+}
+export interface StudyNode {
+  id: number
+  topicId: number
+  parentId: number | null
+  title: string
+  description: string | null
+  status: string // todo | doing | done
+  orderIndex: number
+  estimatedHours: number | null
+  completedAt: string | null
+  createdAt: string
+}
+export interface StudyNote {
+  id: number
+  topicId: number
+  nodeId: number | null
+  content: string
+  updatedAt: string
+}
+export interface StudyFlashcard {
+  id: number
+  topicId: number
+  nodeId: number | null
+  front: string
+  back: string
+  easeFactor: number
+  intervalDays: number
+  repetitions: number
+  nextReviewAt: string | null
+  lastReviewedAt: string | null
+  createdAt: string
+}
+export interface StudyBundle {
+  topic: StudyTopic
+  nodes: StudyNode[]
+  notes: StudyNote[]
+  flashcards: StudyFlashcard[]
+}
+export type StudyIoResult = { ok: boolean; topicId?: number; message?: string; error?: string }
+
 export type Page =
   // Time Tracker (existente)
   | 'timeline'
@@ -473,6 +523,30 @@ declare global {
         update: (id: number, title: string, url: string, tags?: string) => Promise<void>
         setChecked: (id: number, checked: number) => Promise<void>
         delete: (id: number) => Promise<void>
+      }
+      study: {
+        topics: () => Promise<StudyTopic[]>
+        createTopic: (name: string, category: string | null, status: string, targetDate: string | null, priority: number, color: string) => Promise<StudyTopic>
+        updateTopic: (id: number, name: string, category: string | null, status: string, targetDate: string | null, priority: number, color: string) => Promise<StudyTopic>
+        deleteTopic: (id: number) => Promise<void>
+        nodes: (topicId: number) => Promise<StudyNode[]>
+        createNode: (topicId: number, parentId: number | null, title: string, description: string | null, estimatedHours: number | null) => Promise<StudyNode>
+        updateNode: (id: number, title: string, description: string | null, status: string, estimatedHours: number | null) => Promise<StudyNode>
+        deleteNode: (id: number) => Promise<void>
+        moveNode: (id: number, dir: 'up' | 'down') => Promise<void>
+        getNote: (topicId: number, nodeId: number | null) => Promise<StudyNote | null>
+        saveNote: (topicId: number, nodeId: number | null, content: string) => Promise<StudyNote>
+        flashcards: (topicId?: number) => Promise<StudyFlashcard[]>
+        due: (nowISO: string) => Promise<StudyFlashcard[]>
+        createFlashcard: (topicId: number, nodeId: number | null, front: string, back: string) => Promise<StudyFlashcard>
+        updateFlashcard: (id: number, front: string, back: string) => Promise<StudyFlashcard>
+        deleteFlashcard: (id: number) => Promise<void>
+        reviewFlashcard: (id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string) => Promise<StudyFlashcard>
+        exportMarkdown: (topicId: number) => Promise<StudyIoResult>
+        exportJson: (topicId: number) => Promise<boolean>
+        importJson: () => Promise<StudyIoResult>
+        exportFolder: (topicId: number) => Promise<StudyIoResult>
+        importFolder: () => Promise<StudyIoResult>
       }
       on: {
         quickCapture: (cb: () => void) => () => void

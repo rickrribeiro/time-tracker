@@ -92,9 +92,28 @@ import {
   createLink,
   updateLink,
   setLinkChecked,
-  deleteLink
+  deleteLink,
+  getStudyTopics,
+  createStudyTopic,
+  updateStudyTopic,
+  deleteStudyTopic,
+  getStudyNodes,
+  createStudyNode,
+  updateStudyNode,
+  deleteStudyNode,
+  moveStudyNode,
+  getStudyNote,
+  saveStudyNote,
+  getStudyFlashcards,
+  getDueFlashcards,
+  createStudyFlashcard,
+  updateStudyFlashcard,
+  deleteStudyFlashcard,
+  reviewStudyFlashcard,
+  getStudyBundle,
+  importStudyBundle
 } from './database/queries'
-import type { DbTransaction, DbSkill, DbAgent } from './database/queries'
+import type { DbTransaction, DbSkill, DbAgent, StudyBundle } from './database/queries'
 import { syncGithubIssues, createIssueViaClaude } from './services/github'
 import { runClaude } from './services/claude'
 import { connectGoogle, googleConnected, listGoogleAccounts, disconnectGoogle, disconnectGoogleAccount, syncGoogleCalendar, uploadFileToDrive } from './services/google'
@@ -491,6 +510,133 @@ ipcMain.handle('links:create', (_, title: string, url: string, tags?: string) =>
 ipcMain.handle('links:update', (_, id: number, title: string, url: string, tags?: string) => updateLink(id, title, url, tags))
 ipcMain.handle('links:setChecked', (_, id: number, checked: number) => setLinkChecked(id, checked))
 ipcMain.handle('links:delete', (_, id: number) => deleteLink(id))
+
+// ── IPC: Estudos (Learning OS) ────────────────────────────────────────────────
+ipcMain.handle('study:topics', () => getStudyTopics())
+ipcMain.handle('study:createTopic', (_, name: string, category: string | null, status: string, targetDate: string | null, priority: number, color: string) =>
+  createStudyTopic(name, category, status, targetDate, priority, color))
+ipcMain.handle('study:updateTopic', (_, id: number, name: string, category: string | null, status: string, targetDate: string | null, priority: number, color: string) =>
+  updateStudyTopic(id, name, category, status, targetDate, priority, color))
+ipcMain.handle('study:deleteTopic', (_, id: number) => deleteStudyTopic(id))
+
+ipcMain.handle('study:nodes', (_, topicId: number) => getStudyNodes(topicId))
+ipcMain.handle('study:createNode', (_, topicId: number, parentId: number | null, title: string, description: string | null, estimatedHours: number | null) =>
+  createStudyNode(topicId, parentId, title, description, estimatedHours))
+ipcMain.handle('study:updateNode', (_, id: number, title: string, description: string | null, status: string, estimatedHours: number | null) =>
+  updateStudyNode(id, title, description, status, estimatedHours))
+ipcMain.handle('study:deleteNode', (_, id: number) => deleteStudyNode(id))
+ipcMain.handle('study:moveNode', (_, id: number, dir: 'up' | 'down') => moveStudyNode(id, dir))
+
+ipcMain.handle('study:getNote', (_, topicId: number, nodeId: number | null) => getStudyNote(topicId, nodeId))
+ipcMain.handle('study:saveNote', (_, topicId: number, nodeId: number | null, content: string) => saveStudyNote(topicId, nodeId, content))
+
+ipcMain.handle('study:flashcards', (_, topicId?: number) => getStudyFlashcards(topicId))
+ipcMain.handle('study:due', (_, nowISO: string) => getDueFlashcards(nowISO))
+ipcMain.handle('study:createFlashcard', (_, topicId: number, nodeId: number | null, front: string, back: string) =>
+  createStudyFlashcard(topicId, nodeId, front, back))
+ipcMain.handle('study:updateFlashcard', (_, id: number, front: string, back: string) => updateStudyFlashcard(id, front, back))
+ipcMain.handle('study:deleteFlashcard', (_, id: number) => deleteStudyFlashcard(id))
+ipcMain.handle('study:reviewFlashcard', (_, id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string) =>
+  reviewStudyFlashcard(id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt))
+
+// ── IPC: Estudos export/import ────────────────────────────────────────────────
+function studySlug(s: string): string {
+  return (
+    s
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^\w\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .toLowerCase() || 'topico'
+  )
+}
+
+/** Consolidate a topic bundle into a single Markdown "caderno" (roadmap order). */
+function studyToMarkdown(bundle: StudyBundle): string {
+  const lines: string[] = [`# ${bundle.topic.name}`, '']
+  const noteByNode = new Map<number | null, string>()
+  for (const n of bundle.notes) noteByNode.set(n.nodeId, n.content)
+  const childrenOf = (pid: number | null): typeof bundle.nodes =>
+    bundle.nodes
+      .filter((x) => (x.parentId ?? null) === pid)
+      .sort((a, b) => a.orderIndex - b.orderIndex || a.id - b.id)
+  const topicNote = noteByNode.get(null)
+  if (topicNote && topicNote.trim()) lines.push(topicNote.trim(), '')
+  const walk = (pid: number | null, level: number): void => {
+    for (const node of childrenOf(pid)) {
+      const h = '#'.repeat(Math.min(6, level + 1))
+      lines.push(`${h} ${node.title}${node.status === 'done' ? ' ✓' : ''}`, '')
+      if (node.description) lines.push(node.description, '')
+      const note = noteByNode.get(node.id)
+      if (note && note.trim()) lines.push(note.trim(), '')
+      walk(node.id, level + 1)
+    }
+  }
+  walk(null, 1)
+  return lines.join('\n')
+}
+
+ipcMain.handle('study:exportMarkdown', async (_, topicId: number) => {
+  const bundle = await getStudyBundle(topicId)
+  if (!bundle) return { ok: false }
+  const result = await dialog.showSaveDialog({
+    title: 'Exportar caderno',
+    defaultPath: `${studySlug(bundle.topic.name)}.md`,
+    filters: [{ name: 'Markdown', extensions: ['md'] }]
+  })
+  if (result.canceled || !result.filePath) return { ok: false }
+  fs.writeFileSync(result.filePath, studyToMarkdown(bundle))
+  return { ok: true, message: `Caderno salvo em ${result.filePath}` }
+})
+
+ipcMain.handle('study:exportJson', async (_, topicId: number) => {
+  const bundle = await getStudyBundle(topicId)
+  if (!bundle) return false
+  return exportJson(`${studySlug(bundle.topic.name)}.study.json`, bundle)
+})
+
+ipcMain.handle('study:importJson', async () => {
+  const bundle = await readJson<StudyBundle>()
+  if (!bundle || !bundle.topic) return { ok: false }
+  const topicId = await importStudyBundle(bundle)
+  return { ok: true, topicId }
+})
+
+ipcMain.handle('study:exportFolder', async (_, topicId: number) => {
+  const bundle = await getStudyBundle(topicId)
+  if (!bundle) return { ok: false }
+  const result = await dialog.showOpenDialog({
+    title: 'Escolha a pasta de destino',
+    properties: ['openDirectory', 'createDirectory']
+  })
+  if (result.canceled || !result.filePaths[0]) return { ok: false }
+  const root = join(result.filePaths[0], studySlug(bundle.topic.name))
+  fs.mkdirSync(root, { recursive: true })
+  fs.writeFileSync(join(root, 'roadmap.json'), JSON.stringify(bundle, null, 2))
+  const noteByNode = new Map<number | null, string>()
+  for (const n of bundle.notes) noteByNode.set(n.nodeId, n.content)
+  for (const node of bundle.nodes) {
+    const note = noteByNode.get(node.id) ?? ''
+    const body = `# ${node.title}\n\n${node.description ? node.description + '\n\n' : ''}${note}`
+    fs.writeFileSync(join(root, `${String(node.orderIndex).padStart(3, '0')}-${studySlug(node.title)}.md`), body)
+  }
+  return { ok: true, message: `Exportado para ${root}` }
+})
+
+ipcMain.handle('study:importFolder', async () => {
+  const result = await dialog.showOpenDialog({ title: 'Escolha a pasta do tópico', properties: ['openDirectory'] })
+  if (result.canceled || !result.filePaths[0]) return { ok: false }
+  const roadmapPath = join(result.filePaths[0], 'roadmap.json')
+  if (!fs.existsSync(roadmapPath)) return { ok: false, error: 'roadmap.json não encontrado na pasta.' }
+  try {
+    const bundle = JSON.parse(fs.readFileSync(roadmapPath, 'utf8')) as StudyBundle
+    const topicId = await importStudyBundle(bundle)
+    return { ok: true, topicId }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
 
 // Per-entity JSON export/import (mirrors app:exportDb using dialog + fs)
 async function exportJson(defaultName: string, data: unknown): Promise<boolean> {

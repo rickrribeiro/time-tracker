@@ -224,6 +224,36 @@ const api = {
     setChecked: (id: number, checked: number) => ipcRenderer.invoke('links:setChecked', id, checked),
     delete: (id: number) => ipcRenderer.invoke('links:delete', id)
   },
+  study: {
+    topics: () => ipcRenderer.invoke('study:topics'),
+    createTopic: (name: string, category: string | null, status: string, targetDate: string | null, priority: number, color: string) =>
+      ipcRenderer.invoke('study:createTopic', name, category, status, targetDate, priority, color),
+    updateTopic: (id: number, name: string, category: string | null, status: string, targetDate: string | null, priority: number, color: string) =>
+      ipcRenderer.invoke('study:updateTopic', id, name, category, status, targetDate, priority, color),
+    deleteTopic: (id: number) => ipcRenderer.invoke('study:deleteTopic', id),
+    nodes: (topicId: number) => ipcRenderer.invoke('study:nodes', topicId),
+    createNode: (topicId: number, parentId: number | null, title: string, description: string | null, estimatedHours: number | null) =>
+      ipcRenderer.invoke('study:createNode', topicId, parentId, title, description, estimatedHours),
+    updateNode: (id: number, title: string, description: string | null, status: string, estimatedHours: number | null) =>
+      ipcRenderer.invoke('study:updateNode', id, title, description, status, estimatedHours),
+    deleteNode: (id: number) => ipcRenderer.invoke('study:deleteNode', id),
+    moveNode: (id: number, dir: 'up' | 'down') => ipcRenderer.invoke('study:moveNode', id, dir),
+    getNote: (topicId: number, nodeId: number | null) => ipcRenderer.invoke('study:getNote', topicId, nodeId),
+    saveNote: (topicId: number, nodeId: number | null, content: string) => ipcRenderer.invoke('study:saveNote', topicId, nodeId, content),
+    flashcards: (topicId?: number) => ipcRenderer.invoke('study:flashcards', topicId),
+    due: (nowISO: string) => ipcRenderer.invoke('study:due', nowISO),
+    createFlashcard: (topicId: number, nodeId: number | null, front: string, back: string) =>
+      ipcRenderer.invoke('study:createFlashcard', topicId, nodeId, front, back),
+    updateFlashcard: (id: number, front: string, back: string) => ipcRenderer.invoke('study:updateFlashcard', id, front, back),
+    deleteFlashcard: (id: number) => ipcRenderer.invoke('study:deleteFlashcard', id),
+    reviewFlashcard: (id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string) =>
+      ipcRenderer.invoke('study:reviewFlashcard', id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt),
+    exportMarkdown: (topicId: number) => ipcRenderer.invoke('study:exportMarkdown', topicId),
+    exportJson: (topicId: number) => ipcRenderer.invoke('study:exportJson', topicId),
+    importJson: () => ipcRenderer.invoke('study:importJson'),
+    exportFolder: (topicId: number) => ipcRenderer.invoke('study:exportFolder', topicId),
+    importFolder: () => ipcRenderer.invoke('study:importFolder')
+  },
   // AI (Claude CLI)
   ai: {
     run: (prompt: string, projectId?: number, model?: string) => ipcRenderer.invoke('ai:run', prompt, projectId, model),

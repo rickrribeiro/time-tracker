@@ -1392,3 +1392,312 @@ export async function deleteLink(id: number): Promise<void> {
   const db = await getDb()
   run(db, 'DELETE FROM links WHERE id = ?', [id])
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Estudos (Learning OS): topics, roadmap nodes, notes, flashcards
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface DbStudyTopic {
+  id: number
+  name: string
+  category: string | null
+  status: string
+  targetDate: string | null
+  priority: number
+  color: string
+  createdAt: string
+}
+export interface DbStudyNode {
+  id: number
+  topicId: number
+  parentId: number | null
+  title: string
+  description: string | null
+  status: string
+  orderIndex: number
+  estimatedHours: number | null
+  completedAt: string | null
+  createdAt: string
+}
+export interface DbStudyNote {
+  id: number
+  topicId: number
+  nodeId: number | null
+  content: string
+  updatedAt: string
+}
+export interface DbStudyFlashcard {
+  id: number
+  topicId: number
+  nodeId: number | null
+  front: string
+  back: string
+  easeFactor: number
+  intervalDays: number
+  repetitions: number
+  nextReviewAt: string | null
+  lastReviewedAt: string | null
+  createdAt: string
+}
+
+// ── Topics ──
+export async function getStudyTopics(): Promise<DbStudyTopic[]> {
+  const db = await getDb()
+  return getAll<DbStudyTopic>(db, 'SELECT * FROM study_topics ORDER BY priority DESC, name ASC')
+}
+export async function createStudyTopic(
+  name: string,
+  category: string | null,
+  status: string,
+  targetDate: string | null,
+  priority: number,
+  color: string
+): Promise<DbStudyTopic> {
+  const db = await getDb()
+  run(
+    db,
+    'INSERT INTO study_topics (name, category, status, targetDate, priority, color, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [name, category, status, targetDate, priority, color, new Date().toISOString()]
+  )
+  return getOne<DbStudyTopic>(db, 'SELECT * FROM study_topics WHERE id = ?', [lastInsertId(db)])!
+}
+export async function updateStudyTopic(
+  id: number,
+  name: string,
+  category: string | null,
+  status: string,
+  targetDate: string | null,
+  priority: number,
+  color: string
+): Promise<DbStudyTopic> {
+  const db = await getDb()
+  run(
+    db,
+    'UPDATE study_topics SET name = ?, category = ?, status = ?, targetDate = ?, priority = ?, color = ? WHERE id = ?',
+    [name, category, status, targetDate, priority, color, id]
+  )
+  return getOne<DbStudyTopic>(db, 'SELECT * FROM study_topics WHERE id = ?', [id])!
+}
+export async function deleteStudyTopic(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM study_topics WHERE id = ?', [id]) // children cascade (FKs on)
+}
+
+// ── Roadmap nodes ──
+export async function getStudyNodes(topicId: number): Promise<DbStudyNode[]> {
+  const db = await getDb()
+  return getAll<DbStudyNode>(db, 'SELECT * FROM study_nodes WHERE topicId = ? ORDER BY orderIndex ASC, id ASC', [topicId])
+}
+export async function createStudyNode(
+  topicId: number,
+  parentId: number | null,
+  title: string,
+  description: string | null,
+  estimatedHours: number | null
+): Promise<DbStudyNode> {
+  const db = await getDb()
+  // append at the end of its sibling group
+  const siblings = getAll<{ n: number }>(
+    db,
+    'SELECT COALESCE(MAX(orderIndex), -1) + 1 AS n FROM study_nodes WHERE topicId = ? AND IFNULL(parentId, -1) = IFNULL(?, -1)',
+    [topicId, parentId]
+  )
+  const orderIndex = siblings[0]?.n ?? 0
+  run(
+    db,
+    'INSERT INTO study_nodes (topicId, parentId, title, description, status, orderIndex, estimatedHours, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [topicId, parentId, title, description, 'todo', orderIndex, estimatedHours, new Date().toISOString()]
+  )
+  return getOne<DbStudyNode>(db, 'SELECT * FROM study_nodes WHERE id = ?', [lastInsertId(db)])!
+}
+export async function updateStudyNode(
+  id: number,
+  title: string,
+  description: string | null,
+  status: string,
+  estimatedHours: number | null
+): Promise<DbStudyNode> {
+  const db = await getDb()
+  const completedAt = status === 'done' ? new Date().toISOString() : null
+  run(
+    db,
+    'UPDATE study_nodes SET title = ?, description = ?, status = ?, estimatedHours = ?, completedAt = ? WHERE id = ?',
+    [title, description, status, estimatedHours, completedAt, id]
+  )
+  return getOne<DbStudyNode>(db, 'SELECT * FROM study_nodes WHERE id = ?', [id])!
+}
+export async function deleteStudyNode(id: number): Promise<void> {
+  const db = await getDb()
+  // delete the whole subtree (self-ref FK cascade isn't reliable in sql.js)
+  const all = getAll<DbStudyNode>(db, 'SELECT id, parentId FROM study_nodes')
+  const toDelete = new Set<number>([id])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const n of all) {
+      if (n.parentId != null && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
+        toDelete.add(n.id)
+        grew = true
+      }
+    }
+  }
+  for (const nid of toDelete) run(db, 'DELETE FROM study_nodes WHERE id = ?', [nid])
+}
+/** Swap orderIndex with the previous/next sibling (same topic + parent). */
+export async function moveStudyNode(id: number, dir: 'up' | 'down'): Promise<void> {
+  const db = await getDb()
+  const node = getOne<DbStudyNode>(db, 'SELECT * FROM study_nodes WHERE id = ?', [id])
+  if (!node) return
+  const siblings = getAll<DbStudyNode>(
+    db,
+    'SELECT * FROM study_nodes WHERE topicId = ? AND IFNULL(parentId, -1) = IFNULL(?, -1) ORDER BY orderIndex ASC, id ASC',
+    [node.topicId, node.parentId]
+  )
+  const idx = siblings.findIndex((s) => s.id === id)
+  const swapWith = dir === 'up' ? siblings[idx - 1] : siblings[idx + 1]
+  if (!swapWith) return
+  run(db, 'UPDATE study_nodes SET orderIndex = ? WHERE id = ?', [swapWith.orderIndex, node.id])
+  run(db, 'UPDATE study_nodes SET orderIndex = ? WHERE id = ?', [node.orderIndex, swapWith.id])
+}
+
+// ── Notes (one per node; nodeId null = topic-level) ──
+export async function getStudyNote(topicId: number, nodeId: number | null): Promise<DbStudyNote | null> {
+  const db = await getDb()
+  return nodeId == null
+    ? getOne<DbStudyNote>(db, 'SELECT * FROM study_notes WHERE topicId = ? AND nodeId IS NULL', [topicId])
+    : getOne<DbStudyNote>(db, 'SELECT * FROM study_notes WHERE nodeId = ?', [nodeId])
+}
+export async function saveStudyNote(topicId: number, nodeId: number | null, content: string): Promise<DbStudyNote> {
+  const db = await getDb()
+  const existing = await getStudyNote(topicId, nodeId)
+  const now = new Date().toISOString()
+  if (existing) {
+    run(db, 'UPDATE study_notes SET content = ?, updatedAt = ? WHERE id = ?', [content, now, existing.id])
+    return getOne<DbStudyNote>(db, 'SELECT * FROM study_notes WHERE id = ?', [existing.id])!
+  }
+  run(db, 'INSERT INTO study_notes (topicId, nodeId, content, updatedAt) VALUES (?, ?, ?, ?)', [topicId, nodeId, content, now])
+  return getOne<DbStudyNote>(db, 'SELECT * FROM study_notes WHERE id = ?', [lastInsertId(db)])!
+}
+
+// ── Flashcards ──
+export async function getStudyFlashcards(topicId?: number): Promise<DbStudyFlashcard[]> {
+  const db = await getDb()
+  return topicId == null
+    ? getAll<DbStudyFlashcard>(db, 'SELECT * FROM study_flashcards ORDER BY id DESC')
+    : getAll<DbStudyFlashcard>(db, 'SELECT * FROM study_flashcards WHERE topicId = ? ORDER BY id DESC', [topicId])
+}
+export async function getDueFlashcards(nowISO: string): Promise<DbStudyFlashcard[]> {
+  const db = await getDb()
+  return getAll<DbStudyFlashcard>(
+    db,
+    'SELECT * FROM study_flashcards WHERE nextReviewAt IS NULL OR nextReviewAt <= ? ORDER BY nextReviewAt ASC, id ASC',
+    [nowISO]
+  )
+}
+export async function createStudyFlashcard(
+  topicId: number,
+  nodeId: number | null,
+  front: string,
+  back: string
+): Promise<DbStudyFlashcard> {
+  const db = await getDb()
+  run(
+    db,
+    'INSERT INTO study_flashcards (topicId, nodeId, front, back, createdAt) VALUES (?, ?, ?, ?, ?)',
+    [topicId, nodeId, front, back, new Date().toISOString()]
+  )
+  return getOne<DbStudyFlashcard>(db, 'SELECT * FROM study_flashcards WHERE id = ?', [lastInsertId(db)])!
+}
+export async function updateStudyFlashcard(id: number, front: string, back: string): Promise<DbStudyFlashcard> {
+  const db = await getDb()
+  run(db, 'UPDATE study_flashcards SET front = ?, back = ? WHERE id = ?', [front, back, id])
+  return getOne<DbStudyFlashcard>(db, 'SELECT * FROM study_flashcards WHERE id = ?', [id])!
+}
+export async function deleteStudyFlashcard(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM study_flashcards WHERE id = ?', [id])
+}
+/** Persist the SRS schedule computed in the renderer. */
+export async function reviewStudyFlashcard(
+  id: number,
+  easeFactor: number,
+  intervalDays: number,
+  repetitions: number,
+  nextReviewAt: string,
+  lastReviewedAt: string
+): Promise<DbStudyFlashcard> {
+  const db = await getDb()
+  run(
+    db,
+    'UPDATE study_flashcards SET easeFactor = ?, intervalDays = ?, repetitions = ?, nextReviewAt = ?, lastReviewedAt = ? WHERE id = ?',
+    [easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, id]
+  )
+  return getOne<DbStudyFlashcard>(db, 'SELECT * FROM study_flashcards WHERE id = ?', [id])!
+}
+
+// ── Export bundle (all rows for one topic) ──
+export interface StudyBundle {
+  topic: DbStudyTopic
+  nodes: DbStudyNode[]
+  notes: DbStudyNote[]
+  flashcards: DbStudyFlashcard[]
+}
+export async function getStudyBundle(topicId: number): Promise<StudyBundle | null> {
+  const db = await getDb()
+  const topic = getOne<DbStudyTopic>(db, 'SELECT * FROM study_topics WHERE id = ?', [topicId])
+  if (!topic) return null
+  return {
+    topic,
+    nodes: getAll<DbStudyNode>(db, 'SELECT * FROM study_nodes WHERE topicId = ? ORDER BY orderIndex ASC, id ASC', [topicId]),
+    notes: getAll<DbStudyNote>(db, 'SELECT * FROM study_notes WHERE topicId = ?', [topicId]),
+    flashcards: getAll<DbStudyFlashcard>(db, 'SELECT * FROM study_flashcards WHERE topicId = ?', [topicId])
+  }
+}
+/** Recreate a topic from a bundle, assigning fresh ids and remapping parent/node refs. */
+export async function importStudyBundle(bundle: StudyBundle): Promise<number> {
+  const db = await getDb()
+  const now = new Date().toISOString()
+  const t = bundle.topic
+  run(
+    db,
+    'INSERT INTO study_topics (name, category, status, targetDate, priority, color, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [t.name, t.category, t.status ?? 'studying', t.targetDate, t.priority ?? 0, t.color ?? '#6366f1', now]
+  )
+  const newTopicId = lastInsertId(db)
+
+  // nodes: insert respecting parent order so parents exist first; remap ids
+  const nodeIdMap = new Map<number, number>()
+  const remaining = [...(bundle.nodes ?? [])]
+  let guard = remaining.length + 5
+  while (remaining.length && guard-- > 0) {
+    for (let i = 0; i < remaining.length; ) {
+      const n = remaining[i]
+      const parentReady = n.parentId == null || nodeIdMap.has(n.parentId)
+      if (!parentReady) {
+        i++
+        continue
+      }
+      run(
+        db,
+        'INSERT INTO study_nodes (topicId, parentId, title, description, status, orderIndex, estimatedHours, completedAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [newTopicId, n.parentId == null ? null : nodeIdMap.get(n.parentId) ?? null, n.title, n.description ?? null, n.status ?? 'todo', n.orderIndex ?? 0, n.estimatedHours ?? null, n.completedAt ?? null, n.createdAt ?? now]
+      )
+      nodeIdMap.set(n.id, lastInsertId(db))
+      remaining.splice(i, 1)
+    }
+  }
+
+  for (const note of bundle.notes ?? []) {
+    const mappedNode = note.nodeId == null ? null : nodeIdMap.get(note.nodeId) ?? null
+    run(db, 'INSERT INTO study_notes (topicId, nodeId, content, updatedAt) VALUES (?, ?, ?, ?)', [newTopicId, mappedNode, note.content ?? '', note.updatedAt ?? now])
+  }
+  for (const fc of bundle.flashcards ?? []) {
+    const mappedNode = fc.nodeId == null ? null : nodeIdMap.get(fc.nodeId) ?? null
+    run(
+      db,
+      'INSERT INTO study_flashcards (topicId, nodeId, front, back, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [newTopicId, mappedNode, fc.front, fc.back, fc.easeFactor ?? 2.5, fc.intervalDays ?? 0, fc.repetitions ?? 0, fc.nextReviewAt ?? null, fc.lastReviewedAt ?? null, fc.createdAt ?? now]
+    )
+  }
+  return newTopicId
+}

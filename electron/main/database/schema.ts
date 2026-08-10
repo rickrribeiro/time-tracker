@@ -226,4 +226,51 @@ export const SCHEMA = `
     tags TEXT NOT NULL DEFAULT '[]',
     createdAt TEXT NOT NULL
   );
+
+  -- ── Estudos (Learning OS) ──
+  CREATE TABLE IF NOT EXISTS study_topics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    category TEXT,
+    status TEXT NOT NULL DEFAULT 'studying',  -- studying | planned | paused | completed
+    targetDate TEXT,
+    priority INTEGER NOT NULL DEFAULT 0,
+    color TEXT NOT NULL DEFAULT '#6366f1',
+    createdAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS study_nodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topicId INTEGER NOT NULL REFERENCES study_topics(id) ON DELETE CASCADE,
+    parentId INTEGER,                        -- self-ref; null = raiz
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'todo',     -- todo | doing | done
+    orderIndex INTEGER NOT NULL DEFAULT 0,
+    estimatedHours REAL,
+    completedAt TEXT,
+    createdAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS study_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topicId INTEGER NOT NULL REFERENCES study_topics(id) ON DELETE CASCADE,
+    nodeId INTEGER REFERENCES study_nodes(id) ON DELETE CASCADE,  -- null = nota do tópico
+    content TEXT NOT NULL DEFAULT '',
+    updatedAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS study_flashcards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topicId INTEGER NOT NULL REFERENCES study_topics(id) ON DELETE CASCADE,
+    nodeId INTEGER REFERENCES study_nodes(id) ON DELETE SET NULL,
+    front TEXT NOT NULL,
+    back TEXT NOT NULL,
+    easeFactor REAL NOT NULL DEFAULT 2.5,
+    intervalDays INTEGER NOT NULL DEFAULT 0,
+    repetitions INTEGER NOT NULL DEFAULT 0,
+    nextReviewAt TEXT,
+    lastReviewedAt TEXT,
+    createdAt TEXT NOT NULL
+  );
 `;

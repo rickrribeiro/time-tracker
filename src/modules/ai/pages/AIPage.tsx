@@ -239,16 +239,16 @@ export function AIPage(): React.ReactElement {
           <button
             key={a.key}
             className="btn btn-secondary btn-sm"
-            onClick={() => {
-              const p = a.build(ctx)
-              setPrompt(p)
-              run(p)
-            }}
+            title="Preenche o prompt abaixo (não executa automaticamente)"
+            onClick={() => setPrompt(a.build(ctx))}
           >
             {a.label}
           </button>
         ))}
       </div>
+      <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 8px' }}>
+        Clique num atalho para preencher o prompt (pode trocar/editar) e depois em <strong>Executar</strong>.
+      </p>
 
       <textarea
         rows={4}

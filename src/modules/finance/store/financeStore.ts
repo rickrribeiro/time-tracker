@@ -62,7 +62,8 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
         window.api.transactions.getAll(),
         window.api.budgets.getForMonth(month),
         window.api.investments.getAll(),
-        window.api.investments.history(),
+        // guard: a stale preload (dev not fully restarted) may lack `history`
+        window.api.investments.history ? window.api.investments.history() : Promise.resolve([]),
         window.api.settings.get('finance_base'),
         window.api.settings.get('finance_rates')
       ])

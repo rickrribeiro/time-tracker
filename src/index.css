@@ -1803,3 +1803,16 @@ select:focus {
   background: var(--accent);
   color: white;
 }
+
+.collapse-all-btn {
+  display: block;
+  margin: 0 4px 6px auto;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+}
+.collapse-all-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}

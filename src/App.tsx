@@ -168,6 +168,19 @@ export default function App(): React.ReactElement {
     })
   }, [])
 
+  const labeledGroups = NAV_GROUPS.filter((g) => g.label).map((g) => g.label)
+  const allCollapsed = labeledGroups.every((l) => collapsed[l])
+
+  const toggleAll = useCallback(() => {
+    setCollapsed(() => {
+      const next: Record<string, boolean> = {}
+      // if everything is already collapsed, expand all; otherwise collapse all
+      for (const l of labeledGroups) next[l] = !allCollapsed
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [allCollapsed]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     refreshTags()
     refreshActive()
@@ -203,6 +216,13 @@ export default function App(): React.ReactElement {
           <span className="logo-text">RickOS</span>
         </div>
         <div className="nav-list">
+          <button
+            className="collapse-all-btn"
+            onClick={toggleAll}
+            title={allCollapsed ? 'Expandir todos os grupos' : 'Colapsar todos os grupos'}
+          >
+            {allCollapsed ? '⊞ Expandir tudo' : '⊟ Colapsar tudo'}
+          </button>
           {NAV_GROUPS.map((group, gi) => {
             const collapsible = !!group.label
             const isCollapsed = collapsible && collapsed[group.label]

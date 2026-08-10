@@ -1768,10 +1768,20 @@ function defaultDate() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 async function resolvePlace(query, key, host) {
-  const res = await fetch(`https://${host}/flights/auto-complete?query=${encodeURIComponent(query)}`, {
-    headers: headers(key, host)
-  });
-  if (!res.ok) throw new Error(`auto-complete falhou (${res.status}).`);
+  const url = `https://${host}/flights/auto-complete?query=${encodeURIComponent(query)}`;
+  const res = await fetch(url, { headers: headers(key, host) });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    if (res.status === 404) {
+      throw new Error(
+        `auto-complete 404 em ${host}. O host/endpoint não bate com a API Skyscanner assinada. URL: ${url}. Ajuste o host em Configurações (ex.: sky-scanner3.p.rapidapi.com) ou me diga qual API do RapidAPI você assinou.`
+      );
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`Não autorizado (${res.status}) no ${host}. Verifique a RapidAPI Key e se você está inscrito nessa API.`);
+    }
+    throw new Error(`auto-complete falhou (${res.status}) em ${host}. ${body.slice(0, 120)}`);
+  }
   const json = await res.json();
   const first = (json.data ?? [])[0];
   if (!first) throw new Error(`Local não encontrado: "${query}".`);

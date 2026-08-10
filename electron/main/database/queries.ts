@@ -730,10 +730,12 @@ export async function getUpcomingEvents(fromISO: string, limit: number): Promise
 
 export async function getEventsForRange(startISO: string, endISO: string): Promise<DbCalendarEvent[]> {
   const db = await getDb()
+  // Overlap semantics: any event that intersects [startISO, endISO), so multi-day
+  // events show on every day they span (not only the day they start on).
   return getAll<DbCalendarEvent>(
     db,
-    'SELECT * FROM calendar_events WHERE startTime >= ? AND startTime < ? ORDER BY startTime ASC',
-    [startISO, endISO]
+    'SELECT * FROM calendar_events WHERE startTime < ? AND COALESCE(endTime, startTime) > ? ORDER BY startTime ASC',
+    [endISO, startISO]
   )
 }
 

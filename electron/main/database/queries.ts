@@ -16,6 +16,7 @@ export interface DbTask {
   secondaryTagId: number | null
   startTime: string
   endTime: string | null
+  studyNodeId: number | null
 }
 
 export interface DbTaskWithTag extends DbTask {
@@ -24,6 +25,10 @@ export interface DbTaskWithTag extends DbTask {
   tagIsProductive: number | null
   secondaryTagName: string | null
   secondaryTagColor: string | null
+  studyNodeTitle: string | null
+  studyTopicId: number | null
+  studyTopicName: string | null
+  studyTopicColor: string | null
 }
 
 export interface DailyStats {
@@ -133,12 +138,15 @@ export async function deleteTag(id: number): Promise<void> {
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 
 const TASK_WITH_TAG_SQL = `
-  SELECT t.id, t.title, t.tagId, t.secondaryTagId, t.startTime, t.endTime,
+  SELECT t.id, t.title, t.tagId, t.secondaryTagId, t.startTime, t.endTime, t.studyNodeId,
          tg.name as tagName, tg.color as tagColor, tg.isProductive as tagIsProductive,
-         stg.name as secondaryTagName, stg.color as secondaryTagColor
+         stg.name as secondaryTagName, stg.color as secondaryTagColor,
+         sn.title as studyNodeTitle, st.id as studyTopicId, st.name as studyTopicName, st.color as studyTopicColor
   FROM tasks t
   LEFT JOIN tags tg ON t.tagId = tg.id
   LEFT JOIN tags stg ON t.secondaryTagId = stg.id
+  LEFT JOIN study_nodes sn ON t.studyNodeId = sn.id
+  LEFT JOIN study_topics st ON sn.topicId = st.id
 `
 
 export async function getTasksForRange(startDate: string, endDate: string): Promise<DbTaskWithTag[]> {
@@ -176,18 +184,41 @@ export async function createTask(
   tagId: number | null,
   secondaryTagId: number | null,
   startTime: string,
-  endTime: string | null = null
+  endTime: string | null = null,
+  studyNodeId: number | null = null
 ): Promise<DbTask> {
   const db = await getDb()
-  run(db, 'INSERT INTO tasks (title, tagId, secondaryTagId, startTime, endTime) VALUES (?, ?, ?, ?, ?)', [
+  run(db, 'INSERT INTO tasks (title, tagId, secondaryTagId, startTime, endTime, studyNodeId) VALUES (?, ?, ?, ?, ?, ?)', [
     title,
     tagId,
     secondaryTagId,
     startTime,
-    endTime
+    endTime,
+    studyNodeId
   ])
   const id = lastInsertId(db)
-  return { id, title, tagId, secondaryTagId, startTime, endTime }
+  return { id, title, tagId, secondaryTagId, startTime, endTime, studyNodeId }
+}
+
+/** Total focused minutes per study topic (from tasks linked to a study node). */
+export interface StudyTopicHours {
+  topicId: number
+  topicName: string
+  minutes: number
+}
+export async function getStudyHoursByTopic(): Promise<StudyTopicHours[]> {
+  const db = await getDb()
+  return getAll<StudyTopicHours>(
+    db,
+    `SELECT st.id as topicId, st.name as topicName,
+            CAST(ROUND(SUM((julianday(COALESCE(t.endTime, 'now')) - julianday(t.startTime)) * 24 * 60)) AS INTEGER) as minutes
+     FROM tasks t
+     JOIN study_nodes sn ON t.studyNodeId = sn.id
+     JOIN study_topics st ON sn.topicId = st.id
+     WHERE t.studyNodeId IS NOT NULL
+     GROUP BY st.id, st.name
+     ORDER BY minutes DESC`
+  )
 }
 
 export async function updateTask(
@@ -204,7 +235,8 @@ export async function updateTask(
     'UPDATE tasks SET title = ?, tagId = ?, secondaryTagId = ?, startTime = ?, endTime = ? WHERE id = ?',
     [title, tagId, secondaryTagId, startTime, endTime, id]
   )
-  return { id, title, tagId, secondaryTagId, startTime, endTime }
+  // studyNodeId is preserved (not touched by this UPDATE)
+  return getOne<DbTask>(db, 'SELECT id, title, tagId, secondaryTagId, startTime, endTime, studyNodeId FROM tasks WHERE id = ?', [id])!
 }
 
 export async function stopTask(id: number, endTime: string): Promise<void> {

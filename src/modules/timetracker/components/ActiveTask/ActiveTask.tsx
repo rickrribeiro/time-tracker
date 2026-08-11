@@ -12,6 +12,11 @@ function formatDuration(startTime: string): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+interface StudyOption {
+  id: number
+  label: string
+}
+
 export function ActiveTask(): React.ReactElement {
   const { activeTask, startTask, stopActiveTask, switchTask } = useTaskStore()
   const { tags } = useTagStore()
@@ -19,7 +24,17 @@ export function ActiveTask(): React.ReactElement {
   const [newTitle, setNewTitle] = useState('')
   const [newTagId, setNewTagId] = useState<number | null>(null)
   const [newSecondaryTagId, setNewSecondaryTagId] = useState<number | null>(null)
+  const [newStudyNodeId, setNewStudyNodeId] = useState<number | null>(null)
+  const [studyOptions, setStudyOptions] = useState<StudyOption[]>([])
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Load "Tópico › Nó" options for optionally linking a focus session to a study node.
+  useEffect(() => {
+    Promise.all([window.api.study.topics(), window.api.study.allNodes()]).then(([topics, nodes]) => {
+      const topicName = (id: number): string => topics.find((t) => t.id === id)?.name ?? '—'
+      setStudyOptions(nodes.map((n) => ({ id: n.id, label: `${topicName(n.topicId)} › ${n.title}` })).sort((a, b) => a.label.localeCompare(b.label)))
+    })
+  }, [])
 
   useEffect(() => {
     if (activeTask) {
@@ -37,13 +52,13 @@ export function ActiveTask(): React.ReactElement {
 
   const handleStart = async () => {
     if (!newTitle.trim()) return
-    await startTask(newTitle.trim(), newTagId, newSecondaryTagId)
+    await startTask(newTitle.trim(), newTagId, newSecondaryTagId, newStudyNodeId)
     setNewTitle('')
   }
 
   const handleSwitch = async () => {
     if (!newTitle.trim()) return
-    await switchTask(newTitle.trim(), newTagId, newSecondaryTagId)
+    await switchTask(newTitle.trim(), newTagId, newSecondaryTagId, newStudyNodeId)
     setNewTitle('')
   }
 
@@ -61,6 +76,11 @@ export function ActiveTask(): React.ReactElement {
           <div className="active-task-info">
             <div className="active-task-dot" />
             <span className="active-task-title">{activeTask.title}</span>
+            {activeTask.studyTopicName && (
+              <span className="active-task-tag" style={{ background: activeTask.studyTopicColor || '#6366f1' }} title={activeTask.studyNodeTitle || ''}>
+                📖 {activeTask.studyTopicName}
+              </span>
+            )}
             <div style={{ display: 'flex', gap: 6 }}>
               {activeTask.tagName && (
                 <span
@@ -108,6 +128,14 @@ export function ActiveTask(): React.ReactElement {
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>
+              {studyOptions.length > 0 && (
+                <select value={newStudyNodeId ?? ''} onChange={(e) => setNewStudyNodeId(e.target.value ? Number(e.target.value) : null)} title="Vincular a um estudo">
+                  <option value="">📖 Estudo</option>
+                  {studyOptions.map((o) => (
+                    <option key={o.id} value={o.id}>{o.label}</option>
+                  ))}
+                </select>
+              )}
               <button className="btn btn-primary" onClick={handleSwitch}>
                 Switch
               </button>
@@ -147,6 +175,14 @@ export function ActiveTask(): React.ReactElement {
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
+          {studyOptions.length > 0 && (
+            <select value={newStudyNodeId ?? ''} onChange={(e) => setNewStudyNodeId(e.target.value ? Number(e.target.value) : null)} title="Vincular a um estudo">
+              <option value="">📖 Estudo</option>
+              {studyOptions.map((o) => (
+                <option key={o.id} value={o.id}>{o.label}</option>
+              ))}
+            </select>
+          )}
           <button className="btn btn-primary" onClick={handleStart}>
             ▶ Start
           </button>

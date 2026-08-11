@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useUIStore } from '../../../store/uiStore'
-import { StudyTopic } from '../../../types'
+import { StudyTopic, StudyTopicHours } from '../../../types'
 import { useStudyStore } from '../store/studyStore'
 import { TopicEditor, TOPIC_STATUS_LABEL } from '../components/TopicEditor'
 import { StudySearch } from '../components/StudySearch'
@@ -15,6 +15,7 @@ export function EstudosDashboardPage(): React.ReactElement {
   const { setPage } = useUIStore()
   const { topics, refreshTopics, setActiveTopic, removeTopic, dueCards, refreshDue } = useStudyStore()
   const [progress, setProgress] = useState<Record<number, Progress>>({})
+  const [hours, setHours] = useState<StudyTopicHours[]>([])
   const [editing, setEditing] = useState<StudyTopic | null>(null)
   const [creating, setCreating] = useState(false)
 
@@ -31,6 +32,7 @@ export function EstudosDashboardPage(): React.ReactElement {
   useEffect(() => {
     refreshTopics()
     refreshDue()
+    window.api.tasks.studyHours().then(setHours)
   }, [])
 
   useEffect(() => {
@@ -92,6 +94,33 @@ export function EstudosDashboardPage(): React.ReactElement {
           <div className="stat-card-sub">flashcards vencidos hoje</div>
         </div>
       </div>
+
+      {hours.length > 0 && (
+        <>
+          <h3 className="dash-heading">Horas de foco por tópico</h3>
+          <div className="chart-section">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(() => {
+                const max = Math.max(...hours.map((h) => h.minutes), 1)
+                return hours.map((h) => (
+                  <div key={h.topicId}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 2 }}>
+                      <span>{h.topicName}</span>
+                      <span>{Math.floor(h.minutes / 60)}h {h.minutes % 60}m</span>
+                    </div>
+                    <div className="bar-track">
+                      <div className="bar-fill" style={{ width: `${(h.minutes / max) * 100}%` }} />
+                    </div>
+                  </div>
+                ))
+              })()}
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+              Vincule uma tarefa a um item de estudo pelo seletor 📖 na barra do timer.
+            </p>
+          </div>
+        </>
+      )}
 
       <h3 className="dash-heading">Buscar</h3>
       <StudySearch />

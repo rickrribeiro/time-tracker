@@ -12,7 +12,8 @@ export const SCHEMA = `
     tagId INTEGER REFERENCES tags(id) ON DELETE SET NULL,
     secondaryTagId INTEGER REFERENCES tags(id) ON DELETE SET NULL,
     startTime TEXT NOT NULL,
-    endTime TEXT
+    endTime TEXT,
+    studyNodeId INTEGER
   );
 
   INSERT OR IGNORE INTO tags (id, name, color, isProductive)

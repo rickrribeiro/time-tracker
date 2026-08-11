@@ -11,9 +11,9 @@ interface TaskState {
   setTodayTasks: (tasks: TaskWithTag[]) => void
   setLoading: (v: boolean) => void
 
-  startTask: (title: string, tagId: number | null, secondaryTagId?: number | null) => Promise<void>
+  startTask: (title: string, tagId: number | null, secondaryTagId?: number | null, studyNodeId?: number | null) => Promise<void>
   stopActiveTask: () => Promise<void>
-  switchTask: (title: string, tagId: number | null, secondaryTagId?: number | null) => Promise<void>
+  switchTask: (title: string, tagId: number | null, secondaryTagId?: number | null, studyNodeId?: number | null) => Promise<void>
   refreshTasks: (date: string) => Promise<void>
   refreshActive: () => Promise<void>
   deleteTask: (id: number) => Promise<void>
@@ -47,8 +47,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set({ todayTasks: tasks, isLoading: false })
   },
 
-  startTask: async (title: string, tagId: number | null, secondaryTagId: number | null = null) => {
-    await window.api.tasks.start(title, tagId, secondaryTagId)
+  startTask: async (title: string, tagId: number | null, secondaryTagId: number | null = null, studyNodeId: number | null = null) => {
+    await window.api.tasks.start(title, tagId, secondaryTagId, undefined, studyNodeId)
     await get().refreshActive()
   },
 
@@ -59,8 +59,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await get().refreshActive()
   },
 
-  switchTask: async (title: string, tagId: number | null, secondaryTagId: number | null = null) => {
-    await window.api.tasks.start(title, tagId, secondaryTagId)
+  switchTask: async (title: string, tagId: number | null, secondaryTagId: number | null = null, studyNodeId: number | null = null) => {
+    await window.api.tasks.start(title, tagId, secondaryTagId, undefined, studyNodeId)
     await get().refreshActive()
   },
 

@@ -12,6 +12,7 @@ import {
   getTasksForRange,
   getActiveTask,
   createTask,
+  getStudyHoursByTopic,
   updateTask,
   stopTask,
   deleteTask,
@@ -232,10 +233,10 @@ ipcMain.handle('tasks:getForRange', (_, startDate: string, endDate: string) =>
 
 ipcMain.handle('tasks:getActive', () => getActiveTask())
 
-ipcMain.handle('tasks:start', async (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string) => {
+ipcMain.handle('tasks:start', async (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, studyNodeId?: number | null) => {
   const now = startTime || new Date().toISOString()
   await stopAllActiveTasks(now)
-  return createTask(title, tagId, secondaryTagId, now)
+  return createTask(title, tagId, secondaryTagId, now, null, studyNodeId ?? null)
 })
 
 ipcMain.handle('tasks:stop', async (_, id: number, endTime?: string) => {
@@ -253,11 +254,12 @@ ipcMain.handle('tasks:delete', (_, id: number) => deleteTask(id))
 
 ipcMain.handle(
   'tasks:add',
-  (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, endTime: string | null) =>
-    createTask(title, tagId, secondaryTagId, startTime, endTime)
+  (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, endTime: string | null, studyNodeId?: number | null) =>
+    createTask(title, tagId, secondaryTagId, startTime, endTime, studyNodeId ?? null)
 )
 
 ipcMain.handle('tasks:stopAll', (_, endTime: string) => stopAllActiveTasks(endTime))
+ipcMain.handle('tasks:studyHours', () => getStudyHoursByTopic())
 
 ipcMain.handle('tasks:fillGaps', (_, date: string) => fillGapsWithIdle(date))
 

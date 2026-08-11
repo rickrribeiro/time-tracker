@@ -106,6 +106,17 @@ const MIGRATIONS: Migration[] = [
         // column already exists
       }
     }
+  },
+  {
+    version: 7,
+    label: 'tasks.studyNodeId',
+    run: (db) => {
+      try {
+        db.run('ALTER TABLE tasks ADD COLUMN studyNodeId INTEGER;')
+      } catch {
+        // column already exists
+      }
+    }
   }
 ]
 

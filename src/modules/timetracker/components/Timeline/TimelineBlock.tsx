@@ -111,7 +111,10 @@ export function TimelineBlock({
     >
       <div className="timeline-block-content">
         {height > 20 && (
-          <div className="timeline-block-title">{task.title}</div>
+          <div className="timeline-block-title">
+            {task.studyNodeId != null && <span title={task.studyTopicName ? `Estudo: ${task.studyTopicName}` : 'Estudo'}>📖 </span>}
+            {task.title}
+          </div>
         )}
         {height > 40 && (task.tagName || task.secondaryTagName) && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>

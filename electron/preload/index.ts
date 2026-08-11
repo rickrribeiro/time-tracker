@@ -16,8 +16,8 @@ const api = {
     getForRange: (startDate: string, endDate: string) =>
       ipcRenderer.invoke('tasks:getForRange', startDate, endDate),
     getActive: () => ipcRenderer.invoke('tasks:getActive'),
-    start: (title: string, tagId: number | null, secondaryTagId: number | null, startTime?: string) =>
-      ipcRenderer.invoke('tasks:start', title, tagId, secondaryTagId, startTime || new Date().toISOString()),
+    start: (title: string, tagId: number | null, secondaryTagId: number | null, startTime?: string, studyNodeId?: number | null) =>
+      ipcRenderer.invoke('tasks:start', title, tagId, secondaryTagId, startTime || new Date().toISOString(), studyNodeId ?? null),
     stop: (id: number, endTime?: string) =>
       ipcRenderer.invoke('tasks:stop', id, endTime),
     update: (
@@ -29,10 +29,11 @@ const api = {
       endTime: string | null
     ) => ipcRenderer.invoke('tasks:update', id, title, tagId, secondaryTagId, startTime, endTime),
     delete: (id: number) => ipcRenderer.invoke('tasks:delete', id),
-    add: (title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, endTime: string | null) =>
-      ipcRenderer.invoke('tasks:add', title, tagId, secondaryTagId, startTime, endTime),
+    add: (title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, endTime: string | null, studyNodeId?: number | null) =>
+      ipcRenderer.invoke('tasks:add', title, tagId, secondaryTagId, startTime, endTime, studyNodeId ?? null),
     stopAll: (endTime: string) => ipcRenderer.invoke('tasks:stopAll', endTime),
-    fillGaps: (date: string) => ipcRenderer.invoke('tasks:fillGaps', date)
+    fillGaps: (date: string) => ipcRenderer.invoke('tasks:fillGaps', date),
+    studyHours: () => ipcRenderer.invoke('tasks:studyHours')
   },
   stats: {
     daily: (startDate: string, endDate: string) =>

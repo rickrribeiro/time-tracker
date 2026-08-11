@@ -191,9 +191,17 @@ export function PromptRunnerPage(): React.ReactElement {
     setActiveId(t.id)
   }
   function closeTab(id: string): void {
+    const t = tabs.find((x) => x.id === id)
+    const hasContent = !!(t && (t.running || t.userPrompt.trim() || t.output.trim()))
+    if (hasContent) {
+      const msg = t?.running
+        ? 'Esta aba está executando. Fechar vai cancelar a execução. Continuar?'
+        : 'Fechar esta aba? O prompt e a resposta serão descartados.'
+      if (!window.confirm(msg)) return
+    }
     setTabs((prev) => {
-      const t = prev.find((x) => x.id === id)
-      if (t?.runId) window.api.ai.cancel(t.runId)
+      const tt = prev.find((x) => x.id === id)
+      if (tt?.runId) window.api.ai.cancel(tt.runId)
       const next = prev.filter((x) => x.id !== id)
       const finalTabs = next.length ? next : [makeTab()]
       if (id === activeId) setActiveId(finalTabs[0].id)

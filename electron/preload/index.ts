@@ -232,6 +232,8 @@ const api = {
       ipcRenderer.invoke('study:updateTopic', id, name, category, status, targetDate, priority, color),
     deleteTopic: (id: number) => ipcRenderer.invoke('study:deleteTopic', id),
     nodes: (topicId: number) => ipcRenderer.invoke('study:nodes', topicId),
+    allNodes: () => ipcRenderer.invoke('study:allNodes'),
+    allNotes: () => ipcRenderer.invoke('study:allNotes'),
     createNode: (topicId: number, parentId: number | null, title: string, description: string | null, estimatedHours: number | null) =>
       ipcRenderer.invoke('study:createNode', topicId, parentId, title, description, estimatedHours),
     updateNode: (id: number, title: string, description: string | null, status: string, estimatedHours: number | null) =>

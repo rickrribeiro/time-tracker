@@ -3,6 +3,7 @@ import { useUIStore } from '../../../store/uiStore'
 import { StudyTopic } from '../../../types'
 import { useStudyStore } from '../store/studyStore'
 import { TopicEditor, TOPIC_STATUS_LABEL } from '../components/TopicEditor'
+import { StudySearch } from '../components/StudySearch'
 
 interface Progress {
   done: number
@@ -91,6 +92,9 @@ export function EstudosDashboardPage(): React.ReactElement {
           <div className="stat-card-sub">flashcards vencidos hoje</div>
         </div>
       </div>
+
+      <h3 className="dash-heading">Buscar</h3>
+      <StudySearch />
 
       <h3 className="dash-heading">Tópicos</h3>
       <div className="list-stack">

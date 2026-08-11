@@ -1488,6 +1488,14 @@ export async function getStudyNodes(topicId: number): Promise<DbStudyNode[]> {
   const db = await getDb()
   return getAll<DbStudyNode>(db, 'SELECT * FROM study_nodes WHERE topicId = ? ORDER BY orderIndex ASC, id ASC', [topicId])
 }
+export async function getAllStudyNodes(): Promise<DbStudyNode[]> {
+  const db = await getDb()
+  return getAll<DbStudyNode>(db, 'SELECT * FROM study_nodes')
+}
+export async function getAllStudyNotes(): Promise<DbStudyNote[]> {
+  const db = await getDb()
+  return getAll<DbStudyNote>(db, 'SELECT * FROM study_notes')
+}
 export async function createStudyNode(
   topicId: number,
   parentId: number | null,

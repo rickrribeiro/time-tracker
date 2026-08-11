@@ -98,6 +98,8 @@ import {
   updateStudyTopic,
   deleteStudyTopic,
   getStudyNodes,
+  getAllStudyNodes,
+  getAllStudyNotes,
   createStudyNode,
   updateStudyNode,
   deleteStudyNode,
@@ -520,6 +522,8 @@ ipcMain.handle('study:updateTopic', (_, id: number, name: string, category: stri
 ipcMain.handle('study:deleteTopic', (_, id: number) => deleteStudyTopic(id))
 
 ipcMain.handle('study:nodes', (_, topicId: number) => getStudyNodes(topicId))
+ipcMain.handle('study:allNodes', () => getAllStudyNodes())
+ipcMain.handle('study:allNotes', () => getAllStudyNotes())
 ipcMain.handle('study:createNode', (_, topicId: number, parentId: number | null, title: string, description: string | null, estimatedHours: number | null) =>
   createStudyNode(topicId, parentId, title, description, estimatedHours))
 ipcMain.handle('study:updateNode', (_, id: number, title: string, description: string | null, status: string, estimatedHours: number | null) =>

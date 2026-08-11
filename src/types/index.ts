@@ -534,6 +534,8 @@ declare global {
         updateTopic: (id: number, name: string, category: string | null, status: string, targetDate: string | null, priority: number, color: string) => Promise<StudyTopic>
         deleteTopic: (id: number) => Promise<void>
         nodes: (topicId: number) => Promise<StudyNode[]>
+        allNodes: () => Promise<StudyNode[]>
+        allNotes: () => Promise<StudyNote[]>
         createNode: (topicId: number, parentId: number | null, title: string, description: string | null, estimatedHours: number | null) => Promise<StudyNode>
         updateNode: (id: number, title: string, description: string | null, status: string, estimatedHours: number | null) => Promise<StudyNode>
         deleteNode: (id: number) => Promise<void>

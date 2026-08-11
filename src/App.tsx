@@ -14,6 +14,7 @@ import { TodoPage } from './modules/todo/pages/TodoPage'
 import { BrainDumpPage } from './modules/braindump/pages/BrainDumpPage'
 import { GoalsPage } from './modules/goals/pages/GoalsPage'
 import { AutomationsPage } from './modules/automations/pages/AutomationsPage'
+import { WeeklyReviewPage } from './modules/review/pages/WeeklyReviewPage'
 import { EstudosDashboardPage } from './modules/estudos/pages/EstudosDashboardPage'
 import { TopicWorkspacePage } from './modules/estudos/pages/TopicWorkspacePage'
 import { RevisoesPage } from './modules/estudos/pages/RevisoesPage'
@@ -74,6 +75,7 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
       { id: 'goals', label: 'Metas', icon: '🎯' },
       { id: 'habits', label: 'Hábitos', icon: '🔥' },
       { id: 'automations', label: 'Automações', icon: '⚡' },
+      { id: 'weekly-review', label: 'Revisão semanal', icon: '🗓️' },
       { id: 'knowledge', label: 'Base de Conhecimento', icon: '📚' }
     ]
   },
@@ -143,6 +145,7 @@ const PAGES: Record<Page, React.ComponentType> = {
   braindump: BrainDumpPage,
   goals: GoalsPage,
   automations: AutomationsPage,
+  'weekly-review': WeeklyReviewPage,
   estudos: EstudosDashboardPage,
   'estudos-topic': TopicWorkspacePage,
   'estudos-review': RevisoesPage,

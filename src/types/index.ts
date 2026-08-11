@@ -339,6 +339,7 @@ export type Page =
   | 'knowledge'
   | 'goals'
   | 'automations'
+  | 'weekly-review'
   // Estudos (Learning OS)
   | 'estudos'
   | 'estudos-topic'

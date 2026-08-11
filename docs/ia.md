@@ -44,7 +44,7 @@ UI React → store Zustand → window.api.<ns>.<ação>()  (preload / contextBri
 - **Quick-start**: botões dos títulos mais usados do dia. **Fill Gaps**: preenche buracos com Idle e mescla tarefas consecutivas iguais.
 - **Modo Pomodoro** (novo): botão 🍅 na barra global. Você define foco/pausa (padrão 25/5) + título + tag; ao iniciar, **cria a task real na timeline** (cresce ao vivo); ao esgotar, para a task (bloco fecha), notifica e entra na **pausa** (task "Pausa ☕" com tag Idle); ao fim da pausa, volta ao ocioso. Estado persistido (sobrevive à navegação/reload); conta ciclos do dia.
 
-**Modelo:** `tasks(id, title, tagId, secondaryTagId, startTime, endTime)` — endTime NULL = tarefa ativa. `tags(id, name, color, isProductive)`.
+**Modelo:** `tasks(id, title, tagId, secondaryTagId, startTime, endTime, studyNodeId)` — endTime NULL = tarefa ativa; `studyNodeId` liga a tarefa a um item do roadmap de Estudos. `tags(id, name, color, isProductive)`.
 
 **Limitações conhecidas:** não há criação automática de Idle ao parar (só no Fill Gaps); merge só por título+tag primária e adjacência exata; `tasks:add` (bloco explícito) não trata sobreposição.
 
@@ -157,18 +157,50 @@ Fluxo: **Tópico → Roadmap → Anotações → Flashcards → Revisão → Pro
 
 ---
 
+## 9.1 Módulos e features adicionados depois (importante)
+
+Muita coisa foi construída após a 1ª versão deste dump. Resumo do que já existe hoje (não sugerir de novo):
+
+**Organização**
+- **Brain Dump** ("Despejar minha cabeça"): texto livre → IA vira tarefas/projetos/passos/agenda; revisão com checkboxes → importa de verdade.
+- **Metas mensais** (`🎯`): metas por mês, livres ou ligadas a um projeto/tópico de estudo, com progresso e navegação por mês.
+- **Automações** (`⚡`): **motor de regras condição→ação** avaliado no processo main a cada 1 min (sem foco produtivo por X min no horário; gasto de categoria > P% do orçamento; flashcards vencidos > N → notificação nativa / cria TODO) **+ agendador de agentes → Inbox** (roda o Claude no horário definido e o resultado vira item de Inbox com `aiGenerated=1`).
+- **Revisão semanal** (`🗓️`): wizard guiado (inbox zero → TODOs zumbis → hábitos → finanças → plano) com rascunho da IA por etapa.
+- **TODO**: recorrências (a cada N dias / dia X do mês / N dias após concluir — próxima instância nasce ao concluir) e indicador de idade ("há X"); campo `aiGenerated` + filtro no Inbox.
+- **Inbox por OCR**: arrastar/colar print/boleto/foto → Claude local (multimodal, ferramenta Read) extrai título/valor/data/link/nota → item de Inbox.
+
+**Estudos (Learning OS)** — já descrito na seção 3; adições: IA-tutor na nota agora inclui **Tutor Socrático** (só perguntas graduais) e **Revisão Ativa** ("explique sem olhar"); **Detector de Lacunas** no roadmap (IA aponta pré-requisitos faltando); **Quiz automático** com histórico; SM-2 completo; drag-and-drop no roadmap; filtro de revisão por categoria.
+
+**Ponte Time Tracker × Estudos**: uma tarefa pode ser vinculada a um item do roadmap (`tasks.studyNodeId`); a timeline mostra 📖 e o Dashboard de Estudos soma **horas de foco por tópico**.
+
+**Time Tracker**: **modo Pomodoro** (cria a task na timeline; foco→pausa) e **overlay de hábitos** na timeline (marca o horário 🔥 em que o hábito foi concluído).
+
+**Home**: **Daily Standup / briefing matinal** (IA junta TODOs de hoje/atrasados, flashcards vencidos, eventos e horas de ontem → resumo + agenda time-boxed).
+
+**Projetos**: **Resumo de progresso** (semana/mês) por commits+issues via `gh` com o Claude local.
+
+**CRM Pessoal / Relationship OS** (`🤝 Pessoas`): contatos com local/aniversário/interesses/contexto/última conversa/follow-up; ordena "precisam de atenção"; IA sugere mensagens de reconexão puxando o gancho do contexto.
+
+**Travel Stay Finder** (`🏨 Hospedagens`): busca multi-plataforma (arquitetura de provedores; mock funcional + Booking/Agoda/Trip/Airbnb stub); filtros completos; score/dedup/distância/datas flexíveis; mapa de pins (SVG, sem lib); favoritos, monitoramento de preço, histórico; recomendação da IA com base num perfil de viagem.
+
+**Finanças**: relatório cobre todos os meses com movimento desde 2015 (pula zerados); investimentos com histórico mensal; modo privacidade.
+
+**Backup**: snapshots automáticos diários do banco (mantém 3) com restaurar em Configurações.
+
+---
+
 ## 10. Limitações / o que NÃO existe hoje (oportunidades)
 
-- Nenhuma sincronização em nuvem/multi-dispositivo (só backup manual em arquivo/Drive).
+- Nenhuma sincronização em nuvem/multi-dispositivo (só backup manual em arquivo/Drive + snapshots diários locais).
 - Sem multiusuário, sem autenticação.
-- Sem notificações agendadas/recorrentes robustas (só notificação nativa do Pomodoro e sync diária do Google na abertura).
-- Time Tracker e Estudos **não** estão integrados (não há "horas estudadas por tópico").
-- Busca é textual (substring), não semântica; sem FTS5.
+- Os motores de automação (regras + agendador) rodam **só com o app aberto** — não há execução headless com o app fechado.
+- Busca é textual (substring), não semântica; sem FTS5/embeddings.
 - Sem mobile/web; desktop apenas.
-- Sem relatórios exportáveis em PDF.
-- Sem gráficos avançados (tudo em barras CSS simples).
+- Sem relatórios/cadernos exportáveis em **PDF** (só `.md`/JSON/CSV).
+- Sem gráficos avançados nem mapa real com tiles (barras/scatter em CSS/SVG puro).
 - IA depende do Claude Code CLI instalado localmente.
-- Hábitos, finanças e estudos não têm lembretes proativos.
+- Provedores de hospedagem reais ainda são mock (sem API oficial integrada).
+- Sem versionamento de prompts/skills nem execução de agentes com tool-use além do `--allowedTools`.
 
 ---
 

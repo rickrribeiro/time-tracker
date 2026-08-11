@@ -1505,6 +1505,101 @@ export async function deleteLink(id: number): Promise<void> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Travel Stay Finder (favoritos, watches, histórico de preço/busca)
+// ══════════════════════════════════════════════════════════════════════════════
+export interface DbStayFavorite {
+  id: string
+  tripId: number | null
+  provider: string
+  listingUrl: string
+  title: string
+  pricePerNight: number
+  currency: string
+  data: string
+  createdAt: string
+}
+export async function getStayFavorites(): Promise<DbStayFavorite[]> {
+  const db = await getDb()
+  return getAll<DbStayFavorite>(db, 'SELECT * FROM travel_stay_favorites ORDER BY createdAt DESC')
+}
+export async function addStayFavorite(f: DbStayFavorite): Promise<void> {
+  const db = await getDb()
+  run(
+    db,
+    'INSERT OR REPLACE INTO travel_stay_favorites (id, tripId, provider, listingUrl, title, pricePerNight, currency, data, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [f.id, f.tripId, f.provider, f.listingUrl, f.title, f.pricePerNight, f.currency, f.data, f.createdAt || new Date().toISOString()]
+  )
+}
+export async function removeStayFavorite(id: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM travel_stay_favorites WHERE id = ?', [id])
+}
+
+export interface DbStayWatch {
+  id: string
+  city: string
+  filters: string
+  currentPrice: number
+  bestPrice: number
+  currency: string
+  lastCheckedAt: string | null
+  createdAt: string
+}
+export async function getStayWatches(): Promise<DbStayWatch[]> {
+  const db = await getDb()
+  return getAll<DbStayWatch>(db, 'SELECT * FROM travel_stay_watches ORDER BY createdAt DESC')
+}
+export async function addStayWatch(w: DbStayWatch): Promise<void> {
+  const db = await getDb()
+  run(
+    db,
+    'INSERT OR REPLACE INTO travel_stay_watches (id, city, filters, currentPrice, bestPrice, currency, lastCheckedAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [w.id, w.city, w.filters, w.currentPrice, w.bestPrice, w.currency, w.lastCheckedAt, w.createdAt || new Date().toISOString()]
+  )
+}
+export async function updateStayWatchPrice(id: string, currentPrice: number, bestPrice: number, checkedAt: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE travel_stay_watches SET currentPrice = ?, bestPrice = ?, lastCheckedAt = ? WHERE id = ?', [currentPrice, bestPrice, checkedAt, id])
+}
+export async function removeStayWatch(id: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM travel_stay_watches WHERE id = ?', [id])
+  run(db, 'DELETE FROM travel_stay_price_history WHERE watchId = ?', [id])
+}
+
+export interface DbStayPricePoint {
+  id: string
+  watchId: string
+  checkedAt: string
+  price: number
+  currency: string
+}
+export async function getStayPriceHistory(watchId: string): Promise<DbStayPricePoint[]> {
+  const db = await getDb()
+  return getAll<DbStayPricePoint>(db, 'SELECT * FROM travel_stay_price_history WHERE watchId = ? ORDER BY checkedAt ASC', [watchId])
+}
+export async function addStayPricePoint(p: DbStayPricePoint): Promise<void> {
+  const db = await getDb()
+  run(db, 'INSERT INTO travel_stay_price_history (id, watchId, checkedAt, price, currency) VALUES (?, ?, ?, ?, ?)', [p.id, p.watchId, p.checkedAt, p.price, p.currency])
+}
+
+export interface DbStaySearchHistory {
+  id: number
+  filters: string
+  createdAt: string
+}
+export async function getStaySearchHistory(): Promise<DbStaySearchHistory[]> {
+  const db = await getDb()
+  return getAll<DbStaySearchHistory>(db, 'SELECT * FROM travel_stay_search_history ORDER BY id DESC LIMIT 20')
+}
+export async function addStaySearchHistory(filters: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'INSERT INTO travel_stay_search_history (filters, createdAt) VALUES (?, ?)', [filters, new Date().toISOString()])
+  // keep only the latest 20
+  run(db, 'DELETE FROM travel_stay_search_history WHERE id NOT IN (SELECT id FROM travel_stay_search_history ORDER BY id DESC LIMIT 20)')
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // CRM pessoal (contatos / relações)
 // ══════════════════════════════════════════════════════════════════════════════
 export interface DbContact {

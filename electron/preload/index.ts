@@ -49,6 +49,19 @@ const api = {
   inbox: {
     ocr: (base64: string, ext: string) => ipcRenderer.invoke('inbox:ocr', base64, ext)
   },
+  stays: {
+    favorites: () => ipcRenderer.invoke('stays:favorites'),
+    addFavorite: (f: unknown) => ipcRenderer.invoke('stays:addFavorite', f),
+    removeFavorite: (id: string) => ipcRenderer.invoke('stays:removeFavorite', id),
+    watches: () => ipcRenderer.invoke('stays:watches'),
+    addWatch: (w: unknown) => ipcRenderer.invoke('stays:addWatch', w),
+    updateWatchPrice: (id: string, current: number, best: number, at: string) => ipcRenderer.invoke('stays:updateWatchPrice', id, current, best, at),
+    removeWatch: (id: string) => ipcRenderer.invoke('stays:removeWatch', id),
+    priceHistory: (watchId: string) => ipcRenderer.invoke('stays:priceHistory', watchId),
+    addPricePoint: (p: unknown) => ipcRenderer.invoke('stays:addPricePoint', p),
+    searchHistory: () => ipcRenderer.invoke('stays:searchHistory'),
+    addSearchHistory: (filters: string) => ipcRenderer.invoke('stays:addSearchHistory', filters)
+  },
   contacts: {
     getAll: () => ipcRenderer.invoke('contacts:getAll'),
     create: (name: string, location: string | null, birthday: string | null, interests: string | null, context: string | null, nextFollowUp: string | null) =>

@@ -1,3 +1,5 @@
+import type { StayFavorite, StayWatch, StayPricePoint, StaySearchHistory } from '../modules/travel-stays/types'
+
 export interface Tag {
   id: number
   name: string
@@ -427,6 +429,19 @@ declare global {
       }
       inbox: {
         ocr: (base64: string, ext: string) => Promise<{ ok: boolean; output?: string; error?: string }>
+      }
+      stays: {
+        favorites: () => Promise<StayFavorite[]>
+        addFavorite: (f: StayFavorite) => Promise<void>
+        removeFavorite: (id: string) => Promise<void>
+        watches: () => Promise<StayWatch[]>
+        addWatch: (w: StayWatch) => Promise<void>
+        updateWatchPrice: (id: string, current: number, best: number, at: string) => Promise<void>
+        removeWatch: (id: string) => Promise<void>
+        priceHistory: (watchId: string) => Promise<StayPricePoint[]>
+        addPricePoint: (p: StayPricePoint) => Promise<void>
+        searchHistory: () => Promise<StaySearchHistory[]>
+        addSearchHistory: (filters: string) => Promise<void>
       }
       contacts: {
         getAll: () => Promise<Contact[]>

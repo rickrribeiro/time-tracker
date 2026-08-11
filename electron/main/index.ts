@@ -124,6 +124,17 @@ import {
   createGoal,
   updateGoal,
   deleteGoal,
+  getStayFavorites,
+  addStayFavorite,
+  removeStayFavorite,
+  getStayWatches,
+  addStayWatch,
+  updateStayWatchPrice,
+  removeStayWatch,
+  getStayPriceHistory,
+  addStayPricePoint,
+  getStaySearchHistory,
+  addStaySearchHistory,
   getContacts,
   createContact,
   updateContact,
@@ -140,7 +151,7 @@ import {
   setJobRan,
   deleteScheduledJob
 } from './database/queries'
-import type { DbTransaction, DbSkill, DbAgent, StudyBundle } from './database/queries'
+import type { DbTransaction, DbSkill, DbAgent, StudyBundle, DbStayFavorite, DbStayWatch, DbStayPricePoint } from './database/queries'
 import { syncGithubIssues, createIssueViaClaude } from './services/github'
 import { runClaude } from './services/claude'
 import { connectGoogle, googleConnected, listGoogleAccounts, disconnectGoogle, disconnectGoogleAccount, syncGoogleCalendar, uploadFileToDrive } from './services/google'
@@ -346,6 +357,19 @@ ipcMain.handle('goals:create', (_, month: string, title: string, kind: string, r
 ipcMain.handle('goals:update', (_, id: number, title: string, target: number, current: number, unit: string | null, done: number) =>
   updateGoal(id, title, target, current, unit, done))
 ipcMain.handle('goals:delete', (_, id: number) => deleteGoal(id))
+
+// ── IPC: Travel Stay Finder ───────────────────────────────────────────────────
+ipcMain.handle('stays:favorites', () => getStayFavorites())
+ipcMain.handle('stays:addFavorite', (_, f: DbStayFavorite) => addStayFavorite(f))
+ipcMain.handle('stays:removeFavorite', (_, id: string) => removeStayFavorite(id))
+ipcMain.handle('stays:watches', () => getStayWatches())
+ipcMain.handle('stays:addWatch', (_, w: DbStayWatch) => addStayWatch(w))
+ipcMain.handle('stays:updateWatchPrice', (_, id: string, current: number, best: number, at: string) => updateStayWatchPrice(id, current, best, at))
+ipcMain.handle('stays:removeWatch', (_, id: string) => removeStayWatch(id))
+ipcMain.handle('stays:priceHistory', (_, watchId: string) => getStayPriceHistory(watchId))
+ipcMain.handle('stays:addPricePoint', (_, p: DbStayPricePoint) => addStayPricePoint(p))
+ipcMain.handle('stays:searchHistory', () => getStaySearchHistory())
+ipcMain.handle('stays:addSearchHistory', (_, filters: string) => addStaySearchHistory(filters))
 
 // ── IPC: CRM (contatos) ───────────────────────────────────────────────────────
 ipcMain.handle('contacts:getAll', () => getContacts())

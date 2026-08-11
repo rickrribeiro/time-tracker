@@ -287,6 +287,41 @@ export const SCHEMA = `
     createdAt TEXT NOT NULL
   );
 
+  -- Travel Stay Finder (busca de hospedagens)
+  CREATE TABLE IF NOT EXISTS travel_stay_favorites (
+    id TEXT PRIMARY KEY,
+    tripId INTEGER,
+    provider TEXT,
+    listingUrl TEXT,
+    title TEXT,
+    pricePerNight REAL,
+    currency TEXT,
+    data TEXT NOT NULL DEFAULT '{}',
+    createdAt TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS travel_stay_watches (
+    id TEXT PRIMARY KEY,
+    city TEXT NOT NULL,
+    filters TEXT NOT NULL DEFAULT '{}',
+    currentPrice REAL NOT NULL DEFAULT 0,
+    bestPrice REAL NOT NULL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT 'BRL',
+    lastCheckedAt TEXT,
+    createdAt TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS travel_stay_price_history (
+    id TEXT PRIMARY KEY,
+    watchId TEXT NOT NULL,
+    checkedAt TEXT NOT NULL,
+    price REAL NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'BRL'
+  );
+  CREATE TABLE IF NOT EXISTS travel_stay_search_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filters TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+  );
+
   -- CRM pessoal (manutenção de relações importantes)
   CREATE TABLE IF NOT EXISTS contacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

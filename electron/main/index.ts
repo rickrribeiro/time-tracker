@@ -206,6 +206,10 @@ app.whenReady().then(() => {
   setTimeout(() => void evaluateRules(), 15000)
   setInterval(() => void evaluateRules(), 60 * 1000)
 
+  // Scheduled agents: check every 5 minutes (+ shortly after boot).
+  setTimeout(() => void runScheduledJobs(), 20000)
+  setInterval(() => void runScheduledJobs(), 5 * 60 * 1000)
+
   // Daily Google Calendar auto-sync: shortly after boot, then re-check every 6h.
   setTimeout(() => void maybeAutoSyncGoogle(), 8000)
   setInterval(() => void maybeAutoSyncGoogle(), 6 * 60 * 60 * 1000)
@@ -362,6 +366,38 @@ function todayRangeISO(): { start: string; end: string } {
   return {
     start: new Date(n.getFullYear(), n.getMonth(), n.getDate()).toISOString(),
     end: new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1).toISOString()
+  }
+}
+
+// Scheduled agents: run each enabled job once per day at/after its hour; output → Inbox.
+let runningJobs = false
+async function runScheduledJobs(): Promise<void> {
+  if (runningJobs) return
+  runningJobs = true
+  try {
+    const jobs = (await getScheduledJobs()).filter((j) => j.enabled)
+    const now = new Date()
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    for (const job of jobs) {
+      if (now.getHours() < job.hour) continue
+      const ranDay = job.lastRunAt ? job.lastRunAt.slice(0, 10) : ''
+      // lastRunAt is stored as local YYYY-MM-DD to compare against "today"
+      if (ranDay === todayStr) continue
+      await setJobRan(job.id, todayStr) // mark first to avoid double-run if it takes long
+      try {
+        const command = await resolveClaudeCommand()
+        const out = await runClaude(job.prompt, command, { model: await resolveModel(), timeoutMs: 0 })
+        const text = (out || '').trim()
+        if (text) {
+          await createTodo(`🤖 ${job.name}`, text.slice(0, 4000), 'inbox', 'agent', 1, null, null, 1)
+          broadcast('inbox:updated', { jobId: job.id })
+        }
+      } catch {
+        // leave it marked as run today; try again tomorrow
+      }
+    }
+  } finally {
+    runningJobs = false
   }
 }
 

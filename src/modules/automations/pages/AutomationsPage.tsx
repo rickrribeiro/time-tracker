@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Rule } from '../../../types'
+import { Rule, ScheduledJob } from '../../../types'
 
 interface ParamField {
   key: string
@@ -55,15 +55,29 @@ function parseParams(json: string): Record<string, number> {
 export function AutomationsPage(): React.ReactElement {
   const [rules, setRules] = useState<Rule[]>([])
   const [drafts, setDrafts] = useState<Record<number, Record<string, number>>>({})
+  const [jobs, setJobs] = useState<ScheduledJob[]>([])
+  const [jobName, setJobName] = useState('')
+  const [jobPrompt, setJobPrompt] = useState('')
+  const [jobHour, setJobHour] = useState(7)
 
   async function refresh(): Promise<void> {
     const r = await window.api.rules.getAll()
     setRules(r)
     setDrafts(Object.fromEntries(r.map((x) => [x.id, parseParams(x.params)])))
+    setJobs(await window.api.jobs.getAll())
   }
   useEffect(() => {
     refresh()
   }, [])
+
+  async function addJob(): Promise<void> {
+    if (!jobName.trim() || !jobPrompt.trim()) return
+    await window.api.jobs.create(jobName.trim(), jobPrompt.trim(), jobHour)
+    setJobName('')
+    setJobPrompt('')
+    setJobHour(7)
+    refresh()
+  }
 
   async function activate(def: RuleDef): Promise<void> {
     await window.api.rules.create(def.type, JSON.stringify(def.defaults))
@@ -137,6 +151,34 @@ export function AutomationsPage(): React.ReactElement {
             </div>
           )
         })}
+      </div>
+
+      <h3 className="dash-heading">Agendador → Inbox</h3>
+      <div className="chart-section" style={{ marginBottom: 8 }}>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 8px' }}>
+          Todo dia, no horário definido, o Claude local roda o prompt e o resultado vira um item no Inbox (🤖 IA).
+        </p>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input placeholder="Nome (ex: Revisão matinal)" value={jobName} onChange={(e) => setJobName(e.target.value)} style={{ minWidth: 160 }} />
+          <input placeholder="Prompt (ex: revise meus TODOs vencidos e minha semana)" value={jobPrompt} onChange={(e) => setJobPrompt(e.target.value)} style={{ flex: 1, minWidth: 220 }} />
+          <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>às</label>
+          <input type="number" min={0} max={23} value={jobHour} onChange={(e) => setJobHour(Number(e.target.value) || 0)} style={{ width: 64 }} />
+          <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>h</label>
+          <button className="btn btn-primary btn-sm" onClick={addJob}>＋ Agendar</button>
+        </div>
+      </div>
+      <div className="list-stack">
+        {jobs.length === 0 && <div className="empty-hint">Nenhum agendamento.</div>}
+        {jobs.map((j) => (
+          <div key={j.id} className="list-row">
+            <input type="checkbox" checked={j.enabled === 1} onChange={() => window.api.jobs.update(j.id, j.name, j.prompt, j.hour, j.enabled ? 0 : 1).then(refresh)} />
+            <span className="list-row-title">
+              {j.name} <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· {String(j.hour).padStart(2, '0')}h</span>
+            </span>
+            {j.lastRunAt && <span className="project-chip">último: {j.lastRunAt}</span>}
+            <button className="btn btn-danger btn-sm" onClick={() => window.api.jobs.delete(j.id).then(refresh)}>✕</button>
+          </div>
+        ))}
       </div>
     </div>
   )

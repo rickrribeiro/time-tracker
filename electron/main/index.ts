@@ -35,6 +35,7 @@ import {
   deleteHabit,
   getHabitEntries,
   getHabitEntriesForRange,
+  getHabitCompletionsForDate,
   toggleHabitEntry,
   getSetting,
   setSetting,
@@ -410,6 +411,7 @@ ipcMain.handle('habits:getEntriesRange', (_, startDate: string, endDate: string)
 ipcMain.handle('habits:toggleEntry', (_, habitId: number, date: string, completed: number) =>
   toggleHabitEntry(habitId, date, completed)
 )
+ipcMain.handle('habits:completionsForDate', (_, date: string) => getHabitCompletionsForDate(date))
 
 // ── IPC: Settings ───────────────────────────────────────────────────────────
 // Sensitive values (tokens) are encrypted at rest via safeStorage — see services/secrets.

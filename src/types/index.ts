@@ -85,6 +85,12 @@ export interface HabitEntry {
   habitId: number
   date: string
   completed: number
+  completedAt?: string | null
+}
+export interface HabitCompletion {
+  habitId: number
+  name: string
+  completedAt: string
 }
 
 export interface GithubIssue {
@@ -446,6 +452,7 @@ declare global {
         getEntries: (date: string) => Promise<HabitEntry[]>
         getEntriesRange: (startDate: string, endDate: string) => Promise<HabitEntry[]>
         toggleEntry: (habitId: number, date: string, completed: number) => Promise<void>
+        completionsForDate: (date: string) => Promise<HabitCompletion[]>
       }
       settings: {
         get: (key: string) => Promise<string | null>

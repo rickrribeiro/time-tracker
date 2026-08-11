@@ -1443,6 +1443,17 @@ select:focus {
   cursor: pointer;
 }
 
+.timeline-habit-mark {
+  position: absolute;
+  left: 34px;
+  transform: translateY(-50%);
+  font-size: 12px;
+  line-height: 1;
+  z-index: 9;
+  cursor: default;
+  filter: saturate(1.2);
+}
+
 /* ── OCR capture (Inbox) ── */
 .ocr-drop {
   margin-top: 10px;

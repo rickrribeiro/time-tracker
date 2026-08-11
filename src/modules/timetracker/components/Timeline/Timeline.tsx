@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { TaskWithTag, CalendarEvent } from '@/types'
+import { TaskWithTag, CalendarEvent, HabitCompletion } from '@/types'
 import { TimelineBlock } from './TimelineBlock'
 import { TimelineEventBlock } from './TimelineEventBlock'
 import { useTaskStore } from '../../store/taskStore'
@@ -12,6 +12,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i)
 interface Props {
   tasks: TaskWithTag[]
   events: CalendarEvent[]
+  habitMarks?: HabitCompletion[]
   selectedDate: string
   onRefresh: () => void
 }
@@ -31,7 +32,7 @@ function toLocalInput(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-export function Timeline({ tasks, events, selectedDate, onRefresh }: Props): React.ReactElement {
+export function Timeline({ tasks, events, habitMarks = [], selectedDate, onRefresh }: Props): React.ReactElement {
   const { updateTask, deleteTask } = useTaskStore()
   const { tags } = useTagStore()
   const [selected, setSelected] = useState<number | null>(null)
@@ -208,6 +209,23 @@ export function Timeline({ tasks, events, selectedDate, onRefresh }: Props): Rea
               <div className="timeline-now-dot" />
             </div>
           )}
+
+          {/* Habit completion markers (left gutter), positioned by the time they were checked */}
+          {habitMarks
+            .filter((h) => localDateStr(new Date(h.completedAt)) === selectedDate)
+            .map((h) => {
+              const min = (new Date(h.completedAt).getTime() - dayStart.getTime()) / 60000
+              return (
+                <div
+                  key={`${h.habitId}-${h.completedAt}`}
+                  className="timeline-habit-mark"
+                  style={{ top: min * PIXELS_PER_MINUTE }}
+                  title={`🔥 ${h.name} — ${new Date(h.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                >
+                  🔥
+                </div>
+              )
+            })}
 
           <div className="timeline-tasks" style={events.length > 0 ? { right: 140 } : undefined}>
             {tasks.map((task) => (

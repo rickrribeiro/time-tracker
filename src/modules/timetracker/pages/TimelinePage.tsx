@@ -3,7 +3,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useTaskStore } from '../store/taskStore'
 import { useTagStore } from '../store/tagStore'
 import { Timeline } from '../components/Timeline/Timeline'
-import { CalendarEvent } from '@/types'
+import { CalendarEvent, HabitCompletion } from '@/types'
 import { localDateStr, localDayStartISO, localDayEndISO } from '@/utils/dates'
 
 function formatDateDisplay(dateStr: string): string {
@@ -29,9 +29,11 @@ export function TimelinePage(): React.ReactElement {
   const { todayTasks, refreshTasks, startTask, activeTask } = useTaskStore()
   const { tags } = useTagStore()
   const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [habitMarks, setHabitMarks] = useState<HabitCompletion[]>([])
 
   const load = useCallback(() => {
     refreshTasks(selectedDate)
+    window.api.habits.completionsForDate(selectedDate).then(setHabitMarks)
   }, [selectedDate])
 
   const loadEvents = useCallback(async () => {
@@ -105,7 +107,7 @@ export function TimelinePage(): React.ReactElement {
         </div>
       </div>
 
-      <Timeline tasks={todayTasks} events={events} selectedDate={selectedDate} onRefresh={load} />
+      <Timeline tasks={todayTasks} events={events} habitMarks={habitMarks} selectedDate={selectedDate} onRefresh={load} />
     </div>
   )
 }

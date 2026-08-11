@@ -635,11 +635,30 @@ export async function toggleHabitEntry(
   completed: number
 ): Promise<void> {
   const db = await getDb()
+  const completedAt = completed ? new Date().toISOString() : null
   run(
     db,
-    `INSERT INTO habit_entries (habitId, date, completed) VALUES (?, ?, ?)
-     ON CONFLICT(habitId, date) DO UPDATE SET completed = excluded.completed`,
-    [habitId, date, completed]
+    `INSERT INTO habit_entries (habitId, date, completed, completedAt) VALUES (?, ?, ?, ?)
+     ON CONFLICT(habitId, date) DO UPDATE SET completed = excluded.completed, completedAt = excluded.completedAt`,
+    [habitId, date, completed, completedAt]
+  )
+}
+
+export interface HabitCompletion {
+  habitId: number
+  name: string
+  completedAt: string
+}
+/** Completions with a recorded time for a given day (for the timeline overlay). */
+export async function getHabitCompletionsForDate(date: string): Promise<HabitCompletion[]> {
+  const db = await getDb()
+  return getAll<HabitCompletion>(
+    db,
+    `SELECT he.habitId, h.name, he.completedAt
+     FROM habit_entries he JOIN habits h ON h.id = he.habitId
+     WHERE he.date = ? AND he.completed = 1 AND he.completedAt IS NOT NULL
+     ORDER BY he.completedAt ASC`,
+    [date]
   )
 }
 

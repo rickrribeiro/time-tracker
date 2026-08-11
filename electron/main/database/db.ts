@@ -117,6 +117,17 @@ const MIGRATIONS: Migration[] = [
         // column already exists
       }
     }
+  },
+  {
+    version: 8,
+    label: 'habit_entries.completedAt',
+    run: (db) => {
+      try {
+        db.run('ALTER TABLE habit_entries ADD COLUMN completedAt TEXT;')
+      } catch {
+        // column already exists
+      }
+    }
   }
 ]
 

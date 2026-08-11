@@ -65,6 +65,7 @@ export const SCHEMA = `
     habitId INTEGER NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
     date TEXT NOT NULL,
     completed INTEGER NOT NULL DEFAULT 0,
+    completedAt TEXT,
     PRIMARY KEY (habitId, date)
   );
 

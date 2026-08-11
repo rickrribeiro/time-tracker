@@ -108,7 +108,8 @@ const api = {
     getEntriesRange: (startDate: string, endDate: string) =>
       ipcRenderer.invoke('habits:getEntriesRange', startDate, endDate),
     toggleEntry: (habitId: number, date: string, completed: number) =>
-      ipcRenderer.invoke('habits:toggleEntry', habitId, date, completed)
+      ipcRenderer.invoke('habits:toggleEntry', habitId, date, completed),
+    completionsForDate: (date: string) => ipcRenderer.invoke('habits:completionsForDate', date)
   },
   // Settings (key-value)
   settings: {

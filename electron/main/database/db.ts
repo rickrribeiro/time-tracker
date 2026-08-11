@@ -204,7 +204,7 @@ export function closeDb(): void {
 }
 
 // ── Daily local snapshots (versioning) ────────────────────────────────────────
-const SNAP_KEEP = 14
+const SNAP_KEEP = 3
 
 function snapshotsDir(): string {
   const dir = path.join(app.getPath('userData'), 'snapshots')

@@ -35,7 +35,7 @@ export function SnapshotsSection(): React.ReactElement {
     <div className="chart-section" style={{ maxWidth: 560, marginTop: 16 }}>
       <div className="chart-title">🗄️ Snapshots automáticos (diários)</div>
       <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 12px' }}>
-        O banco é copiado automaticamente 1×/dia na abertura do app (mantém os últimos 14). Restaurar
+        O banco é copiado automaticamente 1×/dia na abertura do app (mantém os últimos 3). Restaurar
         substitui os dados atuais e recarrega o app.
       </p>
       <div className="list-stack">

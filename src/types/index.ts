@@ -291,6 +291,23 @@ export interface StudyQuizAttempt {
   durationMs: number | null
   createdAt: string
 }
+export interface Rule {
+  id: number
+  type: string
+  enabled: number
+  params: string
+  lastFiredAt: string | null
+  createdAt: string
+}
+export interface ScheduledJob {
+  id: number
+  name: string
+  prompt: string
+  hour: number
+  enabled: number
+  lastRunAt: string | null
+  createdAt: string
+}
 export interface Goal {
   id: number
   month: string // YYYY-MM
@@ -321,6 +338,7 @@ export type Page =
   | 'habits'
   | 'knowledge'
   | 'goals'
+  | 'automations'
   // Estudos (Learning OS)
   | 'estudos'
   | 'estudos-topic'
@@ -395,6 +413,18 @@ declare global {
       }
       inbox: {
         ocr: (base64: string, ext: string) => Promise<{ ok: boolean; output?: string; error?: string }>
+      }
+      rules: {
+        getAll: () => Promise<Rule[]>
+        create: (type: string, params: string) => Promise<Rule>
+        update: (id: number, enabled: number, params: string) => Promise<void>
+        delete: (id: number) => Promise<void>
+      }
+      jobs: {
+        getAll: () => Promise<ScheduledJob[]>
+        create: (name: string, prompt: string, hour: number) => Promise<ScheduledJob>
+        update: (id: number, name: string, prompt: string, hour: number, enabled: number) => Promise<void>
+        delete: (id: number) => Promise<void>
       }
       goals: {
         getForMonth: (month: string) => Promise<Goal[]>

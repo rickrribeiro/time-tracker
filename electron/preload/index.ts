@@ -49,6 +49,18 @@ const api = {
   inbox: {
     ocr: (base64: string, ext: string) => ipcRenderer.invoke('inbox:ocr', base64, ext)
   },
+  rules: {
+    getAll: () => ipcRenderer.invoke('rules:getAll'),
+    create: (type: string, params: string) => ipcRenderer.invoke('rules:create', type, params),
+    update: (id: number, enabled: number, params: string) => ipcRenderer.invoke('rules:update', id, enabled, params),
+    delete: (id: number) => ipcRenderer.invoke('rules:delete', id)
+  },
+  jobs: {
+    getAll: () => ipcRenderer.invoke('jobs:getAll'),
+    create: (name: string, prompt: string, hour: number) => ipcRenderer.invoke('jobs:create', name, prompt, hour),
+    update: (id: number, name: string, prompt: string, hour: number, enabled: number) => ipcRenderer.invoke('jobs:update', id, name, prompt, hour, enabled),
+    delete: (id: number) => ipcRenderer.invoke('jobs:delete', id)
+  },
   goals: {
     getForMonth: (month: string) => ipcRenderer.invoke('goals:getForMonth', month),
     create: (month: string, title: string, kind: string, refId: number | null, target: number, unit: string | null) =>

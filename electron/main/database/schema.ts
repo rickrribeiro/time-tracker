@@ -286,6 +286,27 @@ export const SCHEMA = `
     createdAt TEXT NOT NULL
   );
 
+  -- Automações: motor de regras (condição → ação)
+  CREATE TABLE IF NOT EXISTS rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,            -- idle_productive | budget_threshold | due_flashcards
+    enabled INTEGER NOT NULL DEFAULT 1,
+    params TEXT NOT NULL DEFAULT '{}',
+    lastFiredAt TEXT,
+    createdAt TEXT NOT NULL
+  );
+
+  -- Automações: agendador de agentes → Inbox
+  CREATE TABLE IF NOT EXISTS scheduled_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    hour INTEGER NOT NULL DEFAULT 7,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    lastRunAt TEXT,
+    createdAt TEXT NOT NULL
+  );
+
   -- Metas mensais (opcionalmente ligadas a um projeto ou tópico de estudo)
   CREATE TABLE IF NOT EXISTS goals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

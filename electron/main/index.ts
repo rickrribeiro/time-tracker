@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut, Notification } from 'electron'
 import { randomUUID } from 'crypto'
 import { join } from 'path'
 import fs from 'fs'
@@ -122,7 +122,17 @@ import {
   getGoals,
   createGoal,
   updateGoal,
-  deleteGoal
+  deleteGoal,
+  getRules,
+  createRule,
+  updateRule,
+  setRuleFired,
+  deleteRule,
+  getScheduledJobs,
+  createScheduledJob,
+  updateScheduledJob,
+  setJobRan,
+  deleteScheduledJob
 } from './database/queries'
 import type { DbTransaction, DbSkill, DbAgent, StudyBundle } from './database/queries'
 import { syncGithubIssues, createIssueViaClaude } from './services/github'
@@ -191,6 +201,10 @@ app.whenReady().then(() => {
 
   // Daily local snapshot of the DB (versioning) — after the DB is loaded.
   getDb().then(() => snapshotDailyIfNeeded())
+
+  // Rules engine: evaluate every minute while the app is open.
+  setTimeout(() => void evaluateRules(), 15000)
+  setInterval(() => void evaluateRules(), 60 * 1000)
 
   // Daily Google Calendar auto-sync: shortly after boot, then re-check every 6h.
   setTimeout(() => void maybeAutoSyncGoogle(), 8000)
@@ -322,6 +336,108 @@ ipcMain.handle('goals:create', (_, month: string, title: string, kind: string, r
 ipcMain.handle('goals:update', (_, id: number, title: string, target: number, current: number, unit: string | null, done: number) =>
   updateGoal(id, title, target, current, unit, done))
 ipcMain.handle('goals:delete', (_, id: number) => deleteGoal(id))
+
+// ── IPC: Automações (regras + agendador) ──────────────────────────────────────
+ipcMain.handle('rules:getAll', () => getRules())
+ipcMain.handle('rules:create', (_, type: string, params: string) => createRule(type, params))
+ipcMain.handle('rules:update', (_, id: number, enabled: number, params: string) => updateRule(id, enabled, params))
+ipcMain.handle('rules:delete', (_, id: number) => deleteRule(id))
+
+ipcMain.handle('jobs:getAll', () => getScheduledJobs())
+ipcMain.handle('jobs:create', (_, name: string, prompt: string, hour: number) => createScheduledJob(name, prompt, hour))
+ipcMain.handle('jobs:update', (_, id: number, name: string, prompt: string, hour: number, enabled: number) => updateScheduledJob(id, name, prompt, hour, enabled))
+ipcMain.handle('jobs:delete', (_, id: number) => deleteScheduledJob(id))
+
+// ── Automation engines (run while the app is open) ────────────────────────────
+function notifyNative(title: string, body: string): void {
+  try {
+    if (Notification.isSupported()) new Notification({ title, body }).show()
+  } catch {
+    // ignore
+  }
+}
+
+function todayRangeISO(): { start: string; end: string } {
+  const n = new Date()
+  return {
+    start: new Date(n.getFullYear(), n.getMonth(), n.getDate()).toISOString(),
+    end: new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1).toISOString()
+  }
+}
+
+let evaluatingRules = false
+async function evaluateRules(): Promise<void> {
+  if (evaluatingRules) return
+  evaluatingRules = true
+  try {
+    const rules = (await getRules()).filter((r) => r.enabled)
+    const now = Date.now()
+    for (const r of rules) {
+      let params: { minutes?: number; startHour?: number; endHour?: number; count?: number; percent?: number } = {}
+      try {
+        params = JSON.parse(r.params)
+      } catch {
+        // ignore
+      }
+      const last = r.lastFiredAt ? new Date(r.lastFiredAt).getTime() : 0
+      try {
+        if (r.type === 'idle_productive') {
+          const minutes = params.minutes ?? 45
+          const startHour = params.startHour ?? 9
+          const endHour = params.endHour ?? 18
+          const h = new Date().getHours()
+          if (h < startHour || h >= endHour) continue
+          if (now - last < minutes * 60000) continue
+          const { start, end } = todayRangeISO()
+          const tasks = await getTasksForRange(start, end)
+          const productive = tasks.filter((t) => (t.tagIsProductive ?? 0) !== 0)
+          if (productive.some((t) => !t.endTime)) continue // productive task running now
+          let lastEnd = 0
+          for (const t of productive) {
+            const e = t.endTime ? new Date(t.endTime).getTime() : 0
+            if (e > lastEnd) lastEnd = e
+          }
+          const workStart = new Date()
+          workStart.setHours(startHour, 0, 0, 0)
+          const ref = lastEnd || workStart.getTime()
+          if (now - ref >= minutes * 60000) {
+            notifyNative('⏳ Hora de focar?', `Você está há ~${Math.round((now - ref) / 60000)}min sem tarefa produtiva.`)
+            await setRuleFired(r.id, new Date().toISOString())
+          }
+        } else if (r.type === 'due_flashcards') {
+          const count = params.count ?? 30
+          if (now - last < 6 * 3600 * 1000) continue
+          const due = await getDueFlashcards(new Date().toISOString())
+          if (due.length > count) {
+            notifyNative('🔁 Revisões acumulando', `${due.length} flashcards vencidos — hora de revisar.`)
+            await setRuleFired(r.id, new Date().toISOString())
+          }
+        } else if (r.type === 'budget_threshold') {
+          const percent = params.percent ?? 80
+          if (now - last < 24 * 3600 * 1000) continue
+          const month = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+          const budgets = await getBudgets(month)
+          if (!budgets.length) continue
+          const txs = await getTransactions(month)
+          const spent: Record<number, number> = {}
+          for (const t of txs) if (t.type === 'expense' && t.categoryId != null) spent[t.categoryId] = (spent[t.categoryId] ?? 0) + t.amount
+          const crossed = budgets.filter((b) => b.categoryId != null && b.amount > 0 && ((spent[b.categoryId] ?? 0) / b.amount) * 100 > percent)
+          if (crossed.length) {
+            const cats = await getCategories()
+            const names = crossed.map((b) => cats.find((c) => c.id === b.categoryId)?.name ?? `#${b.categoryId}`)
+            await createTodo(`Revisar orçamento: ${names.join(', ')} passou de ${percent}%`, 'Gerado por regra automática', 'inbox', 'rule', 2, null, null, 1)
+            notifyNative('💸 Orçamento estourando', `${names.join(', ')} passou de ${percent}%.`)
+            await setRuleFired(r.id, new Date().toISOString())
+          }
+        }
+      } catch {
+        // ignore this rule's error, keep evaluating others
+      }
+    }
+  } finally {
+    evaluatingRules = false
+  }
+}
 
 // OCR/extração de imagem para o Inbox: salva a imagem num arquivo temporário e pede
 // ao Claude local (multimodal, via ferramenta Read) para extrair um JSON estruturado.

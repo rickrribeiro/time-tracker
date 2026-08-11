@@ -1499,6 +1499,70 @@ export async function deleteLink(id: number): Promise<void> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Automações: regras + agendador
+// ══════════════════════════════════════════════════════════════════════════════
+export interface DbRule {
+  id: number
+  type: string
+  enabled: number
+  params: string
+  lastFiredAt: string | null
+  createdAt: string
+}
+export async function getRules(): Promise<DbRule[]> {
+  const db = await getDb()
+  return getAll<DbRule>(db, 'SELECT * FROM rules ORDER BY id ASC')
+}
+export async function createRule(type: string, params: string): Promise<DbRule> {
+  const db = await getDb()
+  run(db, 'INSERT INTO rules (type, enabled, params, createdAt) VALUES (?, 1, ?, ?)', [type, params, new Date().toISOString()])
+  return getOne<DbRule>(db, 'SELECT * FROM rules WHERE id = ?', [lastInsertId(db)])!
+}
+export async function updateRule(id: number, enabled: number, params: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE rules SET enabled = ?, params = ? WHERE id = ?', [enabled, params, id])
+}
+export async function setRuleFired(id: number, at: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE rules SET lastFiredAt = ? WHERE id = ?', [at, id])
+}
+export async function deleteRule(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM rules WHERE id = ?', [id])
+}
+
+export interface DbScheduledJob {
+  id: number
+  name: string
+  prompt: string
+  hour: number
+  enabled: number
+  lastRunAt: string | null
+  createdAt: string
+}
+export async function getScheduledJobs(): Promise<DbScheduledJob[]> {
+  const db = await getDb()
+  return getAll<DbScheduledJob>(db, 'SELECT * FROM scheduled_jobs ORDER BY id ASC')
+}
+export async function createScheduledJob(name: string, prompt: string, hour: number): Promise<DbScheduledJob> {
+  const db = await getDb()
+  run(db, 'INSERT INTO scheduled_jobs (name, prompt, hour, enabled, createdAt) VALUES (?, ?, ?, 1, ?)', [name, prompt, hour, new Date().toISOString()])
+  return getOne<DbScheduledJob>(db, 'SELECT * FROM scheduled_jobs WHERE id = ?', [lastInsertId(db)])!
+}
+export async function updateScheduledJob(id: number, name: string, prompt: string, hour: number, enabled: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE scheduled_jobs SET name = ?, prompt = ?, hour = ?, enabled = ? WHERE id = ?', [name, prompt, hour, enabled, id])
+}
+export async function setJobRan(id: number, at: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE scheduled_jobs SET lastRunAt = ? WHERE id = ?', [at, id])
+}
+export async function deleteScheduledJob(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM scheduled_jobs WHERE id = ?', [id])
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Metas mensais
 // ══════════════════════════════════════════════════════════════════════════════
 export interface DbGoal {

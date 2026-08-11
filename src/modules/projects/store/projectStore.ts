@@ -9,7 +9,8 @@ interface ProjectState {
     description: string | null,
     githubRepoUrl: string | null,
     color: string,
-    claudeCommand: string | null
+    claudeCommand: string | null,
+    localPath: string | null
   ) => Promise<void>
   update: (project: Project) => Promise<void>
   remove: (id: number) => Promise<void>
@@ -23,8 +24,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ projects })
   },
 
-  create: async (name, description, githubRepoUrl, color, claudeCommand) => {
-    await window.api.projects.create(name, description, githubRepoUrl, color, claudeCommand)
+  create: async (name, description, githubRepoUrl, color, claudeCommand, localPath) => {
+    await window.api.projects.create(name, description, githubRepoUrl, color, claudeCommand, localPath)
     await get().refresh()
   },
 
@@ -36,7 +37,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       project.githubRepoUrl,
       project.color,
       project.archived,
-      project.claudeCommand
+      project.claudeCommand,
+      project.localPath
     )
     await get().refresh()
   },

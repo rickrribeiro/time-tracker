@@ -74,6 +74,7 @@ export interface Project {
   color: string
   archived: number
   claudeCommand: string | null
+  localPath: string | null
 }
 
 export interface Habit {
@@ -501,7 +502,8 @@ declare global {
           description: string | null,
           githubRepoUrl: string | null,
           color: string,
-          claudeCommand: string | null
+          claudeCommand: string | null,
+          localPath?: string | null
         ) => Promise<Project>
         update: (
           id: number,
@@ -510,7 +512,8 @@ declare global {
           githubRepoUrl: string | null,
           color: string,
           archived: number,
-          claudeCommand: string | null
+          claudeCommand: string | null,
+          localPath?: string | null
         ) => Promise<Project>
         delete: (id: number) => Promise<void>
       }

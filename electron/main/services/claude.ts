@@ -1,6 +1,7 @@
 import { spawn } from 'child_process'
 import os from 'os'
 import path from 'path'
+import fs from 'fs'
 
 const TIMEOUT_MS = 120_000
 
@@ -33,6 +34,8 @@ export interface RunOptions {
   timeoutMs?: number
   /** Use `--output-format stream-json` to stream tokens, thinking and tool use live. */
   streamJson?: boolean
+  /** Working directory to run the CLI in (e.g. a project's local path). */
+  cwd?: string
 }
 
 /** Single-quote a token for safe inclusion in the interactive-shell command string. */
@@ -59,6 +62,8 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
     // stdin must be closed ('ignore') — otherwise `claude -p` waits for stdin data
     // (it warns "no stdin data received in 3s") and can hang on an open pipe.
     const stdio: ['ignore', 'pipe', 'pipe'] = ['ignore', 'pipe', 'pipe']
+    // run inside the project's directory when provided (and it exists)
+    const cwd = opts.cwd && fs.existsSync(opts.cwd) ? opts.cwd : undefined
     let child
     if (viaShell) {
       const shell = process.env.SHELL || '/bin/zsh'
@@ -66,11 +71,12 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
       const extraPart = extra.length ? ' ' + extra.map(shquote).join(' ') : ''
       child = spawn(shell, ['-ilc', `${bin}${extraPart}${modelPart}${jsonShell} -p "$RICKOS_PROMPT"`], {
         env: { ...env, RICKOS_PROMPT: prompt, RICKOS_MODEL: model || '' },
-        stdio
+        stdio,
+        cwd
       })
     } else {
       const args = [...extra, ...(model ? ['--model', model] : []), ...jsonArgs, '-p', prompt]
-      child = spawn(bin, args, { env, stdio })
+      child = spawn(bin, args, { env, stdio, cwd })
     }
 
     // expose a kill handle so callers (IPC) can cancel this run

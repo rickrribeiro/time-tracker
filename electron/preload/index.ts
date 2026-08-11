@@ -119,8 +119,8 @@ const api = {
   // Projects
   projects: {
     getAll: () => ipcRenderer.invoke('projects:getAll'),
-    create: (name: string, description: string | null, githubRepoUrl: string | null, color: string, claudeCommand: string | null) =>
-      ipcRenderer.invoke('projects:create', name, description, githubRepoUrl, color, claudeCommand),
+    create: (name: string, description: string | null, githubRepoUrl: string | null, color: string, claudeCommand: string | null, localPath?: string | null) =>
+      ipcRenderer.invoke('projects:create', name, description, githubRepoUrl, color, claudeCommand, localPath),
     update: (
       id: number,
       name: string,
@@ -128,8 +128,9 @@ const api = {
       githubRepoUrl: string | null,
       color: string,
       archived: number,
-      claudeCommand: string | null
-    ) => ipcRenderer.invoke('projects:update', id, name, description, githubRepoUrl, color, archived, claudeCommand),
+      claudeCommand: string | null,
+      localPath?: string | null
+    ) => ipcRenderer.invoke('projects:update', id, name, description, githubRepoUrl, color, archived, claudeCommand, localPath),
     delete: (id: number) => ipcRenderer.invoke('projects:delete', id)
   },
   // Habits

@@ -559,8 +559,8 @@ ipcMain.handle('projects:getAll', () => getProjects())
 
 ipcMain.handle(
   'projects:create',
-  (_, name: string, description: string | null, githubRepoUrl: string | null, color: string, claudeCommand: string | null) =>
-    createProject(name, description, githubRepoUrl, color, claudeCommand)
+  (_, name: string, description: string | null, githubRepoUrl: string | null, color: string, claudeCommand: string | null, localPath?: string | null) =>
+    createProject(name, description, githubRepoUrl, color, claudeCommand, localPath ?? null)
 )
 
 ipcMain.handle(
@@ -573,8 +573,9 @@ ipcMain.handle(
     githubRepoUrl: string | null,
     color: string,
     archived: number,
-    claudeCommand: string | null
-  ) => updateProject(id, name, description, githubRepoUrl, color, archived, claudeCommand)
+    claudeCommand: string | null,
+    localPath?: string | null
+  ) => updateProject(id, name, description, githubRepoUrl, color, archived, claudeCommand, localPath ?? null)
 )
 
 ipcMain.handle('projects:delete', (_, id: number) => deleteProject(id))
@@ -962,6 +963,13 @@ async function resolveModel(model?: string): Promise<string> {
   return (model || (await getSetting('claude_model')) || '').trim()
 }
 
+/** The project's local path (cwd for the CLI), if configured. */
+async function resolveProjectCwd(projectId?: number | null): Promise<string | undefined> {
+  if (projectId == null) return undefined
+  const p = (await getProjects()).find((x) => x.id === projectId)
+  return p?.localPath && p.localPath.trim() ? p.localPath.trim() : undefined
+}
+
 // Tools the local Claude may use without an approval prompt (headless `-p` blocks
 // everything else). Default lets it run gh/git and touch files; override via setting.
 const DEFAULT_ALLOWED_TOOLS = 'Bash(gh:*) Bash(git:*) Read Write Edit Glob Grep'
@@ -989,10 +997,16 @@ async function buildProjectContext(projectId?: number | null): Promise<string> {
   const p = (await getProjects()).find((x) => x.id === projectId)
   if (!p) return ''
   const slug = parseRepoSlug(p.githubRepoUrl)
+  const hasLocal = !!(p.localPath && p.localPath.trim() && fs.existsSync(p.localPath.trim()))
   const lines = ['### CONTEXTO DO PROJETO', `Projeto: ${p.name}`]
   if (p.description) lines.push(`Descrição: ${p.description}`)
   if (p.githubRepoUrl) lines.push(`Repositório GitHub: ${p.githubRepoUrl}`)
-  if (slug) {
+  if (hasLocal) {
+    lines.push(
+      `Diretório de trabalho: ${p.localPath!.trim()} (você já está rodando DENTRO desta pasta do projeto).`,
+      'Use o repositório desta pasta normalmente (git/gh sem --repo, pois o remote já é o do projeto).'
+    )
+  } else if (slug) {
     lines.push(
       `Repositório de destino para git/gh: ${slug}`,
       `IMPORTANTE: sempre use --repo ${slug} nos comandos gh (ex.: gh issue create --repo ${slug} ...).`,
@@ -1041,10 +1055,12 @@ ipcMain.handle('ai:start', async (_, params: AiStartParams) => {
   const model = await resolveModel(params.model)
   const context = await buildProjectContext(params.projectId)
   const extraArgs = await resolveAllowedToolsArgs()
+  const cwd = await resolveProjectCwd(params.projectId)
 
   runClaude(context + params.prompt, command, {
     model,
     extraArgs, // libera gh/git/arquivos para o Claude executar (ex.: criar issue)
+    cwd, // roda dentro do diretório do projeto, quando configurado
     timeoutMs: 0, // sem timeout: tarefas podem demorar
     streamJson: true, // transmite texto/pensamento/uso de ferramentas ao vivo
     onChunk: (text) => {
@@ -1091,9 +1107,11 @@ ipcMain.handle('ai:runStream', async (event, prompt: string, projectId?: number,
   const command = await resolveClaudeCommand(projectId)
   const context = await buildProjectContext(projectId)
   const extraArgs = await resolveAllowedToolsArgs()
+  const cwd = await resolveProjectCwd(projectId)
   return runClaude(context + prompt, command, {
     model: await resolveModel(model),
     extraArgs,
+    cwd,
     onChunk: (text) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:chunk', { runId, text })
     }

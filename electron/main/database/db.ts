@@ -150,6 +150,17 @@ const MIGRATIONS: Migration[] = [
         // column already exists
       }
     }
+  },
+  {
+    version: 11,
+    label: 'projects.localPath',
+    run: (db) => {
+      try {
+        db.run('ALTER TABLE projects ADD COLUMN localPath TEXT;')
+      } catch {
+        // column already exists
+      }
+    }
   }
 ]
 

@@ -11,9 +11,10 @@ interface FormState {
   githubRepoUrl: string
   color: string
   claudeCommand: string
+  localPath: string
 }
 
-const emptyForm: FormState = { name: '', description: '', githubRepoUrl: '', color: '#6366f1', claudeCommand: '' }
+const emptyForm: FormState = { name: '', description: '', githubRepoUrl: '', color: '#6366f1', claudeCommand: '', localPath: '' }
 
 export function ProjectsPage(): React.ReactElement {
   const { projects, refresh, create, update, remove } = useProjectStore()
@@ -39,7 +40,8 @@ export function ProjectsPage(): React.ReactElement {
       description: p.description ?? '',
       githubRepoUrl: p.githubRepoUrl ?? '',
       color: p.color,
-      claudeCommand: p.claudeCommand ?? ''
+      claudeCommand: p.claudeCommand ?? '',
+      localPath: p.localPath ?? ''
     })
     setShowForm(true)
   }
@@ -53,7 +55,8 @@ export function ProjectsPage(): React.ReactElement {
         description: form.description.trim() || null,
         githubRepoUrl: form.githubRepoUrl.trim() || null,
         color: form.color,
-        claudeCommand: form.claudeCommand.trim() || null
+        claudeCommand: form.claudeCommand.trim() || null,
+        localPath: form.localPath.trim() || null
       })
     } else {
       await create(
@@ -61,7 +64,8 @@ export function ProjectsPage(): React.ReactElement {
         form.description.trim() || null,
         form.githubRepoUrl.trim() || null,
         form.color,
-        form.claudeCommand.trim() || null
+        form.claudeCommand.trim() || null,
+        form.localPath.trim() || null
       )
     }
     setShowForm(false)
@@ -95,6 +99,9 @@ export function ProjectsPage(): React.ReactElement {
         )}
         {p.claudeCommand && (
           <div className="stat-card-sub">🤖 <code>{p.claudeCommand}</code></div>
+        )}
+        {p.localPath && (
+          <div className="stat-card-sub" style={{ wordBreak: 'break-all' }}>📂 <code>{p.localPath}</code></div>
         )}
         <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
           <button className="btn btn-secondary btn-sm" onClick={() => startEdit(p)}>
@@ -133,6 +140,7 @@ export function ProjectsPage(): React.ReactElement {
             <input placeholder="Descrição (opcional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             <input placeholder="GitHub repo URL (opcional)" value={form.githubRepoUrl} onChange={(e) => setForm({ ...form, githubRepoUrl: e.target.value })} />
             <input placeholder="Comando do Claude (opcional — padrão global)" value={form.claudeCommand} onChange={(e) => setForm({ ...form, claudeCommand: e.target.value })} />
+            <input placeholder="Caminho local (ex: /Users/você/Projects/app) — o Prompt Runner roda o Claude aqui" value={form.localPath} onChange={(e) => setForm({ ...form, localPath: e.target.value })} />
             <div style={{ display: 'flex', gap: 4 }}>
               {PRESET_COLORS.map((c) => (
                 <button

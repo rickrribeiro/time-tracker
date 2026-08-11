@@ -17,9 +17,39 @@ interface PluggyTransaction {
   id: string
   description?: string
   amount: number
+  amountInAccountCurrency?: number | null
   currencyCode?: string
   date: string
   type?: string // DEBIT | CREDIT
+}
+
+/** Manual FX config from settings: base currency + rates (value of 1 unit in base). */
+async function loadFx(): Promise<{ base: string; rates: Record<string, number> }> {
+  const base = (await getSetting('finance_base')) || 'BRL'
+  let rates: Record<string, number> = {}
+  try {
+    const raw = await getSetting('finance_rates')
+    rates = raw ? JSON.parse(raw) : {}
+  } catch {
+    rates = {}
+  }
+  return { base, rates }
+}
+
+/**
+ * Convert a Pluggy transaction to BRL. Prefers the value already in the account's
+ * currency (bank-converted BRL for a Brazilian account); otherwise applies manual
+ * FX rates; last resort keeps the number (best-effort) — always labeled BRL.
+ */
+function toBrl(t: PluggyTransaction, acc: PluggyAccount, fx: { base: string; rates: Record<string, number> }): number {
+  const cur = (t.currencyCode || acc.currencyCode || 'BRL').toUpperCase()
+  if (cur === 'BRL') return Math.abs(t.amount)
+  const accCur = (acc.currencyCode || 'BRL').toUpperCase()
+  if (accCur === 'BRL' && t.amountInAccountCurrency != null) return Math.abs(t.amountInAccountCurrency)
+  // manual rates: value of 1 <cur> in base; brl only meaningful if base is BRL
+  const rate = fx.rates[cur]
+  if (fx.base === 'BRL' && rate) return Math.abs(t.amount) * rate
+  return Math.abs(t.amount) // sem taxa: mantém o número (rotulado BRL)
 }
 
 async function apiKey(): Promise<string> {
@@ -135,6 +165,7 @@ export async function syncPluggy(): Promise<{ imported: number; skipped: number 
     throw new Error('Nenhuma conta encontrada para esse Item ID. Verifique se o Item está conectado e pronto no Pluggy (e se o Item ID está correto).')
   }
 
+  const fx = await loadFx()
   const incoming: Omit<DbTransaction, 'id'>[] = []
   for (const acc of accounts) {
     const txs = await fetchAllTransactions(acc.id, key)
@@ -143,8 +174,8 @@ export async function syncPluggy(): Promise<{ imported: number; skipped: number 
       incoming.push({
         accountId: null,
         categoryId: OUTROS_CATEGORY_ID,
-        amount: Math.abs(t.amount),
-        currency: (t.currencyCode || acc.currencyCode || 'BRL').toUpperCase(),
+        amount: Math.round(toBrl(t, acc, fx) * 100) / 100, // padroniza tudo em BRL
+        currency: 'BRL',
         type: isExpense ? 'expense' : 'income',
         description: t.description ?? null,
         date: t.date.slice(0, 10)

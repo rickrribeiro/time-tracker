@@ -4,7 +4,7 @@ import { useTodoStore } from '../store/todoStore'
 import { useProjectStore } from '../../projects/store/projectStore'
 import { TodoEditor } from '../components/TodoEditor'
 import { PRIORITIES, STATUSES, STATUS_LABELS, priorityDef, dueMeta } from '../constants'
-import { localDateStr } from '../../../utils/dates'
+import { localDateStr, timeAgo } from '../../../utils/dates'
 
 type StatusFilter = 'all' | 'todo' | 'doing' | 'done'
 
@@ -201,6 +201,7 @@ export function TodoPage(): React.ReactElement {
               )}
               {proj && <span className="project-chip">{proj}</span>}
               {due && <span className={`due-badge ${due.cls}`}>{due.label}</span>}
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }} title={`Criada em ${new Date(t.createdAt).toLocaleString('pt-BR')}`}>⏳ {timeAgo(t.createdAt)}</span>
               <select
                 value={t.status}
                 onChange={(e) => setStatus(t.id, e.target.value)}

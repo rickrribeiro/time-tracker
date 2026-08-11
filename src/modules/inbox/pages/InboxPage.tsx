@@ -4,6 +4,7 @@ import { useTodoStore } from '../../todo/store/todoStore'
 import { useProjectStore } from '../../projects/store/projectStore'
 import { TodoEditor } from '../../todo/components/TodoEditor'
 import { OcrCapture } from '../components/OcrCapture'
+import { timeAgo } from '../../../utils/dates'
 
 type SourceFilter = 'all' | 'ai' | 'manual'
 
@@ -80,6 +81,7 @@ export function InboxPage(): React.ReactElement {
               {t.aiGenerated === 1 && <span className="project-chip" title="Gerado por IA" style={{ marginRight: 6 }}>🤖 IA</span>}
               {t.title}
               {t.notes && <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-muted)' }}>📝 {t.notes}</span>}
+              <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-muted)' }} title={`Capturado em ${new Date(t.createdAt).toLocaleString('pt-BR')}`}>⏳ {timeAgo(t.createdAt)}</span>
             </span>
             <div className="list-row-actions">
               <button className="btn btn-primary btn-sm" onClick={() => setStatus(t.id, 'todo')}>

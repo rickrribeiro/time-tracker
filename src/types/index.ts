@@ -265,6 +265,14 @@ export interface StudyBundle {
   notes: StudyNote[]
   flashcards: StudyFlashcard[]
 }
+export interface StudyQuizAttempt {
+  id: number
+  topicId: number
+  score: number
+  total: number
+  durationMs: number | null
+  createdAt: string
+}
 export type StudyIoResult = { ok: boolean; topicId?: number; message?: string; error?: string }
 
 export type Page =
@@ -548,6 +556,8 @@ declare global {
         updateFlashcard: (id: number, front: string, back: string) => Promise<StudyFlashcard>
         deleteFlashcard: (id: number) => Promise<void>
         reviewFlashcard: (id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string) => Promise<StudyFlashcard>
+        quizAttempts: (topicId: number) => Promise<StudyQuizAttempt[]>
+        saveQuizAttempt: (topicId: number, score: number, total: number, durationMs: number | null) => Promise<StudyQuizAttempt>
         exportMarkdown: (topicId: number) => Promise<StudyIoResult>
         exportJson: (topicId: number) => Promise<boolean>
         importJson: () => Promise<StudyIoResult>

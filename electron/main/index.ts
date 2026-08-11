@@ -112,6 +112,8 @@ import {
   updateStudyFlashcard,
   deleteStudyFlashcard,
   reviewStudyFlashcard,
+  getStudyQuizAttempts,
+  createStudyQuizAttempt,
   getStudyBundle,
   importStudyBundle
 } from './database/queries'
@@ -542,6 +544,9 @@ ipcMain.handle('study:updateFlashcard', (_, id: number, front: string, back: str
 ipcMain.handle('study:deleteFlashcard', (_, id: number) => deleteStudyFlashcard(id))
 ipcMain.handle('study:reviewFlashcard', (_, id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string) =>
   reviewStudyFlashcard(id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt))
+ipcMain.handle('study:quizAttempts', (_, topicId: number) => getStudyQuizAttempts(topicId))
+ipcMain.handle('study:saveQuizAttempt', (_, topicId: number, score: number, total: number, durationMs: number | null) =>
+  createStudyQuizAttempt(topicId, score, total, durationMs))
 
 // ── IPC: Estudos export/import ────────────────────────────────────────────────
 function studySlug(s: string): string {

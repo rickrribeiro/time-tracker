@@ -250,6 +250,9 @@ const api = {
     deleteFlashcard: (id: number) => ipcRenderer.invoke('study:deleteFlashcard', id),
     reviewFlashcard: (id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string) =>
       ipcRenderer.invoke('study:reviewFlashcard', id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt),
+    quizAttempts: (topicId: number) => ipcRenderer.invoke('study:quizAttempts', topicId),
+    saveQuizAttempt: (topicId: number, score: number, total: number, durationMs: number | null) =>
+      ipcRenderer.invoke('study:saveQuizAttempt', topicId, score, total, durationMs),
     exportMarkdown: (topicId: number) => ipcRenderer.invoke('study:exportMarkdown', topicId),
     exportJson: (topicId: number) => ipcRenderer.invoke('study:exportJson', topicId),
     importJson: () => ipcRenderer.invoke('study:importJson'),

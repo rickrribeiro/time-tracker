@@ -273,4 +273,13 @@ export const SCHEMA = `
     lastReviewedAt TEXT,
     createdAt TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS study_quiz_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topicId INTEGER NOT NULL REFERENCES study_topics(id) ON DELETE CASCADE,
+    score INTEGER NOT NULL DEFAULT 0,
+    total INTEGER NOT NULL DEFAULT 0,
+    durationMs INTEGER,
+    createdAt TEXT NOT NULL
+  );
 `;

@@ -1643,6 +1643,25 @@ export async function reviewStudyFlashcard(
   return getOne<DbStudyFlashcard>(db, 'SELECT * FROM study_flashcards WHERE id = ?', [id])!
 }
 
+// ── Quiz attempts ──
+export interface DbStudyQuizAttempt {
+  id: number
+  topicId: number
+  score: number
+  total: number
+  durationMs: number | null
+  createdAt: string
+}
+export async function getStudyQuizAttempts(topicId: number): Promise<DbStudyQuizAttempt[]> {
+  const db = await getDb()
+  return getAll<DbStudyQuizAttempt>(db, 'SELECT * FROM study_quiz_attempts WHERE topicId = ? ORDER BY createdAt DESC LIMIT 20', [topicId])
+}
+export async function createStudyQuizAttempt(topicId: number, score: number, total: number, durationMs: number | null): Promise<DbStudyQuizAttempt> {
+  const db = await getDb()
+  run(db, 'INSERT INTO study_quiz_attempts (topicId, score, total, durationMs, createdAt) VALUES (?, ?, ?, ?, ?)', [topicId, score, total, durationMs, new Date().toISOString()])
+  return getOne<DbStudyQuizAttempt>(db, 'SELECT * FROM study_quiz_attempts WHERE id = ?', [lastInsertId(db)])!
+}
+
 // ── Export bundle (all rows for one topic) ──
 export interface StudyBundle {
   topic: DbStudyTopic

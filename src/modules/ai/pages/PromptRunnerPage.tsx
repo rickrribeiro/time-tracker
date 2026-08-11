@@ -16,6 +16,7 @@ interface RunnerTab {
   projectId: number | null
   skillIds: string[]
   userPrompt: string
+  permission: 'allowlist' | 'execute' // 'execute' = deixa o Claude rodar ferramentas
   // transient (not persisted)
   output: string
   running: boolean
@@ -32,6 +33,7 @@ function makeTab(p: Partial<RunnerTab> = {}): RunnerTab {
     projectId: null,
     skillIds: [],
     userPrompt: '',
+    permission: 'allowlist',
     output: '',
     running: false,
     runId: null,
@@ -54,6 +56,7 @@ function loadTabs(): RunnerTab[] {
           projectId: t.projectId ?? null,
           skillIds: Array.isArray(t.skillIds) ? t.skillIds : [],
           userPrompt: t.userPrompt ?? '',
+          permission: t.permission === 'execute' ? 'execute' : 'allowlist',
           runId: typeof t.runId === 'string' ? t.runId : null
         })
       )
@@ -153,7 +156,7 @@ export function PromptRunnerPage(): React.ReactElement {
 
   // persist tab config + runId (so an in-progress run can be reconnected after navigation)
   useEffect(() => {
-    const slim = tabs.map((t) => ({ id: t.id, title: t.title, agentId: t.agentId, projectId: t.projectId, skillIds: t.skillIds, userPrompt: t.userPrompt, runId: t.runId }))
+    const slim = tabs.map((t) => ({ id: t.id, title: t.title, agentId: t.agentId, projectId: t.projectId, skillIds: t.skillIds, userPrompt: t.userPrompt, permission: t.permission, runId: t.runId }))
     localStorage.setItem(TABS_KEY, JSON.stringify(slim))
   }, [tabs])
 
@@ -238,7 +241,8 @@ export function PromptRunnerPage(): React.ReactElement {
       model,
       agentId: tab.agentId,
       skillIds: JSON.stringify(tab.skillIds),
-      userPrompt: tab.userPrompt
+      userPrompt: tab.userPrompt,
+      permission: tab.permission
     })
     patchTab(tab.id, { running: true, runId, output: '', error: '' })
   }
@@ -368,7 +372,14 @@ export function PromptRunnerPage(): React.ReactElement {
             <label>Seu prompt</label>
             <textarea rows={5} value={active.userPrompt} onChange={(e) => patchActive({ userPrompt: e.target.value })} style={{ resize: 'vertical' }} placeholder="Descreva a tarefa…" />
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '4px 0 8px' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '4px 0 8px', alignItems: 'center' }}>
+            <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-muted)' }} title="Só liberadas: usa apenas as ferramentas da allowlist. Executar tudo: o Claude roda ferramentas (Bash/Edit/…) sozinho, como o Claude Code.">
+              🛡️
+              <select value={active.permission} onChange={(e) => patchActive({ permission: e.target.value as RunnerTab['permission'] })} disabled={active.running}>
+                <option value="allowlist">Só liberadas</option>
+                <option value="execute">Executar tudo</option>
+              </select>
+            </label>
             <button className="btn btn-secondary btn-sm" onClick={copyFinal} disabled={!finalPrompt.trim()}>📋 Copiar</button>
             <button className="btn btn-secondary btn-sm" onClick={() => save(active.agentId, active.skillIds, active.userPrompt, finalPrompt, null).then(() => flash('Salvo ✓'))} disabled={!finalPrompt.trim()}>💾 Salvar</button>
             {active.running ? (

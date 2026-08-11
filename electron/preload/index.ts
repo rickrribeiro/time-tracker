@@ -335,6 +335,7 @@ const api = {
       agentId?: string | null
       skillIds?: string
       userPrompt?: string
+      permission?: 'allowlist' | 'execute'
     }) => ipcRenderer.invoke('ai:start', params),
     getRun: (runId: string) => ipcRenderer.invoke('ai:getRun', runId),
     cancel: (runId: string) => ipcRenderer.invoke('ai:cancel', runId),

@@ -1053,6 +1053,7 @@ interface AiStartParams {
   skillIds?: string
   userPrompt?: string
   save?: boolean // persist an execution in the AI history (default true)
+  permission?: 'allowlist' | 'execute' // 'execute' = agentic (roda ferramentas)
 }
 
 // Start a run in the background: returns runId immediately. Output accumulates in main,
@@ -1065,15 +1066,17 @@ ipcMain.handle('ai:start', async (_, params: AiStartParams) => {
   const command = await resolveClaudeCommand(params.projectId ?? undefined)
   const model = await resolveModel(params.model)
   const context = await buildProjectContext(params.projectId)
-  const extraArgs = await resolveAllowedToolsArgs()
   const cwd = await resolveProjectCwd(params.projectId)
+  const agentic = params.permission === 'execute'
+  const extraArgs = agentic ? [] : await resolveAllowedToolsArgs()
 
   runClaude(context + params.prompt, command, {
     model,
     extraArgs, // libera gh/git/arquivos para o Claude executar (ex.: criar issue)
     cwd, // roda dentro do diretório do projeto, quando configurado
     timeoutMs: 0, // sem timeout: tarefas podem demorar
-    streamJson: true, // transmite texto/pensamento/uso de ferramentas ao vivo
+    streamJson: !agentic, // texto/pensamento ao vivo (modo seguro)
+    agentic, // 'executar': roda ferramentas de verdade (bidirecional)
     onChunk: (text) => {
       run.output += text
       broadcast('ai:chunk', { runId, text })

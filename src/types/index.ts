@@ -642,6 +642,7 @@ declare global {
           skillIds?: string
           userPrompt?: string
           save?: boolean
+          permission?: 'allowlist' | 'execute'
         }) => Promise<string>
         getRun: (runId: string) => Promise<{ status: 'running' | 'done' | 'error' | 'cancelled'; output: string; error: string | null } | null>
         cancel: (runId: string) => Promise<boolean>

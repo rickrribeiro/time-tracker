@@ -13,13 +13,14 @@ const api = {
     getAll: () => electron.ipcRenderer.invoke("tasks:getAll"),
     getForRange: (startDate, endDate) => electron.ipcRenderer.invoke("tasks:getForRange", startDate, endDate),
     getActive: () => electron.ipcRenderer.invoke("tasks:getActive"),
-    start: (title, tagId, secondaryTagId, startTime) => electron.ipcRenderer.invoke("tasks:start", title, tagId, secondaryTagId, startTime || (/* @__PURE__ */ new Date()).toISOString()),
+    start: (title, tagId, secondaryTagId, startTime, studyNodeId) => electron.ipcRenderer.invoke("tasks:start", title, tagId, secondaryTagId, startTime || (/* @__PURE__ */ new Date()).toISOString(), studyNodeId ?? null),
     stop: (id, endTime) => electron.ipcRenderer.invoke("tasks:stop", id, endTime),
     update: (id, title, tagId, secondaryTagId, startTime, endTime) => electron.ipcRenderer.invoke("tasks:update", id, title, tagId, secondaryTagId, startTime, endTime),
     delete: (id) => electron.ipcRenderer.invoke("tasks:delete", id),
-    add: (title, tagId, secondaryTagId, startTime, endTime) => electron.ipcRenderer.invoke("tasks:add", title, tagId, secondaryTagId, startTime, endTime),
+    add: (title, tagId, secondaryTagId, startTime, endTime, studyNodeId) => electron.ipcRenderer.invoke("tasks:add", title, tagId, secondaryTagId, startTime, endTime, studyNodeId ?? null),
     stopAll: (endTime) => electron.ipcRenderer.invoke("tasks:stopAll", endTime),
-    fillGaps: (date) => electron.ipcRenderer.invoke("tasks:fillGaps", date)
+    fillGaps: (date) => electron.ipcRenderer.invoke("tasks:fillGaps", date),
+    studyHours: () => electron.ipcRenderer.invoke("tasks:studyHours")
   },
   stats: {
     daily: (startDate, endDate) => electron.ipcRenderer.invoke("stats:daily", startDate, endDate),
@@ -29,18 +30,66 @@ const api = {
     update: (date, isWorkDay) => electron.ipcRenderer.invoke("dayConfig:update", date, isWorkDay)
   },
   // Todos (Inbox + TODO)
+  inbox: {
+    ocr: (base64, ext) => electron.ipcRenderer.invoke("inbox:ocr", base64, ext)
+  },
+  stays: {
+    favorites: () => electron.ipcRenderer.invoke("stays:favorites"),
+    addFavorite: (f) => electron.ipcRenderer.invoke("stays:addFavorite", f),
+    removeFavorite: (id) => electron.ipcRenderer.invoke("stays:removeFavorite", id),
+    watches: () => electron.ipcRenderer.invoke("stays:watches"),
+    addWatch: (w) => electron.ipcRenderer.invoke("stays:addWatch", w),
+    updateWatchPrice: (id, current, best, at) => electron.ipcRenderer.invoke("stays:updateWatchPrice", id, current, best, at),
+    removeWatch: (id) => electron.ipcRenderer.invoke("stays:removeWatch", id),
+    priceHistory: (watchId) => electron.ipcRenderer.invoke("stays:priceHistory", watchId),
+    addPricePoint: (p) => electron.ipcRenderer.invoke("stays:addPricePoint", p),
+    searchHistory: () => electron.ipcRenderer.invoke("stays:searchHistory"),
+    addSearchHistory: (filters) => electron.ipcRenderer.invoke("stays:addSearchHistory", filters)
+  },
+  contacts: {
+    getAll: () => electron.ipcRenderer.invoke("contacts:getAll"),
+    create: (name, location, birthday, interests, context, nextFollowUp) => electron.ipcRenderer.invoke("contacts:create", name, location, birthday, interests, context, nextFollowUp),
+    update: (id, name, location, birthday, interests, context, lastContactAt, nextFollowUp) => electron.ipcRenderer.invoke("contacts:update", id, name, location, birthday, interests, context, lastContactAt, nextFollowUp),
+    log: (id) => electron.ipcRenderer.invoke("contacts:log", id),
+    delete: (id) => electron.ipcRenderer.invoke("contacts:delete", id)
+  },
+  rules: {
+    getAll: () => electron.ipcRenderer.invoke("rules:getAll"),
+    create: (type, params) => electron.ipcRenderer.invoke("rules:create", type, params),
+    update: (id, enabled, params) => electron.ipcRenderer.invoke("rules:update", id, enabled, params),
+    delete: (id) => electron.ipcRenderer.invoke("rules:delete", id)
+  },
+  jobs: {
+    getAll: () => electron.ipcRenderer.invoke("jobs:getAll"),
+    create: (name, prompt, hour) => electron.ipcRenderer.invoke("jobs:create", name, prompt, hour),
+    update: (id, name, prompt, hour, enabled) => electron.ipcRenderer.invoke("jobs:update", id, name, prompt, hour, enabled),
+    delete: (id) => electron.ipcRenderer.invoke("jobs:delete", id)
+  },
+  goals: {
+    getForMonth: (month) => electron.ipcRenderer.invoke("goals:getForMonth", month),
+    create: (month, title, kind, refId, target, unit) => electron.ipcRenderer.invoke("goals:create", month, title, kind, refId, target, unit),
+    update: (id, title, target, current, unit, done) => electron.ipcRenderer.invoke("goals:update", id, title, target, current, unit, done),
+    delete: (id) => electron.ipcRenderer.invoke("goals:delete", id)
+  },
   todos: {
     getAll: (status) => electron.ipcRenderer.invoke("todos:getAll", status),
-    create: (title, notes, status, source, priority = 0, dueDate = null, projectId = null) => electron.ipcRenderer.invoke("todos:create", title, notes, status, source, priority, dueDate, projectId),
-    update: (id, title, notes, status, priority, dueDate, projectId) => electron.ipcRenderer.invoke("todos:update", id, title, notes, status, priority, dueDate, projectId),
+    create: (title, notes, status, source, priority = 0, dueDate = null, projectId = null, aiGenerated = 0, recurrence = null) => electron.ipcRenderer.invoke("todos:create", title, notes, status, source, priority, dueDate, projectId, aiGenerated, recurrence),
+    update: (id, title, notes, status, priority, dueDate, projectId, recurrence) => electron.ipcRenderer.invoke("todos:update", id, title, notes, status, priority, dueDate, projectId, recurrence),
     delete: (id) => electron.ipcRenderer.invoke("todos:delete", id)
   },
   // Projects
   projects: {
     getAll: () => electron.ipcRenderer.invoke("projects:getAll"),
-    create: (name, description, githubRepoUrl, color, claudeCommand) => electron.ipcRenderer.invoke("projects:create", name, description, githubRepoUrl, color, claudeCommand),
-    update: (id, name, description, githubRepoUrl, color, archived, claudeCommand) => electron.ipcRenderer.invoke("projects:update", id, name, description, githubRepoUrl, color, archived, claudeCommand),
+    create: (name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience) => electron.ipcRenderer.invoke("projects:create", name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience),
+    update: (id, name, description, githubRepoUrl, color, archived, claudeCommand, localPath, stage, businessModel, pricing, audience) => electron.ipcRenderer.invoke("projects:update", id, name, description, githubRepoUrl, color, archived, claudeCommand, localPath, stage, businessModel, pricing, audience),
+    setStage: (id, stage) => electron.ipcRenderer.invoke("projects:setStage", id, stage),
     delete: (id) => electron.ipcRenderer.invoke("projects:delete", id)
+  },
+  milestones: {
+    getAll: () => electron.ipcRenderer.invoke("milestones:getAll"),
+    create: (projectId, title, targetDate) => electron.ipcRenderer.invoke("milestones:create", projectId, title, targetDate),
+    toggle: (id, done) => electron.ipcRenderer.invoke("milestones:toggle", id, done),
+    delete: (id) => electron.ipcRenderer.invoke("milestones:delete", id)
   },
   // Habits
   habits: {
@@ -50,7 +99,8 @@ const api = {
     delete: (id) => electron.ipcRenderer.invoke("habits:delete", id),
     getEntries: (date) => electron.ipcRenderer.invoke("habits:getEntries", date),
     getEntriesRange: (startDate, endDate) => electron.ipcRenderer.invoke("habits:getEntriesRange", startDate, endDate),
-    toggleEntry: (habitId, date, completed) => electron.ipcRenderer.invoke("habits:toggleEntry", habitId, date, completed)
+    toggleEntry: (habitId, date, completed) => electron.ipcRenderer.invoke("habits:toggleEntry", habitId, date, completed),
+    completionsForDate: (date) => electron.ipcRenderer.invoke("habits:completionsForDate", date)
   },
   // Settings (key-value)
   settings: {
@@ -77,7 +127,9 @@ const api = {
   google: {
     connect: () => electron.ipcRenderer.invoke("google:connect"),
     status: () => electron.ipcRenderer.invoke("google:status"),
+    accounts: () => electron.ipcRenderer.invoke("google:accounts"),
     disconnect: () => electron.ipcRenderer.invoke("google:disconnect"),
+    disconnectAccount: (email) => electron.ipcRenderer.invoke("google:disconnectAccount", email),
     sync: () => electron.ipcRenderer.invoke("google:sync")
   },
   // Finance
@@ -105,7 +157,9 @@ const api = {
   },
   investments: {
     getAll: () => electron.ipcRenderer.invoke("investments:getAll"),
+    history: () => electron.ipcRenderer.invoke("investments:history"),
     create: (name, type, amount, currency) => electron.ipcRenderer.invoke("investments:create", name, type, amount, currency),
+    setValue: (investmentId, month, amount) => electron.ipcRenderer.invoke("investments:setValue", investmentId, month, amount),
     delete: (id) => electron.ipcRenderer.invoke("investments:delete", id)
   },
   pluggy: {
@@ -156,10 +210,40 @@ const api = {
   },
   links: {
     getAll: () => electron.ipcRenderer.invoke("links:getAll"),
-    create: (title, url) => electron.ipcRenderer.invoke("links:create", title, url),
-    update: (id, title, url) => electron.ipcRenderer.invoke("links:update", id, title, url),
+    create: (title, url, tags) => electron.ipcRenderer.invoke("links:create", title, url, tags),
+    update: (id, title, url, tags) => electron.ipcRenderer.invoke("links:update", id, title, url, tags),
     setChecked: (id, checked) => electron.ipcRenderer.invoke("links:setChecked", id, checked),
+    markOpened: (id) => electron.ipcRenderer.invoke("links:markOpened", id),
     delete: (id) => electron.ipcRenderer.invoke("links:delete", id)
+  },
+  study: {
+    topics: () => electron.ipcRenderer.invoke("study:topics"),
+    createTopic: (name, category, status, targetDate, priority, color) => electron.ipcRenderer.invoke("study:createTopic", name, category, status, targetDate, priority, color),
+    updateTopic: (id, name, category, status, targetDate, priority, color) => electron.ipcRenderer.invoke("study:updateTopic", id, name, category, status, targetDate, priority, color),
+    deleteTopic: (id) => electron.ipcRenderer.invoke("study:deleteTopic", id),
+    nodes: (topicId) => electron.ipcRenderer.invoke("study:nodes", topicId),
+    allNodes: () => electron.ipcRenderer.invoke("study:allNodes"),
+    allNotes: () => electron.ipcRenderer.invoke("study:allNotes"),
+    createNode: (topicId, parentId, title, description, estimatedHours) => electron.ipcRenderer.invoke("study:createNode", topicId, parentId, title, description, estimatedHours),
+    updateNode: (id, title, description, status, estimatedHours) => electron.ipcRenderer.invoke("study:updateNode", id, title, description, status, estimatedHours),
+    deleteNode: (id) => electron.ipcRenderer.invoke("study:deleteNode", id),
+    moveNode: (id, dir) => electron.ipcRenderer.invoke("study:moveNode", id, dir),
+    reorderNode: (id, newParentId, newIndex) => electron.ipcRenderer.invoke("study:reorderNode", id, newParentId, newIndex),
+    getNote: (topicId, nodeId) => electron.ipcRenderer.invoke("study:getNote", topicId, nodeId),
+    saveNote: (topicId, nodeId, content) => electron.ipcRenderer.invoke("study:saveNote", topicId, nodeId, content),
+    flashcards: (topicId) => electron.ipcRenderer.invoke("study:flashcards", topicId),
+    due: (nowISO) => electron.ipcRenderer.invoke("study:due", nowISO),
+    createFlashcard: (topicId, nodeId, front, back) => electron.ipcRenderer.invoke("study:createFlashcard", topicId, nodeId, front, back),
+    updateFlashcard: (id, front, back) => electron.ipcRenderer.invoke("study:updateFlashcard", id, front, back),
+    deleteFlashcard: (id) => electron.ipcRenderer.invoke("study:deleteFlashcard", id),
+    reviewFlashcard: (id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt) => electron.ipcRenderer.invoke("study:reviewFlashcard", id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt),
+    quizAttempts: (topicId) => electron.ipcRenderer.invoke("study:quizAttempts", topicId),
+    saveQuizAttempt: (topicId, score, total, durationMs) => electron.ipcRenderer.invoke("study:saveQuizAttempt", topicId, score, total, durationMs),
+    exportMarkdown: (topicId) => electron.ipcRenderer.invoke("study:exportMarkdown", topicId),
+    exportJson: (topicId) => electron.ipcRenderer.invoke("study:exportJson", topicId),
+    importJson: () => electron.ipcRenderer.invoke("study:importJson"),
+    exportFolder: (topicId) => electron.ipcRenderer.invoke("study:exportFolder", topicId),
+    importFolder: () => electron.ipcRenderer.invoke("study:importFolder")
   },
   // AI (Claude CLI)
   ai: {
@@ -185,12 +269,19 @@ const api = {
       const listener = () => cb();
       electron.ipcRenderer.on("quick-capture:open", listener);
       return () => electron.ipcRenderer.removeListener("quick-capture:open", listener);
+    },
+    calendarUpdated: (cb) => {
+      const listener = () => cb();
+      electron.ipcRenderer.on("calendar:updated", listener);
+      return () => electron.ipcRenderer.removeListener("calendar:updated", listener);
     }
   },
   // App
   app: {
     exportDb: () => electron.ipcRenderer.invoke("app:exportDb"),
     importDb: () => electron.ipcRenderer.invoke("app:importDb"),
+    snapshots: () => electron.ipcRenderer.invoke("app:snapshots"),
+    restoreSnapshot: (snapPath) => electron.ipcRenderer.invoke("app:restoreSnapshot", snapPath),
     openExternal: (url) => electron.ipcRenderer.invoke("app:openExternal", url)
   }
 };

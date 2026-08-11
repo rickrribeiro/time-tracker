@@ -99,6 +99,9 @@ export function AIPage(): React.ReactElement {
   const [running, setRunning] = useState(false)
   const [error, setError] = useState('')
   const [model, setModel] = useState('')
+  const [permission, setPermission] = useState<'allowlist' | 'execute'>(
+    () => (localStorage.getItem('ai_permission') === 'execute' ? 'execute' : 'allowlist')
+  )
   const [weekMinutes, setWeekMinutes] = useState(0)
   const [kb, setKb] = useState(DEFAULT_KNOWLEDGE)
   const [runId, setRunId] = useState<string | null>(null)
@@ -208,7 +211,7 @@ export function AIPage(): React.ReactElement {
     try {
       // main owns the run → it keeps going (and streams) even if we leave the page.
       // save:false → don't clutter the Prompt Runner history with assistant runs.
-      const rid = await window.api.ai.start({ prompt: text, model, save: false })
+      const rid = await window.api.ai.start({ prompt: text, model, save: false, permission })
       runIdRef.current = rid
       setRunId(rid)
     } catch (e) {
@@ -271,6 +274,19 @@ export function AIPage(): React.ReactElement {
           <option value="sonnet">Sonnet</option>
           <option value="opus">Opus</option>
           <option value="haiku">Haiku</option>
+        </select>
+        <label style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }} title="Só liberadas: usa apenas a allowlist. Executar tudo: o Claude roda ferramentas sozinho, como o Claude Code.">🛡️</label>
+        <select
+          value={permission}
+          disabled={running}
+          onChange={(e) => {
+            const v = e.target.value as 'allowlist' | 'execute'
+            setPermission(v)
+            localStorage.setItem('ai_permission', v)
+          }}
+        >
+          <option value="allowlist">Só liberadas</option>
+          <option value="execute">Executar tudo</option>
         </select>
       </div>
 

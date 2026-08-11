@@ -36,6 +36,12 @@ export interface RunOptions {
   streamJson?: boolean
   /** Working directory to run the CLI in (e.g. a project's local path). */
   cwd?: string
+  /**
+   * Agentic mode: bidirectional stream-json (stdin open) with `--permission-mode default`,
+   * so the CLI actually EXECUTES tools (Bash/Edit/…) and completes the task, streaming
+   * tool_use / tool_result progress. Prompt is sent as a JSON message on stdin.
+   */
+  agentic?: boolean
 }
 
 /** Single-quote a token for safe inclusion in the interactive-shell command string. */
@@ -56,12 +62,17 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
     const env = { ...process.env, PATH: buildPath() }
     const model = opts.model?.trim()
     const extra = opts.extraArgs ?? []
+    const agentic = !!opts.agentic
     const streamJson = !!opts.streamJson
-    const jsonArgs = streamJson ? ['--output-format', 'stream-json', '--verbose', '--include-partial-messages'] : []
-    const jsonShell = streamJson ? ' --output-format stream-json --verbose --include-partial-messages' : ''
-    // stdin must be closed ('ignore') — otherwise `claude -p` waits for stdin data
-    // (it warns "no stdin data received in 3s") and can hang on an open pipe.
-    const stdio: ['ignore', 'pipe', 'pipe'] = ['ignore', 'pipe', 'pipe']
+    const useStreamParse = streamJson || agentic
+    // agentic: bidirectional stream-json (stdin open, prompt via JSON message, tools execute)
+    const agenticArgs = ['--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'default']
+    const agenticShell = ' --input-format stream-json --output-format stream-json --verbose --permission-mode default'
+    const jsonArgs = agentic ? agenticArgs : streamJson ? ['--output-format', 'stream-json', '--verbose', '--include-partial-messages'] : []
+    const jsonShell = agentic ? agenticShell : streamJson ? ' --output-format stream-json --verbose --include-partial-messages' : ''
+    // stdin: agentic keeps it OPEN (to send the user message); otherwise 'ignore' so
+    // `claude -p` doesn't hang waiting for stdin.
+    const stdio: ['ignore' | 'pipe', 'pipe', 'pipe'] = [agentic ? 'pipe' : 'ignore', 'pipe', 'pipe']
     // run inside the project's directory when provided (and it exists)
     const cwd = opts.cwd && fs.existsSync(opts.cwd) ? opts.cwd : undefined
     let child
@@ -69,14 +80,27 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
       const shell = process.env.SHELL || '/bin/zsh'
       const modelPart = model ? ' --model "$RICKOS_MODEL"' : ''
       const extraPart = extra.length ? ' ' + extra.map(shquote).join(' ') : ''
-      child = spawn(shell, ['-ilc', `${bin}${extraPart}${modelPart}${jsonShell} -p "$RICKOS_PROMPT"`], {
+      const promptPart = agentic ? '' : ' -p "$RICKOS_PROMPT"'
+      child = spawn(shell, ['-ilc', `${bin}${extraPart}${modelPart}${jsonShell}${promptPart}`], {
         env: { ...env, RICKOS_PROMPT: prompt, RICKOS_MODEL: model || '' },
         stdio,
         cwd
       })
     } else {
-      const args = [...extra, ...(model ? ['--model', model] : []), ...jsonArgs, '-p', prompt]
+      const args = agentic
+        ? [...extra, ...(model ? ['--model', model] : []), ...agenticArgs]
+        : [...extra, ...(model ? ['--model', model] : []), ...jsonArgs, '-p', prompt]
       child = spawn(bin, args, { env, stdio, cwd })
+    }
+
+    // agentic: send the initial user message on stdin and keep the pipe open
+    if (agentic && child.stdin) {
+      const userMsg = { type: 'user', message: { role: 'user', content: [{ type: 'text', text: prompt }] } }
+      try {
+        child.stdin.write(JSON.stringify(userMsg) + '\n')
+      } catch {
+        // pipe not ready — the run will error out normally
+      }
     }
 
     // expose a kill handle so callers (IPC) can cancel this run
@@ -103,10 +127,35 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
         type?: string
         result?: unknown
         event?: { type?: string; delta?: { type?: string; text?: string; thinking?: string }; content_block?: { type?: string; name?: string } }
+        message?: { content?: Array<{ type?: string; text?: string; thinking?: string; name?: string; input?: unknown; content?: unknown }> }
       }
       try {
         evt = JSON.parse(trimmed)
       } catch {
+        return
+      }
+      // agentic: full assistant/user messages (tool_use + tool_result) instead of partial deltas
+      if (agentic && evt.type === 'assistant' && evt.message?.content) {
+        for (const c of evt.message.content) {
+          if (c.type === 'text' && c.text) {
+            assistantText += c.text
+            opts.onChunk?.('\n' + c.text)
+          } else if (c.type === 'thinking' && c.thinking) {
+            opts.onChunk?.('\n💭 ' + c.thinking)
+          } else if (c.type === 'tool_use') {
+            const brief = c.input ? ' ' + JSON.stringify(c.input).slice(0, 160) : ''
+            opts.onChunk?.(`\n🔧 ${c.name || 'tool'}${brief}`)
+          }
+        }
+        return
+      }
+      if (agentic && evt.type === 'user' && evt.message?.content) {
+        for (const c of evt.message.content) {
+          if (c.type === 'tool_result') {
+            const raw = typeof c.content === 'string' ? c.content : Array.isArray(c.content) ? (c.content as Array<{ text?: string }>).map((x) => x?.text || '').join('') : ''
+            if (raw.trim()) opts.onChunk?.('\n↳ ' + raw.trim().slice(0, 500))
+          }
+        }
         return
       }
       if (evt.type === 'stream_event' && evt.event) {
@@ -141,10 +190,14 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
       if (timer) clearTimeout(timer)
     }
 
+    if (!child.stdout || !child.stderr) {
+      reject(new Error('Falha ao abrir os fluxos de saída do Claude CLI.'))
+      return
+    }
     child.stdout.on('data', (d) => {
       const text = d.toString()
       stdout += text
-      if (streamJson) {
+      if (useStreamParse) {
         lineBuf += text
         let idx: number
         while ((idx = lineBuf.indexOf('\n')) >= 0) {
@@ -168,11 +221,11 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
       if (settled) return
       settled = true
       clear()
-      if (streamJson && lineBuf.trim()) processLine(lineBuf)
+      if (useStreamParse && lineBuf.trim()) processLine(lineBuf)
       if (code === 0) {
-        resolve(streamJson ? finalText ?? (assistantText.trim() || stdout.trim()) : stdout.trim())
+        resolve(useStreamParse ? finalText ?? (assistantText.trim() || stdout.trim()) : stdout.trim())
       } else {
-        reject(new Error(stderr.trim() || (streamJson ? finalText ?? '' : '') || `Claude CLI saiu com código ${code}.`))
+        reject(new Error(stderr.trim() || (useStreamParse ? finalText ?? '' : '') || `Claude CLI saiu com código ${code}.`))
       }
     })
   })

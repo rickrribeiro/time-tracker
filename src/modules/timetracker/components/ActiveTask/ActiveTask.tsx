@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useTaskStore } from '../../store/taskStore'
 import { useTagStore } from '../../store/tagStore'
+import { PomodoroWidget } from './PomodoroWidget'
 
 function formatDuration(startTime: string): string {
   const diff = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000)
@@ -114,6 +115,7 @@ export function ActiveTask(): React.ReactElement {
             <button className="btn btn-danger" onClick={stopActiveTask}>
               ■ Stop
             </button>
+            <PomodoroWidget />
           </div>
         </>
       ) : (
@@ -149,6 +151,7 @@ export function ActiveTask(): React.ReactElement {
           <button className="btn btn-primary" onClick={handleStart}>
             ▶ Start
           </button>
+          <PomodoroWidget />
         </div>
       )}
     </div>

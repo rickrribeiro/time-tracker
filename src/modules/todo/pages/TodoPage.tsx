@@ -17,6 +17,14 @@ export function TodoPage(): React.ReactElement {
   const [projectFilter, setProjectFilter] = useState<number | 'all'>('all')
   const [editing, setEditing] = useState<Todo | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [doneCollapsed, setDoneCollapsed] = useState(() => localStorage.getItem('rickos:todoDoneCollapsed') === '1')
+
+  function toggleDone(): void {
+    setDoneCollapsed((c) => {
+      localStorage.setItem('rickos:todoDoneCollapsed', c ? '0' : '1')
+      return !c
+    })
+  }
 
   useEffect(() => {
     refresh()
@@ -161,11 +169,12 @@ export function TodoPage(): React.ReactElement {
         {items.length === 0 && <div className="empty-hint">Nenhuma tarefa encontrada.</div>}
         {openItems.map((t) => renderRow(t))}
         {doneItems.length > 0 && (
-          <div className="todo-divider">
+          <button className="todo-divider" onClick={toggleDone} title={doneCollapsed ? 'Mostrar concluídas' : 'Ocultar concluídas'}>
+            <span className={`nav-group-chevron ${doneCollapsed ? 'collapsed' : ''}`}>▾</span>
             <span>Concluídas ({doneItems.length})</span>
-          </div>
+          </button>
         )}
-        {doneItems.map((t) => renderRow(t))}
+        {!doneCollapsed && doneItems.map((t) => renderRow(t))}
       </div>
 
       {editing && <TodoEditor todo={editing} onClose={() => setEditing(null)} />}

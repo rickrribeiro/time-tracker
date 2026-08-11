@@ -1482,11 +1482,15 @@ select:focus {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   margin: 8px 0 2px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
+}
+button.todo-divider:hover {
+  color: var(--text-secondary);
 }
 .todo-divider::before,
 .todo-divider::after {

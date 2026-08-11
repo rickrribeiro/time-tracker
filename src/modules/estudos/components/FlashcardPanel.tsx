@@ -95,12 +95,17 @@ export function FlashcardPanel(): React.ReactElement {
     setGenError('')
     setGenerated(null)
     setGenerating(true)
+    // Escala o alvo com o tamanho da nota (~1 cartão a cada 250 caracteres), sem teto rígido.
+    const suggested = Math.max(5, Math.round(content.length / 250))
     const prompt = `A partir da anotação em Markdown abaixo, crie flashcards de estudo (pergunta/resposta) concisos e úteis para memorização.
 
 Responda APENAS com um JSON válido (sem markdown, sem texto fora do JSON), um array no formato:
 [{ "front": "pergunta", "back": "resposta" }]
 
-Regras: 3 a 10 cartões; frente é uma pergunta clara; verso é a resposta objetiva; não repita cartões.
+Regras:
+- COBERTURA COMPLETA: gere um flashcard para CADA conceito, definição, comando, fato ou passo importante da anotação. Não resuma nem selecione só alguns — percorra a nota inteira, seção por seção.
+- Não há limite máximo. Para esta anotação, espere aproximadamente ${suggested} cartões (mais se o conteúdo exigir). Nunca menos que isso se houver material.
+- Frente = pergunta/estímulo claro; verso = resposta objetiva. Não repita cartões.
 
 Anotação:
 """

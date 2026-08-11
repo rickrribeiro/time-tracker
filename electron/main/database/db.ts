@@ -161,6 +161,17 @@ const MIGRATIONS: Migration[] = [
         // column already exists
       }
     }
+  },
+  {
+    version: 12,
+    label: 'projects business pipeline fields',
+    run: (db) => {
+      // existing projects (work repos) default to the "trabalho" stage
+      try { db.run("ALTER TABLE projects ADD COLUMN stage TEXT NOT NULL DEFAULT 'trabalho';") } catch { /* exists */ }
+      try { db.run('ALTER TABLE projects ADD COLUMN businessModel TEXT;') } catch { /* exists */ }
+      try { db.run('ALTER TABLE projects ADD COLUMN pricing TEXT;') } catch { /* exists */ }
+      try { db.run('ALTER TABLE projects ADD COLUMN audience TEXT;') } catch { /* exists */ }
+    }
   }
 ]
 

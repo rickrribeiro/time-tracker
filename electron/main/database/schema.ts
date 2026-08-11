@@ -38,7 +38,20 @@ export const SCHEMA = `
     color TEXT NOT NULL DEFAULT '#6366f1',
     archived INTEGER NOT NULL DEFAULT 0,
     claudeCommand TEXT,
-    localPath TEXT
+    localPath TEXT,
+    stage TEXT NOT NULL DEFAULT 'ideia',   -- ideia|validacao|mvp|lancado|monetizando|morto|trabalho
+    businessModel TEXT,
+    pricing TEXT,
+    audience TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS project_milestones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    targetDate TEXT,
+    doneAt TEXT,
+    createdAt TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS todos (

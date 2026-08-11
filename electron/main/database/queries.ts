@@ -434,6 +434,18 @@ export interface DbProject {
   archived: number
   claudeCommand: string | null
   localPath: string | null
+  stage: string
+  businessModel: string | null
+  pricing: string | null
+  audience: string | null
+}
+export interface DbProjectMilestone {
+  id: number
+  projectId: number
+  title: string
+  targetDate: string | null
+  doneAt: string | null
+  createdAt: string
 }
 
 export interface DbTodo {
@@ -588,13 +600,17 @@ export async function createProject(
   githubRepoUrl: string | null,
   color: string,
   claudeCommand: string | null = null,
-  localPath: string | null = null
+  localPath: string | null = null,
+  stage = 'ideia',
+  businessModel: string | null = null,
+  pricing: string | null = null,
+  audience: string | null = null
 ): Promise<DbProject> {
   const db = await getDb()
   run(
     db,
-    'INSERT INTO projects (name, description, githubRepoUrl, color, claudeCommand, localPath) VALUES (?, ?, ?, ?, ?, ?)',
-    [name, description, githubRepoUrl, color, claudeCommand, localPath]
+    'INSERT INTO projects (name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience]
   )
   const id = lastInsertId(db)
   return getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])!
@@ -608,15 +624,44 @@ export async function updateProject(
   color: string,
   archived: number,
   claudeCommand: string | null = null,
-  localPath: string | null = null
+  localPath: string | null = null,
+  stage = 'ideia',
+  businessModel: string | null = null,
+  pricing: string | null = null,
+  audience: string | null = null
 ): Promise<DbProject> {
   const db = await getDb()
   run(
     db,
-    'UPDATE projects SET name = ?, description = ?, githubRepoUrl = ?, color = ?, archived = ?, claudeCommand = ?, localPath = ? WHERE id = ?',
-    [name, description, githubRepoUrl, color, archived, claudeCommand, localPath, id]
+    'UPDATE projects SET name = ?, description = ?, githubRepoUrl = ?, color = ?, archived = ?, claudeCommand = ?, localPath = ?, stage = ?, businessModel = ?, pricing = ?, audience = ? WHERE id = ?',
+    [name, description, githubRepoUrl, color, archived, claudeCommand, localPath, stage, businessModel, pricing, audience, id]
   )
   return getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])!
+}
+
+/** Move a project between pipeline stages (drag-and-drop). */
+export async function setProjectStage(id: number, stage: string): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE projects SET stage = ? WHERE id = ?', [stage, id])
+}
+
+// ── Project milestones ──
+export async function getProjectMilestones(): Promise<DbProjectMilestone[]> {
+  const db = await getDb()
+  return getAll<DbProjectMilestone>(db, 'SELECT * FROM project_milestones ORDER BY doneAt IS NOT NULL, targetDate IS NULL, targetDate ASC, id ASC')
+}
+export async function createProjectMilestone(projectId: number, title: string, targetDate: string | null): Promise<DbProjectMilestone> {
+  const db = await getDb()
+  run(db, 'INSERT INTO project_milestones (projectId, title, targetDate, createdAt) VALUES (?, ?, ?, ?)', [projectId, title, targetDate, new Date().toISOString()])
+  return getOne<DbProjectMilestone>(db, 'SELECT * FROM project_milestones WHERE id = ?', [lastInsertId(db)])!
+}
+export async function toggleProjectMilestone(id: number, done: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE project_milestones SET doneAt = ? WHERE id = ?', [done ? new Date().toISOString() : null, id])
+}
+export async function deleteProjectMilestone(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM project_milestones WHERE id = ?', [id])
 }
 
 export async function deleteProject(id: number): Promise<void> {

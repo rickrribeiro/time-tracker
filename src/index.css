@@ -1814,6 +1814,47 @@ button.todo-divider:hover {
   min-height: 120px;
 }
 
+/* Business pipeline (Projetos) */
+.pipeline-board {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  align-items: flex-start;
+}
+.pipeline-column {
+  flex: 0 0 220px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px;
+  min-height: 120px;
+}
+.pipeline-column-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  padding: 2px 2px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pipeline-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pipeline-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  cursor: grab;
+}
+.pipeline-card:active {
+  cursor: grabbing;
+}
+
 .kanban-column-header {
   font-size: 12px;
   font-weight: 700;

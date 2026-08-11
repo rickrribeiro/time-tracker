@@ -75,6 +75,18 @@ export interface Project {
   archived: number
   claudeCommand: string | null
   localPath: string | null
+  stage: string
+  businessModel: string | null
+  pricing: string | null
+  audience: string | null
+}
+export interface ProjectMilestone {
+  id: number
+  projectId: number
+  title: string
+  targetDate: string | null
+  doneAt: string | null
+  createdAt: string
 }
 
 export interface Habit {
@@ -503,7 +515,11 @@ declare global {
           githubRepoUrl: string | null,
           color: string,
           claudeCommand: string | null,
-          localPath?: string | null
+          localPath?: string | null,
+          stage?: string,
+          businessModel?: string | null,
+          pricing?: string | null,
+          audience?: string | null
         ) => Promise<Project>
         update: (
           id: number,
@@ -513,8 +529,19 @@ declare global {
           color: string,
           archived: number,
           claudeCommand: string | null,
-          localPath?: string | null
+          localPath?: string | null,
+          stage?: string,
+          businessModel?: string | null,
+          pricing?: string | null,
+          audience?: string | null
         ) => Promise<Project>
+        setStage: (id: number, stage: string) => Promise<void>
+        delete: (id: number) => Promise<void>
+      }
+      milestones: {
+        getAll: () => Promise<ProjectMilestone[]>
+        create: (projectId: number, title: string, targetDate: string | null) => Promise<ProjectMilestone>
+        toggle: (id: number, done: number) => Promise<void>
         delete: (id: number) => Promise<void>
       }
       habits: {

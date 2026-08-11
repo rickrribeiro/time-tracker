@@ -119,8 +119,8 @@ const api = {
   // Projects
   projects: {
     getAll: () => ipcRenderer.invoke('projects:getAll'),
-    create: (name: string, description: string | null, githubRepoUrl: string | null, color: string, claudeCommand: string | null, localPath?: string | null) =>
-      ipcRenderer.invoke('projects:create', name, description, githubRepoUrl, color, claudeCommand, localPath),
+    create: (name: string, description: string | null, githubRepoUrl: string | null, color: string, claudeCommand: string | null, localPath?: string | null, stage?: string, businessModel?: string | null, pricing?: string | null, audience?: string | null) =>
+      ipcRenderer.invoke('projects:create', name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience),
     update: (
       id: number,
       name: string,
@@ -129,9 +129,20 @@ const api = {
       color: string,
       archived: number,
       claudeCommand: string | null,
-      localPath?: string | null
-    ) => ipcRenderer.invoke('projects:update', id, name, description, githubRepoUrl, color, archived, claudeCommand, localPath),
+      localPath?: string | null,
+      stage?: string,
+      businessModel?: string | null,
+      pricing?: string | null,
+      audience?: string | null
+    ) => ipcRenderer.invoke('projects:update', id, name, description, githubRepoUrl, color, archived, claudeCommand, localPath, stage, businessModel, pricing, audience),
+    setStage: (id: number, stage: string) => ipcRenderer.invoke('projects:setStage', id, stage),
     delete: (id: number) => ipcRenderer.invoke('projects:delete', id)
+  },
+  milestones: {
+    getAll: () => ipcRenderer.invoke('milestones:getAll'),
+    create: (projectId: number, title: string, targetDate: string | null) => ipcRenderer.invoke('milestones:create', projectId, title, targetDate),
+    toggle: (id: number, done: number) => ipcRenderer.invoke('milestones:toggle', id, done),
+    delete: (id: number) => ipcRenderer.invoke('milestones:delete', id)
   },
   // Habits
   habits: {

@@ -10,9 +10,14 @@ interface ProjectState {
     githubRepoUrl: string | null,
     color: string,
     claudeCommand: string | null,
-    localPath: string | null
+    localPath: string | null,
+    stage: string,
+    businessModel: string | null,
+    pricing: string | null,
+    audience: string | null
   ) => Promise<void>
   update: (project: Project) => Promise<void>
+  setStage: (id: number, stage: string) => Promise<void>
   remove: (id: number) => Promise<void>
 }
 
@@ -24,8 +29,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ projects })
   },
 
-  create: async (name, description, githubRepoUrl, color, claudeCommand, localPath) => {
-    await window.api.projects.create(name, description, githubRepoUrl, color, claudeCommand, localPath)
+  create: async (name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience) => {
+    await window.api.projects.create(name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience)
     await get().refresh()
   },
 
@@ -38,8 +43,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       project.color,
       project.archived,
       project.claudeCommand,
-      project.localPath
+      project.localPath,
+      project.stage,
+      project.businessModel,
+      project.pricing,
+      project.audience
     )
+    await get().refresh()
+  },
+
+  setStage: async (id, stage) => {
+    // optimistic
+    set({ projects: get().projects.map((p) => (p.id === id ? { ...p, stage } : p)) })
+    await window.api.projects.setStage(id, stage)
     await get().refresh()
   },
 

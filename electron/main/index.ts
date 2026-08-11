@@ -28,7 +28,12 @@ import {
   getProjects,
   createProject,
   updateProject,
+  setProjectStage,
   deleteProject,
+  getProjectMilestones,
+  createProjectMilestone,
+  toggleProjectMilestone,
+  deleteProjectMilestone,
   getHabits,
   createHabit,
   updateHabit,
@@ -559,8 +564,8 @@ ipcMain.handle('projects:getAll', () => getProjects())
 
 ipcMain.handle(
   'projects:create',
-  (_, name: string, description: string | null, githubRepoUrl: string | null, color: string, claudeCommand: string | null, localPath?: string | null) =>
-    createProject(name, description, githubRepoUrl, color, claudeCommand, localPath ?? null)
+  (_, name: string, description: string | null, githubRepoUrl: string | null, color: string, claudeCommand: string | null, localPath?: string | null, stage?: string, businessModel?: string | null, pricing?: string | null, audience?: string | null) =>
+    createProject(name, description, githubRepoUrl, color, claudeCommand, localPath ?? null, stage ?? 'ideia', businessModel ?? null, pricing ?? null, audience ?? null)
 )
 
 ipcMain.handle(
@@ -574,11 +579,21 @@ ipcMain.handle(
     color: string,
     archived: number,
     claudeCommand: string | null,
-    localPath?: string | null
-  ) => updateProject(id, name, description, githubRepoUrl, color, archived, claudeCommand, localPath ?? null)
+    localPath?: string | null,
+    stage?: string,
+    businessModel?: string | null,
+    pricing?: string | null,
+    audience?: string | null
+  ) => updateProject(id, name, description, githubRepoUrl, color, archived, claudeCommand, localPath ?? null, stage ?? 'ideia', businessModel ?? null, pricing ?? null, audience ?? null)
 )
 
+ipcMain.handle('projects:setStage', (_, id: number, stage: string) => setProjectStage(id, stage))
 ipcMain.handle('projects:delete', (_, id: number) => deleteProject(id))
+
+ipcMain.handle('milestones:getAll', () => getProjectMilestones())
+ipcMain.handle('milestones:create', (_, projectId: number, title: string, targetDate: string | null) => createProjectMilestone(projectId, title, targetDate))
+ipcMain.handle('milestones:toggle', (_, id: number, done: number) => toggleProjectMilestone(id, done))
+ipcMain.handle('milestones:delete', (_, id: number) => deleteProjectMilestone(id))
 
 // ── IPC: Habits ───────────────────────────────────────────────────────────────
 

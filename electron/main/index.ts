@@ -293,8 +293,9 @@ ipcMain.handle(
     priority: number,
     dueDate: string | null,
     projectId: number | null,
-    aiGenerated?: number
-  ) => createTodo(title, notes, status, source, priority, dueDate, projectId, aiGenerated ?? 0)
+    aiGenerated?: number,
+    recurrence?: string | null
+  ) => createTodo(title, notes, status, source, priority, dueDate, projectId, aiGenerated ?? 0, recurrence ?? null)
 )
 
 ipcMain.handle(
@@ -307,8 +308,9 @@ ipcMain.handle(
     status: string,
     priority: number,
     dueDate: string | null,
-    projectId: number | null
-  ) => updateTodo(id, title, notes, status, priority, dueDate, projectId)
+    projectId: number | null,
+    recurrence?: string | null
+  ) => updateTodo(id, title, notes, status, priority, dueDate, projectId, recurrence)
 )
 
 ipcMain.handle('todos:delete', (_, id: number) => deleteTodo(id))

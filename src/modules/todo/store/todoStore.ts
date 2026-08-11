@@ -47,7 +47,8 @@ export const useTodoStore = create<TodoState>((set, get) => ({
       todo.status,
       todo.priority,
       todo.dueDate,
-      todo.projectId
+      todo.projectId,
+      todo.recurrence
     )
     await get().refresh()
   },

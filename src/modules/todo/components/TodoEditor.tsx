@@ -25,9 +25,29 @@ export function TodoEditor({ todo, onClose }: TodoEditorProps): React.ReactEleme
   const [dueDate, setDueDate] = useState(todo.dueDate ?? '')
   const [projectId, setProjectId] = useState<number | null>(todo.projectId)
 
+  // recurrence: '' (none) | 'everyNDays' | 'dayOfMonth' | 'afterCompletion'
+  const parsedRec = (() => {
+    try {
+      return todo.recurrence ? (JSON.parse(todo.recurrence) as { type: string; n?: number; day?: number }) : null
+    } catch {
+      return null
+    }
+  })()
+  const [recType, setRecType] = useState<string>(parsedRec?.type ?? '')
+  const [recN, setRecN] = useState<number>(parsedRec?.n ?? 7)
+  const [recDay, setRecDay] = useState<number>(parsedRec?.day ?? 1)
+
   useEffect(() => {
     if (projects.length === 0) refreshProjects()
   }, [])
+
+  function buildRecurrence(): string | null {
+    if (!recType) return null
+    if (recType === 'everyNDays') return JSON.stringify({ type: 'everyNDays', n: recN })
+    if (recType === 'afterCompletion') return JSON.stringify({ type: 'afterCompletion', n: recN })
+    if (recType === 'dayOfMonth') return JSON.stringify({ type: 'dayOfMonth', day: recDay })
+    return null
+  }
 
   async function handleSave(): Promise<void> {
     if (!title.trim()) return
@@ -38,7 +58,8 @@ export function TodoEditor({ todo, onClose }: TodoEditorProps): React.ReactEleme
       status,
       priority,
       dueDate: dueDate || null,
-      projectId
+      projectId,
+      recurrence: buildRecurrence()
     })
     onClose()
   }
@@ -101,6 +122,35 @@ export function TodoEditor({ todo, onClose }: TodoEditorProps): React.ReactEleme
             </select>
           </div>
         </div>
+
+        <div className="editor-row">
+          <div className="editor-field">
+            <label>Repetir</label>
+            <select value={recType} onChange={(e) => setRecType(e.target.value)}>
+              <option value="">Não repetir</option>
+              <option value="everyNDays">A cada N dias</option>
+              <option value="dayOfMonth">Dia X do mês</option>
+              <option value="afterCompletion">N dias após concluir</option>
+            </select>
+          </div>
+          {(recType === 'everyNDays' || recType === 'afterCompletion') && (
+            <div className="editor-field">
+              <label>N (dias)</label>
+              <input type="number" min={1} value={recN} onChange={(e) => setRecN(Number(e.target.value) || 1)} />
+            </div>
+          )}
+          {recType === 'dayOfMonth' && (
+            <div className="editor-field">
+              <label>Dia do mês</label>
+              <input type="number" min={1} max={31} value={recDay} onChange={(e) => setRecDay(Number(e.target.value) || 1)} />
+            </div>
+          )}
+        </div>
+        {recType && (
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            Ao concluir, uma nova tarefa nasce automaticamente com o próximo prazo.
+          </p>
+        )}
 
         <div className="modal-actions">
           <button className="btn btn-secondary btn-sm" onClick={onClose}>

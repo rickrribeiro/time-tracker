@@ -67,8 +67,9 @@ const api = {
       priority = 0,
       dueDate: string | null = null,
       projectId: number | null = null,
-      aiGenerated = 0
-    ) => ipcRenderer.invoke('todos:create', title, notes, status, source, priority, dueDate, projectId, aiGenerated),
+      aiGenerated = 0,
+      recurrence: string | null = null
+    ) => ipcRenderer.invoke('todos:create', title, notes, status, source, priority, dueDate, projectId, aiGenerated, recurrence),
     update: (
       id: number,
       title: string,
@@ -76,8 +77,9 @@ const api = {
       status: string,
       priority: number,
       dueDate: string | null,
-      projectId: number | null
-    ) => ipcRenderer.invoke('todos:update', id, title, notes, status, priority, dueDate, projectId),
+      projectId: number | null,
+      recurrence?: string | null
+    ) => ipcRenderer.invoke('todos:update', id, title, notes, status, priority, dueDate, projectId, recurrence),
     delete: (id: number) => ipcRenderer.invoke('todos:delete', id)
   },
   // Projects

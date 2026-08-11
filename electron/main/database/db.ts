@@ -128,6 +128,17 @@ const MIGRATIONS: Migration[] = [
         // column already exists
       }
     }
+  },
+  {
+    version: 9,
+    label: 'todos.recurrence',
+    run: (db) => {
+      try {
+        db.run('ALTER TABLE todos ADD COLUMN recurrence TEXT;')
+      } catch {
+        // column already exists
+      }
+    }
   }
 ]
 

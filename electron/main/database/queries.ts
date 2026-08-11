@@ -445,6 +445,7 @@ export interface DbTodo {
   projectId: number | null
   source: string
   aiGenerated: number
+  recurrence: string | null
   createdAt: string
 }
 
@@ -484,14 +485,15 @@ export async function createTodo(
   priority = 0,
   dueDate: string | null = null,
   projectId: number | null = null,
-  aiGenerated = 0
+  aiGenerated = 0,
+  recurrence: string | null = null
 ): Promise<DbTodo> {
   const db = await getDb()
   const createdAt = new Date().toISOString()
   run(
     db,
-    'INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [title, notes, status, priority, dueDate, projectId, source, aiGenerated, createdAt]
+    'INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, createdAt]
   )
   const id = lastInsertId(db)
   return getOne<DbTodo>(db, 'SELECT * FROM todos WHERE id = ?', [id])!
@@ -504,15 +506,67 @@ export async function updateTodo(
   status: string,
   priority: number,
   dueDate: string | null,
-  projectId: number | null
+  projectId: number | null,
+  recurrence?: string | null
 ): Promise<DbTodo> {
   const db = await getDb()
+  const prev = getOne<DbTodo>(db, 'SELECT status FROM todos WHERE id = ?', [id])
+  if (recurrence === undefined) {
+    run(
+      db,
+      'UPDATE todos SET title = ?, notes = ?, status = ?, priority = ?, dueDate = ?, projectId = ? WHERE id = ?',
+      [title, notes, status, priority, dueDate, projectId, id]
+    )
+  } else {
+    run(
+      db,
+      'UPDATE todos SET title = ?, notes = ?, status = ?, priority = ?, dueDate = ?, projectId = ?, recurrence = ? WHERE id = ?',
+      [title, notes, status, priority, dueDate, projectId, recurrence, id]
+    )
+  }
+  // On transition INTO done, spawn the next instance of a recurring todo (once).
+  if (status === 'done' && prev?.status !== 'done') spawnRecurrenceIfNeeded(db, id)
+  return getOne<DbTodo>(db, 'SELECT * FROM todos WHERE id = ?', [id])!
+}
+
+/** Compute the next due date (YYYY-MM-DD) from a recurrence rule. */
+function nextDueDate(rec: { type: string; n?: number; day?: number }, fromDue: string | null): string {
+  const today = new Date()
+  const base = fromDue ? new Date(`${fromDue}T12:00:00`) : new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12)
+  const iso = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  if (rec.type === 'everyNDays') {
+    base.setDate(base.getDate() + (rec.n && rec.n > 0 ? rec.n : 1))
+    return iso(base)
+  }
+  if (rec.type === 'afterCompletion') {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12)
+    d.setDate(d.getDate() + (rec.n && rec.n > 0 ? rec.n : 1))
+    return iso(d)
+  }
+  // dayOfMonth: next occurrence of day X (next month from today)
+  const day = rec.day && rec.day >= 1 && rec.day <= 31 ? rec.day : 1
+  const d = new Date(today.getFullYear(), today.getMonth() + 1, day, 12)
+  return iso(d)
+}
+
+/** If the just-completed todo has a recurrence rule, create the next open instance. */
+function spawnRecurrenceIfNeeded(db: Awaited<ReturnType<typeof getDb>>, id: number): void {
+  const t = getOne<DbTodo>(db, 'SELECT * FROM todos WHERE id = ?', [id])
+  if (!t || !t.recurrence) return
+  // avoid duplicating: only spawn once per completion (the source becomes 'recurring')
+  let rec: { type: string; n?: number; day?: number }
+  try {
+    rec = JSON.parse(t.recurrence)
+  } catch {
+    return
+  }
+  if (!rec || !rec.type) return
+  const nextDue = nextDueDate(rec, t.dueDate)
   run(
     db,
-    'UPDATE todos SET title = ?, notes = ?, status = ?, priority = ?, dueDate = ?, projectId = ? WHERE id = ?',
-    [title, notes, status, priority, dueDate, projectId, id]
+    'INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [t.title, t.notes, 'todo', t.priority, nextDue, t.projectId, 'recurring', 0, t.recurrence, new Date().toISOString()]
   )
-  return getOne<DbTodo>(db, 'SELECT * FROM todos WHERE id = ?', [id])!
 }
 
 export async function deleteTodo(id: number): Promise<void> {

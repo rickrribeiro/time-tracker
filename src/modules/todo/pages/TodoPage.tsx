@@ -200,6 +200,7 @@ export function TodoPage(): React.ReactElement {
                 </button>
               )}
               {proj && <span className="project-chip">{proj}</span>}
+              {t.recurrence && <span title="Tarefa recorrente">🔁</span>}
               {due && <span className={`due-badge ${due.cls}`}>{due.label}</span>}
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }} title={`Criada em ${new Date(t.createdAt).toLocaleString('pt-BR')}`}>⏳ {timeAgo(t.createdAt)}</span>
               <select

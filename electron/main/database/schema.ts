@@ -50,6 +50,7 @@ export const SCHEMA = `
     projectId INTEGER REFERENCES projects(id) ON DELETE SET NULL,
     source TEXT NOT NULL DEFAULT 'manual',  -- manual | quick-capture | github
     aiGenerated INTEGER NOT NULL DEFAULT 0,
+    recurrence TEXT,                        -- JSON: { type, n?, day? } | null
     createdAt TEXT NOT NULL
   );
 

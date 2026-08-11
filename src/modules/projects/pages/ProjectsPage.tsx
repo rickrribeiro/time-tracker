@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Project } from '../../../types'
 import { useProjectStore } from '../store/projectStore'
+import { ProgressModal } from '../components/ProgressModal'
 
 const PRESET_COLORS = ['#6366f1', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#06b6d4']
 
@@ -19,6 +20,7 @@ export function ProjectsPage(): React.ReactElement {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
+  const [showProgress, setShowProgress] = useState(false)
 
   useEffect(() => {
     refresh()
@@ -115,9 +117,12 @@ export function ProjectsPage(): React.ReactElement {
             Associe um repo do GitHub e veja as issues em <strong>Issues (Kanban)</strong>.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={startCreate}>
-          + Novo Projeto
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" onClick={() => setShowProgress(true)}>📊 Progresso</button>
+          <button className="btn btn-primary" onClick={startCreate}>
+            + Novo Projeto
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -169,6 +174,8 @@ export function ProjectsPage(): React.ReactElement {
           <div className="cards-grid">{archived.map(renderCard)}</div>
         </>
       )}
+
+      {showProgress && <ProgressModal projects={active} onClose={() => setShowProgress(false)} />}
     </div>
   )
 }

@@ -160,10 +160,12 @@ async function fetchIssuesViaGh(query: string): Promise<GithubApiIssue[]> {
   }
 }
 
-export async function syncGithubIssues(): Promise<number> {
+export async function syncGithubIssues(forceFull = false): Promise<number> {
   const mode = (await getSetting('github_auth_mode')) || 'token'
   const lastSync = await getSetting('github_last_sync')
-  const full = !lastSync
+  // Manual sync = always full (re-pull everything). Incremental (`since`) só quando
+  // não forçado E já houve um sync — evita o botão "não fazer nada" por causa do cursor.
+  const full = forceFull || !lastSync
   const query =
     `issues?filter=assigned&state=all&per_page=100&sort=updated` +
     (full ? '' : `&since=${encodeURIComponent(lastSync as string)}`)

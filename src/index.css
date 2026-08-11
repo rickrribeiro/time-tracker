@@ -1478,6 +1478,24 @@ select:focus {
   color: var(--accent-hover);
 }
 
+.todo-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.todo-divider::before,
+.todo-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 /* ── Travel Stay Finder ── */
 .stay-card {
   background: var(--bg-secondary);

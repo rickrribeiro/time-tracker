@@ -46,6 +46,9 @@ export function TodoPage(): React.ReactElement {
       })
   }, [todos, search, statusFilter, projectFilter])
 
+  const openItems = items.filter((t) => t.status !== 'done')
+  const doneItems = items.filter((t) => t.status === 'done')
+
   async function handleAdd(): Promise<void> {
     const v = text.trim()
     if (!v) return
@@ -104,7 +107,7 @@ export function TodoPage(): React.ReactElement {
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700 }}>✅ TODO</h2>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            {items.length} {items.length === 1 ? 'tarefa' : 'tarefas'}
+            {openItems.length} em aberto · {doneItems.length} feitas
             <span style={{ color: 'var(--text-muted)', marginLeft: 10 }}>
               ↑↓ navegar · espaço concluir · p adiar · e editar
             </span>
@@ -156,17 +159,30 @@ export function TodoPage(): React.ReactElement {
 
       <div className="list-stack">
         {items.length === 0 && <div className="empty-hint">Nenhuma tarefa encontrada.</div>}
-        {items.map((t) => {
-          const done = t.status === 'done'
-          const prio = priorityDef(t.priority)
-          const due = dueMeta(t.dueDate, done)
-          const proj = projectName(t.projectId)
-          return (
-            <div
-              key={t.id}
-              className={`list-row ${selectedId === t.id ? 'selected' : ''}`}
-              onClick={() => setSelectedId(t.id)}
-            >
+        {openItems.map((t) => renderRow(t))}
+        {doneItems.length > 0 && (
+          <div className="todo-divider">
+            <span>Concluídas ({doneItems.length})</span>
+          </div>
+        )}
+        {doneItems.map((t) => renderRow(t))}
+      </div>
+
+      {editing && <TodoEditor todo={editing} onClose={() => setEditing(null)} />}
+    </div>
+  )
+
+  function renderRow(t: Todo): React.ReactElement {
+    const done = t.status === 'done'
+    const prio = priorityDef(t.priority)
+    const due = dueMeta(t.dueDate, done)
+    const proj = projectName(t.projectId)
+    return (
+      <div
+        key={t.id}
+        className={`list-row ${selectedId === t.id ? 'selected' : ''}`}
+        onClick={() => setSelectedId(t.id)}
+      >
               <input
                 type="checkbox"
                 checked={done}
@@ -222,12 +238,7 @@ export function TodoPage(): React.ReactElement {
                   Excluir
                 </button>
               </div>
-            </div>
-          )
-        })}
       </div>
-
-      {editing && <TodoEditor todo={editing} onClose={() => setEditing(null)} />}
-    </div>
-  )
+    )
+  }
 }

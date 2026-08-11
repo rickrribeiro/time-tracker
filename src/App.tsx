@@ -16,6 +16,7 @@ import { GoalsPage } from './modules/goals/pages/GoalsPage'
 import { AutomationsPage } from './modules/automations/pages/AutomationsPage'
 import { WeeklyReviewPage } from './modules/review/pages/WeeklyReviewPage'
 import { CrmPage } from './modules/crm/pages/CrmPage'
+import { StayFinderPage } from './modules/travel-stays/pages/StayFinderPage'
 import { EstudosDashboardPage } from './modules/estudos/pages/EstudosDashboardPage'
 import { TopicWorkspacePage } from './modules/estudos/pages/TopicWorkspacePage'
 import { RevisoesPage } from './modules/estudos/pages/RevisoesPage'
@@ -114,6 +115,7 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
     groupIcon: '✈️',
     items: [
       { id: 'trips', label: 'Próximas', icon: '✈️' },
+      { id: 'stays', label: 'Hospedagens', icon: '🏨' },
       { id: 'trip-monitoring', label: 'Monitoramento', icon: '🔔' },
       { id: 'destinations', label: 'Destinos', icon: '🗺' },
       { id: 'documents', label: 'Documentos', icon: '📄' },
@@ -162,6 +164,7 @@ const PAGES: Record<Page, React.ComponentType> = {
   investments: InvestmentsPage,
   reports: ReportsPage,
   trips: TripsPage,
+  stays: StayFinderPage,
   'trip-monitoring': MonitoringPage,
   destinations: DestinationsPage,
   documents: DocumentsPage,

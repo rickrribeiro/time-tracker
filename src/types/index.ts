@@ -370,6 +370,7 @@ export type Page =
   | 'reports'
   // Viagens
   | 'trips'
+  | 'stays'
   | 'trip-monitoring'
   | 'destinations'
   | 'documents'

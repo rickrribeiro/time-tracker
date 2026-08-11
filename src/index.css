@@ -1478,6 +1478,33 @@ select:focus {
   color: var(--accent-hover);
 }
 
+/* ── Travel Stay Finder ── */
+.stay-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.stay-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  color: var(--accent-hover);
+  font-weight: 700;
+  font-size: 15px;
+}
+.stay-map {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px;
+}
+
 /* ── Pomodoro ── */
 .pomodoro-widget { position: relative; }
 .pomodoro-panel {

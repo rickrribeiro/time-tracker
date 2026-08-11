@@ -5,11 +5,13 @@ import { RoadmapTree } from '../components/RoadmapTree'
 import { NoteEditor } from '../components/NoteEditor'
 import { FlashcardPanel } from '../components/FlashcardPanel'
 import { QuizModal } from '../components/QuizModal'
+import { GapsModal } from '../components/GapsModal'
 
 export function TopicWorkspacePage(): React.ReactElement {
   const { setPage } = useUIStore()
   const { topics, activeTopicId, nodes, refreshActive, refreshTopics } = useStudyStore()
   const [quizOpen, setQuizOpen] = useState(false)
+  const [gapsOpen, setGapsOpen] = useState(false)
   const topic = topics.find((t) => t.id === activeTopicId) ?? null
 
   useEffect(() => {
@@ -53,6 +55,7 @@ export function TopicWorkspacePage(): React.ReactElement {
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button className="btn btn-primary btn-sm" onClick={() => setQuizOpen(true)} title="Gerar um quiz a partir das anotações">🧪 Quiz</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setGapsOpen(true)} title="Detectar pré-requisitos/itens faltando no roadmap">🕳️ Lacunas</button>
           <button className="btn btn-secondary btn-sm" onClick={() => runExport(() => window.api.study.exportMarkdown(topic.id))} title="Gerar caderno (.md) do tópico">📄 Caderno .md</button>
           <button className="btn btn-secondary btn-sm" onClick={() => runExport(() => window.api.study.exportJson(topic.id))} title="Backup JSON do tópico">🗄 JSON</button>
           <button className="btn btn-secondary btn-sm" onClick={() => runExport(() => window.api.study.exportFolder(topic.id))} title="Exportar pasta Markdown (Obsidian)">📁 Pasta</button>
@@ -75,6 +78,7 @@ export function TopicWorkspacePage(): React.ReactElement {
       </div>
 
       {quizOpen && <QuizModal topic={topic} onClose={() => setQuizOpen(false)} />}
+      {gapsOpen && <GapsModal topic={topic} onClose={() => setGapsOpen(false)} />}
     </div>
   )
 }

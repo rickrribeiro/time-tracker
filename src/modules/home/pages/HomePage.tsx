@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useUIStore } from '../../../store/uiStore'
+import { DailyStandup } from '../components/DailyStandup'
 import { useTaskStore } from '../../timetracker/store/taskStore'
 import { useTodoStore } from '../../todo/store/todoStore'
 import { useHabitStore } from '../../habits/store/habitStore'
@@ -87,6 +88,8 @@ export function HomePage(): React.ReactElement {
         </span>
         <span className="braindump-cta-arrow">→</span>
       </button>
+
+      <DailyStandup />
 
       {/* ── Hoje ── */}
       <div className="dash-section">

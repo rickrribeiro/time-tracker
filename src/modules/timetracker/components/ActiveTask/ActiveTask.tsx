@@ -115,7 +115,6 @@ export function ActiveTask(): React.ReactElement {
             <button className="btn btn-danger" onClick={stopActiveTask}>
               ■ Stop
             </button>
-            <PomodoroWidget />
           </div>
         </>
       ) : (
@@ -151,9 +150,9 @@ export function ActiveTask(): React.ReactElement {
           <button className="btn btn-primary" onClick={handleStart}>
             ▶ Start
           </button>
-          <PomodoroWidget />
         </div>
       )}
+      <PomodoroWidget />
     </div>
   )
 }

@@ -57,6 +57,14 @@ export function PomodoroWidget(): React.ReactElement {
   const [now, setNow] = useState(Date.now())
   const advancing = useRef(false)
 
+  // refs with the latest values so the single interval can read them without stale closures
+  const stRef = useRef(st)
+  stRef.current = st
+  const breakMinRef = useRef(breakMin)
+  breakMinRef.current = breakMin
+  const activeRef = useRef(activeTask)
+  activeRef.current = activeTask
+
   // load durations from settings
   useEffect(() => {
     window.api.settings.get('pomodoro_work_minutes').then((v) => { const n = parseInt(v || ''); if (n > 0) setWorkMin(n) })
@@ -68,38 +76,43 @@ export function PomodoroWidget(): React.ReactElement {
     localStorage.setItem(STATE_KEY, JSON.stringify(st))
   }, [st])
 
-  // 1s tick
-  useEffect(() => {
-    if (st.phase === 'idle') return
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [st.phase])
-
-  // if the user stopped the task manually while a session was running, reset
-  useEffect(() => {
-    if (st.phase !== 'idle' && !activeTask) setSt((s) => ({ ...s, phase: 'idle', endsAt: 0 }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTask])
-
-  // phase expiry
-  useEffect(() => {
-    if (st.phase === 'idle' || now < st.endsAt || advancing.current) return
+  async function advance(): Promise<void> {
+    if (advancing.current) return
+    const cur = stRef.current
     advancing.current = true
-    ;(async () => {
-      if (st.phase === 'work') {
+    try {
+      if (cur.phase === 'work') {
         await stopActiveTask()
         notify('🍅 Foco concluído!', 'Hora da pausa.')
         await startTask('Pausa ☕', IDLE_TAG_ID, null)
-        setSt((s) => ({ ...s, phase: 'break', endsAt: Date.now() + breakMin * 60000, cycles: s.cycles + 1 }))
+        setSt((s) => ({ ...s, phase: 'break', endsAt: Date.now() + breakMinRef.current * 60000, cycles: s.cycles + 1 }))
       } else {
         await stopActiveTask()
         notify('☕ Pausa acabou', 'Pronto para o próximo foco?')
         setSt((s) => ({ ...s, phase: 'idle', endsAt: 0 }))
       }
+    } finally {
       advancing.current = false
-    })()
+    }
+  }
+
+  // single ticker: updates the display and fires expiry / manual-stop detection
+  useEffect(() => {
+    const id = setInterval(() => {
+      const cur = stRef.current
+      if (cur.phase === 'idle') return
+      setNow(Date.now())
+      if (advancing.current) return
+      // user stopped the task by hand → cancel the session
+      if (!activeRef.current) {
+        setSt((s) => ({ ...s, phase: 'idle', endsAt: 0 }))
+        return
+      }
+      if (Date.now() >= cur.endsAt) void advance()
+    }, 1000)
+    return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [now, st.phase, st.endsAt])
+  }, [])
 
   async function startWork(): Promise<void> {
     const title = st.title.trim() || 'Foco'
@@ -111,8 +124,7 @@ export function PomodoroWidget(): React.ReactElement {
   }
 
   async function skip(): Promise<void> {
-    setNow(Date.now())
-    setSt((s) => ({ ...s, endsAt: Date.now() - 1 })) // trigger expiry handler
+    await advance()
   }
 
   async function stopAll(): Promise<void> {

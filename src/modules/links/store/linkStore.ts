@@ -8,6 +8,7 @@ interface LinkState {
   update: (id: number, title: string, url: string, tags: string[]) => Promise<void>
   remove: (id: number) => Promise<void>
   setChecked: (id: number, checked: boolean) => Promise<void>
+  markOpened: (id: number) => Promise<void>
 }
 
 export const useLinkStore = create<LinkState>((set, get) => ({
@@ -31,6 +32,11 @@ export const useLinkStore = create<LinkState>((set, get) => ({
     await window.api.links.setChecked(id, checked ? 1 : 0)
     // optimistic local update (avoids a full refetch flicker on the checkbox)
     set({ links: get().links.map((l) => (l.id === id ? { ...l, checked: checked ? 1 : 0 } : l)) })
+  },
+  markOpened: async (id) => {
+    const now = new Date().toISOString()
+    set({ links: get().links.map((l) => (l.id === id ? { ...l, lastOpenedAt: now } : l)) })
+    await window.api.links.markOpened(id)
   }
 }))
 

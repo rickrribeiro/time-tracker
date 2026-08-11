@@ -139,6 +139,17 @@ const MIGRATIONS: Migration[] = [
         // column already exists
       }
     }
+  },
+  {
+    version: 10,
+    label: 'links.lastOpenedAt',
+    run: (db) => {
+      try {
+        db.run('ALTER TABLE links ADD COLUMN lastOpenedAt TEXT;')
+      } catch {
+        // column already exists
+      }
+    }
   }
 ]
 

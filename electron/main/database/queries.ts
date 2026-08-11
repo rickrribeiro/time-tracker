@@ -1464,6 +1464,7 @@ export interface DbLink {
   url: string
   checked: number
   tags: string // JSON array
+  lastOpenedAt: string | null
   createdAt: string
 }
 
@@ -1491,6 +1492,11 @@ export async function updateLink(id: number, title: string, url: string, tags = 
 export async function setLinkChecked(id: number, checked: number): Promise<void> {
   const db = await getDb()
   run(db, 'UPDATE links SET checked = ? WHERE id = ?', [checked, id])
+}
+
+export async function setLinkOpened(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE links SET lastOpenedAt = ? WHERE id = ?', [new Date().toISOString(), id])
 }
 
 export async function deleteLink(id: number): Promise<void> {

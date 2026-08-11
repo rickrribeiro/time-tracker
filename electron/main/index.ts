@@ -94,6 +94,7 @@ import {
   createLink,
   updateLink,
   setLinkChecked,
+  setLinkOpened,
   deleteLink,
   getStudyTopics,
   createStudyTopic,
@@ -740,6 +741,7 @@ ipcMain.handle('links:getAll', () => getLinks())
 ipcMain.handle('links:create', (_, title: string, url: string, tags?: string) => createLink(title, url, tags))
 ipcMain.handle('links:update', (_, id: number, title: string, url: string, tags?: string) => updateLink(id, title, url, tags))
 ipcMain.handle('links:setChecked', (_, id: number, checked: number) => setLinkChecked(id, checked))
+ipcMain.handle('links:markOpened', (_, id: number) => setLinkOpened(id))
 ipcMain.handle('links:delete', (_, id: number) => deleteLink(id))
 
 // ── IPC: Estudos (Learning OS) ────────────────────────────────────────────────

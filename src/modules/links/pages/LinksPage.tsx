@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from '../../../types'
 import { useLinkStore, normalizeUrl, parseTags } from '../store/linkStore'
+import { timeAgo } from '../../../utils/dates'
 
 /** Chip editor: click a chip to remove, type + Enter/comma to add. */
 function TagEditor({ tags, setTags }: { tags: string[]; setTags: (t: string[]) => void }): React.ReactElement {
@@ -72,7 +73,7 @@ function LinkEditor({ link, onClose }: { link: Link; onClose: () => void }): Rea
 }
 
 export function LinksPage(): React.ReactElement {
-  const { links, refresh, create, remove, setChecked } = useLinkStore()
+  const { links, refresh, create, remove, setChecked, markOpened } = useLinkStore()
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
   const [newTags, setNewTags] = useState<string[]>([])
@@ -100,17 +101,18 @@ export function LinksPage(): React.ReactElement {
     setNewTags([])
   }
 
-  function open(u: string): void {
-    window.api.app.openExternal(normalizeUrl(u))
+  function open(l: Link): void {
+    window.api.app.openExternal(normalizeUrl(l.url))
+    markOpened(l.id)
   }
 
   function openAllChecked(): void {
-    links.filter((l) => l.checked === 1).forEach((l) => open(l.url))
+    links.filter((l) => l.checked === 1).forEach(open)
   }
 
   function openByTag(): void {
     if (tagFilter === 'all') return
-    links.filter((l) => parseTags(l.tags).includes(tagFilter)).forEach((l) => open(l.url))
+    links.filter((l) => parseTags(l.tags).includes(tagFilter)).forEach(open)
   }
 
   return (
@@ -184,7 +186,7 @@ export function LinksPage(): React.ReactElement {
                 onChange={(e) => setChecked(l.id, e.target.checked)}
                 title="Incluir em 'Abrir marcados'"
               />
-              <button className="link-title" onClick={() => open(l.url)} title={`Abrir ${l.url}`}>
+              <button className="link-title" onClick={() => open(l)} title={`Abrir ${l.url}`}>
                 {l.title}
               </button>
               {tags.map((t) => (
@@ -199,8 +201,11 @@ export function LinksPage(): React.ReactElement {
                 </span>
               ))}
               <span className="link-url">{l.url}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }} title={l.lastOpenedAt ? `Aberto em ${new Date(l.lastOpenedAt).toLocaleString('pt-BR')}` : 'Nunca aberto por aqui'}>
+                {l.lastOpenedAt ? `aberto há ${timeAgo(l.lastOpenedAt)}` : 'nunca aberto'}
+              </span>
               <div className="list-row-actions">
-                <button className="btn btn-secondary btn-sm" onClick={() => open(l.url)}>Abrir</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => open(l)}>Abrir</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => setEditing(l)}>Editar</button>
                 <button className="btn btn-danger btn-sm" onClick={() => remove(l.id)}>✕</button>
               </div>

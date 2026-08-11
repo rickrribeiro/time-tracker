@@ -232,6 +232,7 @@ export interface Link {
   url: string
   checked: number
   tags: string // JSON array
+  lastOpenedAt: string | null
   createdAt: string
 }
 
@@ -629,6 +630,7 @@ declare global {
         create: (title: string, url: string, tags?: string) => Promise<Link>
         update: (id: number, title: string, url: string, tags?: string) => Promise<void>
         setChecked: (id: number, checked: number) => Promise<void>
+        markOpened: (id: number) => Promise<void>
         delete: (id: number) => Promise<void>
       }
       study: {

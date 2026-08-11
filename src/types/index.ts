@@ -273,6 +273,18 @@ export interface StudyQuizAttempt {
   durationMs: number | null
   createdAt: string
 }
+export interface Goal {
+  id: number
+  month: string // YYYY-MM
+  title: string
+  kind: string // free | project | study
+  refId: number | null
+  target: number
+  current: number
+  unit: string | null
+  done: number
+  createdAt: string
+}
 export type StudyIoResult = { ok: boolean; topicId?: number; message?: string; error?: string }
 
 export type Page =
@@ -290,6 +302,7 @@ export type Page =
   | 'braindump'
   | 'habits'
   | 'knowledge'
+  | 'goals'
   // Estudos (Learning OS)
   | 'estudos'
   | 'estudos-topic'
@@ -362,6 +375,12 @@ declare global {
       }
       inbox: {
         ocr: (base64: string, ext: string) => Promise<{ ok: boolean; output?: string; error?: string }>
+      }
+      goals: {
+        getForMonth: (month: string) => Promise<Goal[]>
+        create: (month: string, title: string, kind: string, refId: number | null, target: number, unit: string | null) => Promise<Goal>
+        update: (id: number, title: string, target: number, current: number, unit: string | null, done: number) => Promise<Goal>
+        delete: (id: number) => Promise<void>
       }
       todos: {
         getAll: (status?: string) => Promise<Todo[]>

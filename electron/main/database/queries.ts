@@ -1394,6 +1394,58 @@ export async function deleteLink(id: number): Promise<void> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Metas mensais
+// ══════════════════════════════════════════════════════════════════════════════
+export interface DbGoal {
+  id: number
+  month: string
+  title: string
+  kind: string
+  refId: number | null
+  target: number
+  current: number
+  unit: string | null
+  done: number
+  createdAt: string
+}
+export async function getGoals(month: string): Promise<DbGoal[]> {
+  const db = await getDb()
+  return getAll<DbGoal>(db, 'SELECT * FROM goals WHERE month = ? ORDER BY done ASC, id ASC', [month])
+}
+export async function createGoal(
+  month: string,
+  title: string,
+  kind: string,
+  refId: number | null,
+  target: number,
+  unit: string | null
+): Promise<DbGoal> {
+  const db = await getDb()
+  run(
+    db,
+    'INSERT INTO goals (month, title, kind, refId, target, current, unit, done, createdAt) VALUES (?, ?, ?, ?, ?, 0, ?, 0, ?)',
+    [month, title, kind, refId, target, unit, new Date().toISOString()]
+  )
+  return getOne<DbGoal>(db, 'SELECT * FROM goals WHERE id = ?', [lastInsertId(db)])!
+}
+export async function updateGoal(
+  id: number,
+  title: string,
+  target: number,
+  current: number,
+  unit: string | null,
+  done: number
+): Promise<DbGoal> {
+  const db = await getDb()
+  run(db, 'UPDATE goals SET title = ?, target = ?, current = ?, unit = ?, done = ? WHERE id = ?', [title, target, current, unit, done, id])
+  return getOne<DbGoal>(db, 'SELECT * FROM goals WHERE id = ?', [id])!
+}
+export async function deleteGoal(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM goals WHERE id = ?', [id])
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Estudos (Learning OS): topics, roadmap nodes, notes, flashcards
 // ══════════════════════════════════════════════════════════════════════════════
 

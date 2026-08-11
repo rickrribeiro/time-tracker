@@ -116,7 +116,11 @@ import {
   getStudyQuizAttempts,
   createStudyQuizAttempt,
   getStudyBundle,
-  importStudyBundle
+  importStudyBundle,
+  getGoals,
+  createGoal,
+  updateGoal,
+  deleteGoal
 } from './database/queries'
 import type { DbTransaction, DbSkill, DbAgent, StudyBundle } from './database/queries'
 import { syncGithubIssues, createIssueViaClaude } from './services/github'
@@ -302,6 +306,14 @@ ipcMain.handle(
 )
 
 ipcMain.handle('todos:delete', (_, id: number) => deleteTodo(id))
+
+// ── IPC: Metas ────────────────────────────────────────────────────────────────
+ipcMain.handle('goals:getForMonth', (_, month: string) => getGoals(month))
+ipcMain.handle('goals:create', (_, month: string, title: string, kind: string, refId: number | null, target: number, unit: string | null) =>
+  createGoal(month, title, kind, refId, target, unit))
+ipcMain.handle('goals:update', (_, id: number, title: string, target: number, current: number, unit: string | null, done: number) =>
+  updateGoal(id, title, target, current, unit, done))
+ipcMain.handle('goals:delete', (_, id: number) => deleteGoal(id))
 
 // OCR/extração de imagem para o Inbox: salva a imagem num arquivo temporário e pede
 // ao Claude local (multimodal, via ferramenta Read) para extrair um JSON estruturado.

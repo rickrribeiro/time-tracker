@@ -282,4 +282,18 @@ export const SCHEMA = `
     durationMs INTEGER,
     createdAt TEXT NOT NULL
   );
+
+  -- Metas mensais (opcionalmente ligadas a um projeto ou tópico de estudo)
+  CREATE TABLE IF NOT EXISTS goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    month TEXT NOT NULL,            -- YYYY-MM
+    title TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'free',  -- free | project | study
+    refId INTEGER,                 -- projectId ou study_topicId conforme kind
+    target REAL NOT NULL DEFAULT 1,
+    current REAL NOT NULL DEFAULT 0,
+    unit TEXT,
+    done INTEGER NOT NULL DEFAULT 0,
+    createdAt TEXT NOT NULL
+  );
 `;

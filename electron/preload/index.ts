@@ -48,6 +48,14 @@ const api = {
   inbox: {
     ocr: (base64: string, ext: string) => ipcRenderer.invoke('inbox:ocr', base64, ext)
   },
+  goals: {
+    getForMonth: (month: string) => ipcRenderer.invoke('goals:getForMonth', month),
+    create: (month: string, title: string, kind: string, refId: number | null, target: number, unit: string | null) =>
+      ipcRenderer.invoke('goals:create', month, title, kind, refId, target, unit),
+    update: (id: number, title: string, target: number, current: number, unit: string | null, done: number) =>
+      ipcRenderer.invoke('goals:update', id, title, target, current, unit, done),
+    delete: (id: number) => ipcRenderer.invoke('goals:delete', id)
+  },
   todos: {
     getAll: (status?: string) => ipcRenderer.invoke('todos:getAll', status),
     create: (

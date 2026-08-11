@@ -303,6 +303,45 @@ ipcMain.handle(
 
 ipcMain.handle('todos:delete', (_, id: number) => deleteTodo(id))
 
+// OCR/extração de imagem para o Inbox: salva a imagem num arquivo temporário e pede
+// ao Claude local (multimodal, via ferramenta Read) para extrair um JSON estruturado.
+ipcMain.handle('inbox:ocr', async (_, base64: string, ext: string) => {
+  const dir = join(app.getPath('temp'), 'rickos-ocr')
+  fs.mkdirSync(dir, { recursive: true })
+  const safeExt = /^[a-z0-9]{1,5}$/i.test(ext) ? ext : 'png'
+  const file = join(dir, `${randomUUID()}.${safeExt}`)
+  const b64 = base64.includes(',') ? base64.split(',')[1] : base64
+  fs.writeFileSync(file, Buffer.from(b64, 'base64'))
+  const prompt = `Você recebeu o caminho de uma imagem: ${file}
+Use a ferramenta Read para abrir a imagem e extraia as informações em JSON.
+Responda APENAS com JSON válido (sem markdown, sem texto fora do JSON), no formato:
+{ "title": string, "amount": number|null, "currency": string|null, "date": "YYYY-MM-DD"|null, "link": string|null, "note": string|null }
+Regras:
+- "title": tarefa/assunto curto e acionável que resume a imagem (comece com um verbo quando fizer sentido).
+- "amount"/"currency": se houver valor monetário (boleto, comprovante, recibo).
+- "date": se houver uma data relevante (vencimento, evento) — formato YYYY-MM-DD.
+- "link": URL visível na imagem.
+- "note": detalhes úteis (ex.: itens de um quadro branco, linha digitável do boleto).
+- Campos ausentes = null.`
+  try {
+    const command = await resolveClaudeCommand()
+    const out = await runClaude(prompt, command, {
+      model: await resolveModel(),
+      extraArgs: ['--allowedTools', 'Read'],
+      timeoutMs: 180000
+    })
+    return { ok: true, output: out }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  } finally {
+    try {
+      fs.unlinkSync(file)
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+})
+
 // ── IPC: Projects ─────────────────────────────────────────────────────────────
 
 ipcMain.handle('projects:getAll', () => getProjects())

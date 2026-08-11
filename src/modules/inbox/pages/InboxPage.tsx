@@ -3,6 +3,7 @@ import { Todo } from '../../../types'
 import { useTodoStore } from '../../todo/store/todoStore'
 import { useProjectStore } from '../../projects/store/projectStore'
 import { TodoEditor } from '../../todo/components/TodoEditor'
+import { OcrCapture } from '../components/OcrCapture'
 
 type SourceFilter = 'all' | 'ai' | 'manual'
 
@@ -69,7 +70,9 @@ export function InboxPage(): React.ReactElement {
         </button>
       </div>
 
-      <div className="list-stack">
+      <OcrCapture onCreated={refresh} />
+
+      <div className="list-stack" style={{ marginTop: 12 }}>
         {items.length === 0 && <div className="empty-hint">Inbox vazia ✨</div>}
         {items.map((t) => (
           <div key={t.id} className="list-row">

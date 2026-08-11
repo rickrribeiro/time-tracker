@@ -45,6 +45,9 @@ const api = {
       ipcRenderer.invoke('dayConfig:update', date, isWorkDay)
   },
   // Todos (Inbox + TODO)
+  inbox: {
+    ocr: (base64: string, ext: string) => ipcRenderer.invoke('inbox:ocr', base64, ext)
+  },
   todos: {
     getAll: (status?: string) => ipcRenderer.invoke('todos:getAll', status),
     create: (

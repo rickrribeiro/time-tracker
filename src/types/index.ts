@@ -360,6 +360,9 @@ declare global {
       dayConfig: {
         update: (date: string, isWorkDay: number) => Promise<void>
       }
+      inbox: {
+        ocr: (base64: string, ext: string) => Promise<{ ok: boolean; output?: string; error?: string }>
+      }
       todos: {
         getAll: (status?: string) => Promise<Todo[]>
         create: (

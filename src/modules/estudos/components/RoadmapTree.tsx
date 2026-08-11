@@ -69,12 +69,15 @@ function NodeEditor({ node, onClose }: { node: StudyNode; onClose: () => void })
   )
 }
 
-function NodeRow({ item, depth }: { item: TreeItem; depth: number }): React.ReactElement {
-  const { selectedNodeId, selectNode, cycleNodeStatus, createNode, moveNode, removeNode } = useStudyStore()
+type DropZone = 'before' | 'after' | 'inside'
+
+function NodeRow({ item, depth, siblings }: { item: TreeItem; depth: number; siblings: TreeItem[]; index: number }): React.ReactElement {
+  const { selectedNodeId, selectNode, cycleNodeStatus, createNode, moveNode, removeNode, reorderNode } = useStudyStore()
   const [collapsed, setCollapsed] = useState(false)
   const [adding, setAdding] = useState(false)
   const [childTitle, setChildTitle] = useState('')
   const [editing, setEditing] = useState(false)
+  const [zone, setZone] = useState<DropZone | null>(null)
   const n = item.node
   const hasChildren = item.children.length > 0
   const prog = subtreeProgress(item)
@@ -88,9 +91,48 @@ function NodeRow({ item, depth }: { item: TreeItem; depth: number }): React.Reac
     setCollapsed(false)
   }
 
+  function onDragOver(e: React.DragEvent): void {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    const r = e.currentTarget.getBoundingClientRect()
+    const y = e.clientY - r.top
+    const z: DropZone = y < r.height * 0.28 ? 'before' : y > r.height * 0.72 ? 'after' : 'inside'
+    setZone(z)
+  }
+
+  async function onDrop(e: React.DragEvent): Promise<void> {
+    e.preventDefault()
+    e.stopPropagation()
+    const draggedId = Number(e.dataTransfer.getData('text/plain'))
+    const z = zone
+    setZone(null)
+    if (!draggedId || draggedId === n.id || !z) return
+    if (z === 'inside') {
+      const childrenIds = item.children.map((c) => c.node.id).filter((cid) => cid !== draggedId)
+      await reorderNode(draggedId, n.id, childrenIds.length) // append as last child
+      setCollapsed(false)
+    } else {
+      const order = siblings.map((s) => s.node.id).filter((sid) => sid !== draggedId)
+      const targetPos = order.indexOf(n.id)
+      const newIndex = z === 'before' ? targetPos : targetPos + 1
+      await reorderNode(draggedId, n.parentId ?? null, newIndex)
+    }
+  }
+
   return (
     <div className="study-node">
-      <div className={`study-node-row ${selectedNodeId === n.id ? 'selected' : ''}`} style={{ paddingLeft: depth * 16 }}>
+      <div
+        className={`study-node-row ${selectedNodeId === n.id ? 'selected' : ''} ${zone ? `drop-${zone}` : ''}`}
+        style={{ paddingLeft: depth * 16 }}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/plain', String(n.id))
+          e.dataTransfer.effectAllowed = 'move'
+        }}
+        onDragOver={onDragOver}
+        onDragLeave={() => setZone(null)}
+        onDrop={onDrop}
+      >
         <button
           className={`nav-group-chevron ${collapsed ? 'collapsed' : ''}`}
           style={{ visibility: hasChildren ? 'visible' : 'hidden', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
@@ -136,7 +178,7 @@ function NodeRow({ item, depth }: { item: TreeItem; depth: number }): React.Reac
         </div>
       )}
 
-      {!collapsed && item.children.map((c) => <NodeRow key={c.node.id} item={c} depth={depth + 1} />)}
+      {!collapsed && item.children.map((c, ci) => <NodeRow key={c.node.id} item={c} depth={depth + 1} siblings={item.children} index={ci} />)}
 
       {editing && <NodeEditor node={n} onClose={() => setEditing(false)} />}
     </div>
@@ -167,7 +209,7 @@ export function RoadmapTree(): React.ReactElement {
       </div>
       <div className="study-tree">
         {tree.length === 0 && <div className="empty-hint">Sem itens. Adicione a primeira seção acima.</div>}
-        {tree.map((item) => <NodeRow key={item.node.id} item={item} depth={0} />)}
+        {tree.map((item, i) => <NodeRow key={item.node.id} item={item} depth={0} siblings={tree} index={i} />)}
       </div>
     </div>
   )

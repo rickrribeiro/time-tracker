@@ -41,6 +41,7 @@ interface StudyState {
   cycleNodeStatus: (node: StudyNode) => Promise<void>
   removeNode: (id: number) => Promise<void>
   moveNode: (id: number, dir: 'up' | 'down') => Promise<void>
+  reorderNode: (id: number, newParentId: number | null, newIndex: number) => Promise<void>
 
   saveNote: (content: string) => Promise<void>
 
@@ -123,6 +124,10 @@ export const useStudyStore = create<StudyState>((set, get) => ({
   },
   moveNode: async (id, dir) => {
     await window.api.study.moveNode(id, dir)
+    await get().refreshActive()
+  },
+  reorderNode: async (id, newParentId, newIndex) => {
+    await window.api.study.reorderNode(id, newParentId, newIndex)
     await get().refreshActive()
   },
 

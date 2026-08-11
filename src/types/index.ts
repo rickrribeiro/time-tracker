@@ -548,6 +548,7 @@ declare global {
         updateNode: (id: number, title: string, description: string | null, status: string, estimatedHours: number | null) => Promise<StudyNode>
         deleteNode: (id: number) => Promise<void>
         moveNode: (id: number, dir: 'up' | 'down') => Promise<void>
+        reorderNode: (id: number, newParentId: number | null, newIndex: number) => Promise<void>
         getNote: (topicId: number, nodeId: number | null) => Promise<StudyNote | null>
         saveNote: (topicId: number, nodeId: number | null, content: string) => Promise<StudyNote>
         flashcards: (topicId?: number) => Promise<StudyFlashcard[]>

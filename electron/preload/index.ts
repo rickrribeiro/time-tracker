@@ -240,6 +240,7 @@ const api = {
       ipcRenderer.invoke('study:updateNode', id, title, description, status, estimatedHours),
     deleteNode: (id: number) => ipcRenderer.invoke('study:deleteNode', id),
     moveNode: (id: number, dir: 'up' | 'down') => ipcRenderer.invoke('study:moveNode', id, dir),
+    reorderNode: (id: number, newParentId: number | null, newIndex: number) => ipcRenderer.invoke('study:reorderNode', id, newParentId, newIndex),
     getNote: (topicId: number, nodeId: number | null) => ipcRenderer.invoke('study:getNote', topicId, nodeId),
     saveNote: (topicId: number, nodeId: number | null, content: string) => ipcRenderer.invoke('study:saveNote', topicId, nodeId, content),
     flashcards: (topicId?: number) => ipcRenderer.invoke('study:flashcards', topicId),

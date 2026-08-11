@@ -1551,6 +1551,43 @@ export async function deleteStudyNode(id: number): Promise<void> {
   }
   for (const nid of toDelete) run(db, 'DELETE FROM study_nodes WHERE id = ?', [nid])
 }
+/**
+ * Move a node to a new parent + position (drag-and-drop). Rewrites the target
+ * sibling group's orderIndex sequentially. No-op if it would create a cycle
+ * (dropping a node into its own subtree).
+ */
+export async function reorderStudyNode(id: number, newParentId: number | null, newIndex: number): Promise<void> {
+  const db = await getDb()
+  const n = getOne<DbStudyNode>(db, 'SELECT * FROM study_nodes WHERE id = ?', [id])
+  if (!n) return
+  // guard against cycles: newParent must not be the node or any descendant
+  if (newParentId != null) {
+    const all = getAll<DbStudyNode>(db, 'SELECT id, parentId FROM study_nodes WHERE topicId = ?', [n.topicId])
+    const desc = new Set<number>([id])
+    let grew = true
+    while (grew) {
+      grew = false
+      for (const x of all) {
+        if (x.parentId != null && desc.has(x.parentId) && !desc.has(x.id)) {
+          desc.add(x.id)
+          grew = true
+        }
+      }
+    }
+    if (desc.has(newParentId)) return
+  }
+  // sibling group in the destination, excluding the moved node
+  const siblings = getAll<DbStudyNode>(
+    db,
+    'SELECT * FROM study_nodes WHERE topicId = ? AND IFNULL(parentId, -1) = IFNULL(?, -1) AND id <> ? ORDER BY orderIndex ASC, id ASC',
+    [n.topicId, newParentId, id]
+  )
+  const clamped = Math.max(0, Math.min(newIndex, siblings.length))
+  siblings.splice(clamped, 0, n)
+  run(db, 'UPDATE study_nodes SET parentId = ? WHERE id = ?', [newParentId, id])
+  siblings.forEach((s, i) => run(db, 'UPDATE study_nodes SET orderIndex = ? WHERE id = ?', [i, s.id]))
+}
+
 /** Swap orderIndex with the previous/next sibling (same topic + parent). */
 export async function moveStudyNode(id: number, dir: 'up' | 'down'): Promise<void> {
   const db = await getDb()

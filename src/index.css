@@ -1472,6 +1472,10 @@ select:focus {
 }
 .study-node-row:hover { background: var(--bg-hover); }
 .study-node-row.selected { background: var(--accent-dim); }
+.study-node-row[draggable='true'] { cursor: grab; }
+.study-node-row.drop-inside { background: var(--accent-dim); box-shadow: inset 0 0 0 1px var(--accent); }
+.study-node-row.drop-before { box-shadow: inset 0 2px 0 0 var(--accent); }
+.study-node-row.drop-after { box-shadow: inset 0 -2px 0 0 var(--accent); }
 .study-status { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
 .study-node-title {
   flex: 1;

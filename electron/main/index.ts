@@ -104,6 +104,7 @@ import {
   updateStudyNode,
   deleteStudyNode,
   moveStudyNode,
+  reorderStudyNode,
   getStudyNote,
   saveStudyNote,
   getStudyFlashcards,
@@ -532,6 +533,7 @@ ipcMain.handle('study:updateNode', (_, id: number, title: string, description: s
   updateStudyNode(id, title, description, status, estimatedHours))
 ipcMain.handle('study:deleteNode', (_, id: number) => deleteStudyNode(id))
 ipcMain.handle('study:moveNode', (_, id: number, dir: 'up' | 'down') => moveStudyNode(id, dir))
+ipcMain.handle('study:reorderNode', (_, id: number, newParentId: number | null, newIndex: number) => reorderStudyNode(id, newParentId, newIndex))
 
 ipcMain.handle('study:getNote', (_, topicId: number, nodeId: number | null) => getStudyNote(topicId, nodeId))
 ipcMain.handle('study:saveNote', (_, topicId: number, nodeId: number | null, content: string) => saveStudyNote(topicId, nodeId, content))

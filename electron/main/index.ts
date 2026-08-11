@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, dialog, globalShortcut } from 'elec
 import { randomUUID } from 'crypto'
 import { join } from 'path'
 import fs from 'fs'
-import { getDb, closeDb, saveDb } from './database/db'
+import { getDb, closeDb, saveDb, snapshotDailyIfNeeded, listSnapshots, restoreSnapshot } from './database/db'
 import {
   getAllTags,
   getAllTasks,
@@ -186,6 +186,9 @@ app.whenReady().then(() => {
     win.focus()
     win.webContents.send('quick-capture:open')
   })
+
+  // Daily local snapshot of the DB (versioning) — after the DB is loaded.
+  getDb().then(() => snapshotDailyIfNeeded())
 
   // Daily Google Calendar auto-sync: shortly after boot, then re-check every 6h.
   setTimeout(() => void maybeAutoSyncGoogle(), 8000)
@@ -995,4 +998,11 @@ ipcMain.handle('app:importDb', async (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   win?.webContents.reload()
   return true
+})
+
+ipcMain.handle('app:snapshots', () => listSnapshots())
+ipcMain.handle('app:restoreSnapshot', async (event, snapPath: string) => {
+  const ok = restoreSnapshot(snapPath)
+  if (ok) BrowserWindow.fromWebContents(event.sender)?.webContents.reload()
+  return ok
 })

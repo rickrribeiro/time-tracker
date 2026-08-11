@@ -169,3 +169,66 @@ export function closeDb(): void {
     db = null
   }
 }
+
+// ── Daily local snapshots (versioning) ────────────────────────────────────────
+const SNAP_KEEP = 14
+
+function snapshotsDir(): string {
+  const dir = path.join(app.getPath('userData'), 'snapshots')
+  fs.mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+export interface SnapshotInfo {
+  name: string
+  path: string
+  date: string // ISO (mtime)
+  size: number
+}
+
+export function listSnapshots(): SnapshotInfo[] {
+  const dir = snapshotsDir()
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.sqlite'))
+    .map((f) => {
+      const p = path.join(dir, f)
+      const s = fs.statSync(p)
+      return { name: f, path: p, date: s.mtime.toISOString(), size: s.size }
+    })
+    .sort((a, b) => b.name.localeCompare(a.name))
+}
+
+/** Copy the current DB to snapshots/ once per day (YYYY-MM-DD), pruning to SNAP_KEEP. */
+export function snapshotDailyIfNeeded(): void {
+  if (!dbPath || !fs.existsSync(dbPath)) return
+  const now = new Date()
+  const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const dir = snapshotsDir()
+  const target = path.join(dir, `timetracker_${day}.sqlite`)
+  try {
+    if (!fs.existsSync(target)) {
+      saveDb()
+      fs.copyFileSync(dbPath, target)
+    }
+    // prune oldest beyond SNAP_KEEP
+    const all = listSnapshots()
+    for (const old of all.slice(SNAP_KEEP)) {
+      try {
+        fs.unlinkSync(old.path)
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // best-effort; never block boot
+  }
+}
+
+/** Restore a snapshot: overwrite the live DB file and reset the in-memory handle. */
+export function restoreSnapshot(snapPath: string): boolean {
+  if (!dbPath || !fs.existsSync(snapPath)) return false
+  closeDb()
+  fs.copyFileSync(snapPath, dbPath)
+  return true
+}

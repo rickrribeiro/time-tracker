@@ -594,6 +594,8 @@ declare global {
       app: {
         exportDb: () => Promise<{ ok: boolean; target?: 'local' | 'drive'; message?: string; error?: string; link?: string | null }>
         importDb: () => Promise<boolean>
+        snapshots: () => Promise<{ name: string; path: string; date: string; size: number }[]>
+        restoreSnapshot: (snapPath: string) => Promise<boolean>
         openExternal: (url: string) => Promise<void>
       }
     }

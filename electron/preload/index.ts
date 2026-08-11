@@ -315,6 +315,8 @@ const api = {
   app: {
     exportDb: () => ipcRenderer.invoke('app:exportDb'),
     importDb: () => ipcRenderer.invoke('app:importDb'),
+    snapshots: () => ipcRenderer.invoke('app:snapshots'),
+    restoreSnapshot: (snapPath: string) => ipcRenderer.invoke('app:restoreSnapshot', snapPath),
     openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url)
   }
 }

@@ -4,6 +4,7 @@ import { useGithubStore } from '../../projects/store/githubStore'
 import { useCalendarStore } from '../../calendar/store/calendarStore'
 import { useFinanceStore } from '../../finance/store/financeStore'
 import { PluggyConnect } from 'react-pluggy-connect'
+import { SnapshotsSection } from '../components/SnapshotsSection'
 
 const FX_CURRENCIES = ['BRL', 'USD', 'JPY', 'EUR']
 
@@ -563,6 +564,8 @@ export function SettingsPage(): React.ReactElement {
           Última busca de voos: <strong>{fmtLastSync(values['skyscanner_last_sync'])}</strong>
         </div>
       </div>
+
+      <SnapshotsSection />
     </div>
   )
 }

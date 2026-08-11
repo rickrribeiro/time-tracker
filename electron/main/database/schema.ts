@@ -286,6 +286,19 @@ export const SCHEMA = `
     createdAt TEXT NOT NULL
   );
 
+  -- CRM pessoal (manutenção de relações importantes)
+  CREATE TABLE IF NOT EXISTS contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    location TEXT,             -- cidade/país
+    birthday TEXT,             -- MM-DD ou YYYY-MM-DD
+    interests TEXT,
+    context TEXT,              -- o que está acontecendo na vida dela
+    lastContactAt TEXT,        -- ISO da última conversa
+    nextFollowUp TEXT,         -- YYYY-MM-DD
+    createdAt TEXT NOT NULL
+  );
+
   -- Automações: motor de regras (condição → ação)
   CREATE TABLE IF NOT EXISTS rules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

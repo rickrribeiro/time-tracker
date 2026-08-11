@@ -49,6 +49,15 @@ const api = {
   inbox: {
     ocr: (base64: string, ext: string) => ipcRenderer.invoke('inbox:ocr', base64, ext)
   },
+  contacts: {
+    getAll: () => ipcRenderer.invoke('contacts:getAll'),
+    create: (name: string, location: string | null, birthday: string | null, interests: string | null, context: string | null, nextFollowUp: string | null) =>
+      ipcRenderer.invoke('contacts:create', name, location, birthday, interests, context, nextFollowUp),
+    update: (id: number, name: string, location: string | null, birthday: string | null, interests: string | null, context: string | null, lastContactAt: string | null, nextFollowUp: string | null) =>
+      ipcRenderer.invoke('contacts:update', id, name, location, birthday, interests, context, lastContactAt, nextFollowUp),
+    log: (id: number) => ipcRenderer.invoke('contacts:log', id),
+    delete: (id: number) => ipcRenderer.invoke('contacts:delete', id)
+  },
   rules: {
     getAll: () => ipcRenderer.invoke('rules:getAll'),
     create: (type: string, params: string) => ipcRenderer.invoke('rules:create', type, params),

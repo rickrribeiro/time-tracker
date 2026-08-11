@@ -291,6 +291,17 @@ export interface StudyQuizAttempt {
   durationMs: number | null
   createdAt: string
 }
+export interface Contact {
+  id: number
+  name: string
+  location: string | null
+  birthday: string | null
+  interests: string | null
+  context: string | null
+  lastContactAt: string | null
+  nextFollowUp: string | null
+  createdAt: string
+}
 export interface Rule {
   id: number
   type: string
@@ -340,6 +351,7 @@ export type Page =
   | 'goals'
   | 'automations'
   | 'weekly-review'
+  | 'crm'
   // Estudos (Learning OS)
   | 'estudos'
   | 'estudos-topic'
@@ -414,6 +426,13 @@ declare global {
       }
       inbox: {
         ocr: (base64: string, ext: string) => Promise<{ ok: boolean; output?: string; error?: string }>
+      }
+      contacts: {
+        getAll: () => Promise<Contact[]>
+        create: (name: string, location: string | null, birthday: string | null, interests: string | null, context: string | null, nextFollowUp: string | null) => Promise<Contact>
+        update: (id: number, name: string, location: string | null, birthday: string | null, interests: string | null, context: string | null, lastContactAt: string | null, nextFollowUp: string | null) => Promise<Contact>
+        log: (id: number) => Promise<Contact>
+        delete: (id: number) => Promise<void>
       }
       rules: {
         getAll: () => Promise<Rule[]>

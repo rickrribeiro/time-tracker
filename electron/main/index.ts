@@ -123,6 +123,11 @@ import {
   createGoal,
   updateGoal,
   deleteGoal,
+  getContacts,
+  createContact,
+  updateContact,
+  logContact,
+  deleteContact,
   getRules,
   createRule,
   updateRule,
@@ -340,6 +345,15 @@ ipcMain.handle('goals:create', (_, month: string, title: string, kind: string, r
 ipcMain.handle('goals:update', (_, id: number, title: string, target: number, current: number, unit: string | null, done: number) =>
   updateGoal(id, title, target, current, unit, done))
 ipcMain.handle('goals:delete', (_, id: number) => deleteGoal(id))
+
+// ── IPC: CRM (contatos) ───────────────────────────────────────────────────────
+ipcMain.handle('contacts:getAll', () => getContacts())
+ipcMain.handle('contacts:create', (_, name: string, location: string | null, birthday: string | null, interests: string | null, context: string | null, nextFollowUp: string | null) =>
+  createContact(name, location, birthday, interests, context, nextFollowUp))
+ipcMain.handle('contacts:update', (_, id: number, name: string, location: string | null, birthday: string | null, interests: string | null, context: string | null, lastContactAt: string | null, nextFollowUp: string | null) =>
+  updateContact(id, name, location, birthday, interests, context, lastContactAt, nextFollowUp))
+ipcMain.handle('contacts:log', (_, id: number) => logContact(id))
+ipcMain.handle('contacts:delete', (_, id: number) => deleteContact(id))
 
 // ── IPC: Automações (regras + agendador) ──────────────────────────────────────
 ipcMain.handle('rules:getAll', () => getRules())

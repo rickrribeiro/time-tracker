@@ -1499,6 +1499,69 @@ export async function deleteLink(id: number): Promise<void> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// CRM pessoal (contatos / relações)
+// ══════════════════════════════════════════════════════════════════════════════
+export interface DbContact {
+  id: number
+  name: string
+  location: string | null
+  birthday: string | null
+  interests: string | null
+  context: string | null
+  lastContactAt: string | null
+  nextFollowUp: string | null
+  createdAt: string
+}
+export async function getContacts(): Promise<DbContact[]> {
+  const db = await getDb()
+  return getAll<DbContact>(db, 'SELECT * FROM contacts ORDER BY name COLLATE NOCASE ASC')
+}
+export async function createContact(
+  name: string,
+  location: string | null,
+  birthday: string | null,
+  interests: string | null,
+  context: string | null,
+  nextFollowUp: string | null
+): Promise<DbContact> {
+  const db = await getDb()
+  run(
+    db,
+    'INSERT INTO contacts (name, location, birthday, interests, context, nextFollowUp, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [name, location, birthday, interests, context, nextFollowUp, new Date().toISOString()]
+  )
+  return getOne<DbContact>(db, 'SELECT * FROM contacts WHERE id = ?', [lastInsertId(db)])!
+}
+export async function updateContact(
+  id: number,
+  name: string,
+  location: string | null,
+  birthday: string | null,
+  interests: string | null,
+  context: string | null,
+  lastContactAt: string | null,
+  nextFollowUp: string | null
+): Promise<DbContact> {
+  const db = await getDb()
+  run(
+    db,
+    'UPDATE contacts SET name = ?, location = ?, birthday = ?, interests = ?, context = ?, lastContactAt = ?, nextFollowUp = ? WHERE id = ?',
+    [name, location, birthday, interests, context, lastContactAt, nextFollowUp, id]
+  )
+  return getOne<DbContact>(db, 'SELECT * FROM contacts WHERE id = ?', [id])!
+}
+/** Mark a conversation now: set lastContactAt and clear the follow-up. */
+export async function logContact(id: number): Promise<DbContact> {
+  const db = await getDb()
+  run(db, 'UPDATE contacts SET lastContactAt = ?, nextFollowUp = NULL WHERE id = ?', [new Date().toISOString(), id])
+  return getOne<DbContact>(db, 'SELECT * FROM contacts WHERE id = ?', [id])!
+}
+export async function deleteContact(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM contacts WHERE id = ?', [id])
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Automações: regras + agendador
 // ══════════════════════════════════════════════════════════════════════════════
 export interface DbRule {

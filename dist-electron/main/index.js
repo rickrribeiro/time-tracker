@@ -96,6 +96,7 @@ const SCHEMA = `
     source TEXT NOT NULL DEFAULT 'manual',  -- manual | quick-capture | github
     aiGenerated INTEGER NOT NULL DEFAULT 0,
     recurrence TEXT,                        -- JSON: { type, n?, day? } | null
+    type TEXT NOT NULL DEFAULT 'projeto',   -- projeto | compra | urgente | lembrete
     createdAt TEXT NOT NULL
   );
 
@@ -680,6 +681,16 @@ const MIGRATIONS = [
       } catch {
       }
     }
+  },
+  {
+    version: 13,
+    label: "todos.type",
+    run: (db2) => {
+      try {
+        db2.run("ALTER TABLE todos ADD COLUMN type TEXT NOT NULL DEFAULT 'projeto';");
+      } catch {
+      }
+    }
   }
 ];
 function getUserVersion(database) {
@@ -1064,33 +1075,32 @@ async function getTodos(status) {
   }
   return getAll(db2, "SELECT * FROM todos ORDER BY priority DESC, createdAt DESC");
 }
-async function createTodo(title, notes, status, source, priority = 0, dueDate = null, projectId = null, aiGenerated = 0, recurrence = null) {
+async function createTodo(title, notes, status, source, priority = 0, dueDate = null, projectId = null, aiGenerated = 0, recurrence = null, type = "projeto") {
   const db2 = await getDb();
   const createdAt = (/* @__PURE__ */ new Date()).toISOString();
   run(
     db2,
-    "INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, createdAt]
+    "INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, type, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, type, createdAt]
   );
   const id = lastInsertId(db2);
   return getOne(db2, "SELECT * FROM todos WHERE id = ?", [id]);
 }
-async function updateTodo(id, title, notes, status, priority, dueDate, projectId, recurrence) {
+async function updateTodo(id, title, notes, status, priority, dueDate, projectId, recurrence, type) {
   const db2 = await getDb();
   const prev = getOne(db2, "SELECT status FROM todos WHERE id = ?", [id]);
-  if (recurrence === void 0) {
-    run(
-      db2,
-      "UPDATE todos SET title = ?, notes = ?, status = ?, priority = ?, dueDate = ?, projectId = ? WHERE id = ?",
-      [title, notes, status, priority, dueDate, projectId, id]
-    );
-  } else {
-    run(
-      db2,
-      "UPDATE todos SET title = ?, notes = ?, status = ?, priority = ?, dueDate = ?, projectId = ?, recurrence = ? WHERE id = ?",
-      [title, notes, status, priority, dueDate, projectId, recurrence, id]
-    );
+  const cols = ["title = ?", "notes = ?", "status = ?", "priority = ?", "dueDate = ?", "projectId = ?"];
+  const params = [title, notes, status, priority, dueDate, projectId];
+  if (recurrence !== void 0) {
+    cols.push("recurrence = ?");
+    params.push(recurrence);
   }
+  if (type !== void 0) {
+    cols.push("type = ?");
+    params.push(type);
+  }
+  params.push(id);
+  run(db2, `UPDATE todos SET ${cols.join(", ")} WHERE id = ?`, params);
   if (status === "done" && prev?.status !== "done") spawnRecurrenceIfNeeded(db2, id);
   return getOne(db2, "SELECT * FROM todos WHERE id = ?", [id]);
 }
@@ -1124,8 +1134,8 @@ function spawnRecurrenceIfNeeded(db2, id) {
   const nextDue = nextDueDate(rec, t.dueDate);
   run(
     db2,
-    "INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [t.title, t.notes, "todo", t.priority, nextDue, t.projectId, "recurring", 0, t.recurrence, (/* @__PURE__ */ new Date()).toISOString()]
+    "INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, type, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [t.title, t.notes, "todo", t.priority, nextDue, t.projectId, "recurring", 0, t.recurrence, t.type, (/* @__PURE__ */ new Date()).toISOString()]
   );
 }
 async function deleteTodo(id) {
@@ -3068,11 +3078,11 @@ electron.ipcMain.handle(
 electron.ipcMain.handle("todos:getAll", (_, status) => getTodos(status));
 electron.ipcMain.handle(
   "todos:create",
-  (_, title, notes, status, source, priority, dueDate, projectId, aiGenerated, recurrence) => createTodo(title, notes, status, source, priority, dueDate, projectId, aiGenerated ?? 0, recurrence ?? null)
+  (_, title, notes, status, source, priority, dueDate, projectId, aiGenerated, recurrence, type) => createTodo(title, notes, status, source, priority, dueDate, projectId, aiGenerated ?? 0, recurrence ?? null, type ?? "projeto")
 );
 electron.ipcMain.handle(
   "todos:update",
-  (_, id, title, notes, status, priority, dueDate, projectId, recurrence) => updateTodo(id, title, notes, status, priority, dueDate, projectId, recurrence)
+  (_, id, title, notes, status, priority, dueDate, projectId, recurrence, type) => updateTodo(id, title, notes, status, priority, dueDate, projectId, recurrence, type)
 );
 electron.ipcMain.handle("todos:delete", (_, id) => deleteTodo(id));
 electron.ipcMain.handle("goals:getForMonth", (_, month) => getGoals(month));

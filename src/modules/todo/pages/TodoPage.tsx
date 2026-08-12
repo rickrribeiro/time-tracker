@@ -3,7 +3,7 @@ import { Todo } from '../../../types'
 import { useTodoStore } from '../store/todoStore'
 import { useProjectStore } from '../../projects/store/projectStore'
 import { TodoEditor } from '../components/TodoEditor'
-import { PRIORITIES, STATUSES, STATUS_LABELS, priorityDef, dueMeta } from '../constants'
+import { PRIORITIES, STATUSES, STATUS_LABELS, TODO_TYPES, priorityDef, dueMeta, todoTypeDef } from '../constants'
 import { localDateStr, timeAgo } from '../../../utils/dates'
 
 type StatusFilter = 'all' | 'todo' | 'doing' | 'done'
@@ -15,6 +15,8 @@ export function TodoPage(): React.ReactElement {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [projectFilter, setProjectFilter] = useState<number | 'all'>('all')
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [newType, setNewType] = useState<string>('projeto')
   const [editing, setEditing] = useState<Todo | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [doneCollapsed, setDoneCollapsed] = useState(() => localStorage.getItem('rickos:todoDoneCollapsed') === '1')
@@ -40,6 +42,7 @@ export function TodoPage(): React.ReactElement {
       .filter((t) => t.status !== 'inbox')
       .filter((t) => statusFilter === 'all' || t.status === statusFilter)
       .filter((t) => projectFilter === 'all' || t.projectId === projectFilter)
+      .filter((t) => typeFilter === 'all' || (t.type ?? 'projeto') === typeFilter)
       .filter((t) => !q || t.title.toLowerCase().includes(q) || (t.notes ?? '').toLowerCase().includes(q))
       .sort((a, b) => {
         const doneA = a.status === 'done' ? 1 : 0
@@ -52,7 +55,7 @@ export function TodoPage(): React.ReactElement {
         if (b.dueDate) return 1
         return b.createdAt.localeCompare(a.createdAt)
       })
-  }, [todos, search, statusFilter, projectFilter])
+  }, [todos, search, statusFilter, projectFilter, typeFilter])
 
   const openItems = items.filter((t) => t.status !== 'done')
   const doneItems = items.filter((t) => t.status === 'done')
@@ -60,7 +63,7 @@ export function TodoPage(): React.ReactElement {
   async function handleAdd(): Promise<void> {
     const v = text.trim()
     if (!v) return
-    await create(v, 'todo')
+    await create(v, 'todo', newType)
     setText('')
   }
 
@@ -131,6 +134,13 @@ export function TodoPage(): React.ReactElement {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
         />
+        <select value={newType} onChange={(e) => setNewType(e.target.value)} title="Tipo da nova tarefa">
+          {TODO_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.icon} {t.label}
+            </option>
+          ))}
+        </select>
         <button className="btn btn-primary" onClick={handleAdd}>
           + Adicionar
         </button>
@@ -149,6 +159,14 @@ export function TodoPage(): React.ReactElement {
           {STATUSES.map((s) => (
             <option key={s} value={s}>
               {STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+          <option value="all">Todos os tipos</option>
+          {TODO_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.icon} {t.label}
             </option>
           ))}
         </select>
@@ -186,6 +204,7 @@ export function TodoPage(): React.ReactElement {
     const prio = priorityDef(t.priority)
     const due = dueMeta(t.dueDate, done)
     const proj = projectName(t.projectId)
+    const type = todoTypeDef(t.type)
     return (
       <div
         key={t.id}
@@ -224,6 +243,13 @@ export function TodoPage(): React.ReactElement {
                   📝
                 </button>
               )}
+              <span
+                className="todo-type-chip"
+                title={`Tipo: ${type.label}`}
+                style={{ borderColor: type.color, color: type.color }}
+              >
+                {type.icon} {type.label}
+              </span>
               {proj && <span className="project-chip">{proj}</span>}
               {t.recurrence && <span title="Tarefa recorrente">🔁</span>}
               {due && <span className={`due-badge ${due.cls}`}>{due.label}</span>}

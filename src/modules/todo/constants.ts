@@ -21,6 +21,25 @@ export function priorityDef(value: number): PriorityDef {
 export const STATUSES = ['todo', 'doing', 'done'] as const
 export type TodoStatus = (typeof STATUSES)[number]
 
+export interface TodoTypeDef {
+  value: string
+  label: string
+  icon: string
+  color: string
+}
+
+/** Kind of task. `type` is a TEXT column; existing tasks default to 'projeto'. */
+export const TODO_TYPES: TodoTypeDef[] = [
+  { value: 'projeto', label: 'Projeto', icon: '📁', color: '#3b82f6' },
+  { value: 'compra', label: 'A comprar', icon: '🛒', color: '#22c55e' },
+  { value: 'urgente', label: 'Resolver urgente', icon: '🔥', color: '#ef4444' },
+  { value: 'lembrete', label: 'Lembrete', icon: '🔔', color: '#a855f7' }
+]
+
+export function todoTypeDef(value: string | null | undefined): TodoTypeDef {
+  return TODO_TYPES.find((t) => t.value === value) || TODO_TYPES[0]
+}
+
 export const STATUS_LABELS: Record<string, string> = {
   inbox: 'Caixa de entrada',
   todo: 'A fazer',

@@ -172,6 +172,14 @@ const MIGRATIONS: Migration[] = [
       try { db.run('ALTER TABLE projects ADD COLUMN pricing TEXT;') } catch { /* exists */ }
       try { db.run('ALTER TABLE projects ADD COLUMN audience TEXT;') } catch { /* exists */ }
     }
+  },
+  {
+    version: 13,
+    label: 'todos.type',
+    run: (db) => {
+      // existing tasks default to the "projeto" kind
+      try { db.run("ALTER TABLE todos ADD COLUMN type TEXT NOT NULL DEFAULT 'projeto';") } catch { /* exists */ }
+    }
   }
 ]
 

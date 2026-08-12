@@ -1434,6 +1434,16 @@ select:focus {
   white-space: nowrap;
 }
 
+.todo-type-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  font-weight: 600;
+}
+
 .note-badge {
   font-size: 12px;
   line-height: 1;

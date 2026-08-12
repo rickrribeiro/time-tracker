@@ -63,6 +63,7 @@ export interface Todo {
   source: string // manual | quick-capture | github
   aiGenerated: number // 0 | 1 — created by AI
   recurrence: string | null // JSON: { type, n?, day? } | null
+  type: string // projeto | compra | urgente | lembrete
   createdAt: string
 }
 
@@ -493,7 +494,8 @@ declare global {
           dueDate?: string | null,
           projectId?: number | null,
           aiGenerated?: number,
-          recurrence?: string | null
+          recurrence?: string | null,
+          type?: string
         ) => Promise<Todo>
         update: (
           id: number,
@@ -503,7 +505,8 @@ declare global {
           priority: number,
           dueDate: string | null,
           projectId: number | null,
-          recurrence?: string | null
+          recurrence?: string | null,
+          type?: string
         ) => Promise<Todo>
         delete: (id: number) => Promise<void>
       }

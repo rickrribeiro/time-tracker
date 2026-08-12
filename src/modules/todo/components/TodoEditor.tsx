@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Todo } from '../../../types'
 import { useTodoStore } from '../store/todoStore'
 import { useProjectStore } from '../../projects/store/projectStore'
-import { PRIORITIES, STATUSES, STATUS_LABELS } from '../constants'
+import { PRIORITIES, STATUSES, STATUS_LABELS, TODO_TYPES } from '../constants'
 
 interface TodoEditorProps {
   todo: Todo
@@ -19,6 +19,7 @@ export function TodoEditor({ todo, onClose }: TodoEditorProps): React.ReactEleme
   // Keep the real status (inbox stays inbox until the user explicitly promotes it).
   const [status, setStatus] = useState(todo.status)
   const [priority, setPriority] = useState(todo.priority)
+  const [type, setType] = useState(todo.type ?? 'projeto')
 
   // Inbox items can be promoted; show 'inbox' as an option so it can also be kept.
   const statusOptions = todo.status === 'inbox' ? ['inbox', ...STATUSES] : STATUSES
@@ -59,7 +60,8 @@ export function TodoEditor({ todo, onClose }: TodoEditorProps): React.ReactEleme
       priority,
       dueDate: dueDate || null,
       projectId,
-      recurrence: buildRecurrence()
+      recurrence: buildRecurrence(),
+      type
     })
     onClose()
   }
@@ -77,6 +79,17 @@ export function TodoEditor({ todo, onClose }: TodoEditorProps): React.ReactEleme
         <div className="editor-field">
           <label>Notas</label>
           <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </div>
+
+        <div className="editor-field">
+          <label>Tipo</label>
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            {TODO_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.icon} {t.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="editor-row">

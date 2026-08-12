@@ -459,6 +459,7 @@ export interface DbTodo {
   source: string
   aiGenerated: number
   recurrence: string | null
+  type: string
   createdAt: string
 }
 
@@ -499,14 +500,15 @@ export async function createTodo(
   dueDate: string | null = null,
   projectId: number | null = null,
   aiGenerated = 0,
-  recurrence: string | null = null
+  recurrence: string | null = null,
+  type = 'projeto'
 ): Promise<DbTodo> {
   const db = await getDb()
   const createdAt = new Date().toISOString()
   run(
     db,
-    'INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, createdAt]
+    'INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, type, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, type, createdAt]
   )
   const id = lastInsertId(db)
   return getOne<DbTodo>(db, 'SELECT * FROM todos WHERE id = ?', [id])!
@@ -520,23 +522,24 @@ export async function updateTodo(
   priority: number,
   dueDate: string | null,
   projectId: number | null,
-  recurrence?: string | null
+  recurrence?: string | null,
+  type?: string
 ): Promise<DbTodo> {
   const db = await getDb()
   const prev = getOne<DbTodo>(db, 'SELECT status FROM todos WHERE id = ?', [id])
-  if (recurrence === undefined) {
-    run(
-      db,
-      'UPDATE todos SET title = ?, notes = ?, status = ?, priority = ?, dueDate = ?, projectId = ? WHERE id = ?',
-      [title, notes, status, priority, dueDate, projectId, id]
-    )
-  } else {
-    run(
-      db,
-      'UPDATE todos SET title = ?, notes = ?, status = ?, priority = ?, dueDate = ?, projectId = ?, recurrence = ? WHERE id = ?',
-      [title, notes, status, priority, dueDate, projectId, recurrence, id]
-    )
+  // Build the SET clause dynamically so callers can omit recurrence/type (undefined = keep).
+  const cols = ['title = ?', 'notes = ?', 'status = ?', 'priority = ?', 'dueDate = ?', 'projectId = ?']
+  const params: (string | number | null)[] = [title, notes, status, priority, dueDate, projectId]
+  if (recurrence !== undefined) {
+    cols.push('recurrence = ?')
+    params.push(recurrence)
   }
+  if (type !== undefined) {
+    cols.push('type = ?')
+    params.push(type)
+  }
+  params.push(id)
+  run(db, `UPDATE todos SET ${cols.join(', ')} WHERE id = ?`, params)
   // On transition INTO done, spawn the next instance of a recurring todo (once).
   if (status === 'done' && prev?.status !== 'done') spawnRecurrenceIfNeeded(db, id)
   return getOne<DbTodo>(db, 'SELECT * FROM todos WHERE id = ?', [id])!
@@ -577,8 +580,8 @@ function spawnRecurrenceIfNeeded(db: Awaited<ReturnType<typeof getDb>>, id: numb
   const nextDue = nextDueDate(rec, t.dueDate)
   run(
     db,
-    'INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [t.title, t.notes, 'todo', t.priority, nextDue, t.projectId, 'recurring', 0, t.recurrence, new Date().toISOString()]
+    'INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, type, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [t.title, t.notes, 'todo', t.priority, nextDue, t.projectId, 'recurring', 0, t.recurrence, t.type, new Date().toISOString()]
   )
 }
 

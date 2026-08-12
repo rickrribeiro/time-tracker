@@ -73,8 +73,8 @@ const api = {
   },
   todos: {
     getAll: (status) => electron.ipcRenderer.invoke("todos:getAll", status),
-    create: (title, notes, status, source, priority = 0, dueDate = null, projectId = null, aiGenerated = 0, recurrence = null) => electron.ipcRenderer.invoke("todos:create", title, notes, status, source, priority, dueDate, projectId, aiGenerated, recurrence),
-    update: (id, title, notes, status, priority, dueDate, projectId, recurrence) => electron.ipcRenderer.invoke("todos:update", id, title, notes, status, priority, dueDate, projectId, recurrence),
+    create: (title, notes, status, source, priority = 0, dueDate = null, projectId = null, aiGenerated = 0, recurrence = null, type = "projeto") => electron.ipcRenderer.invoke("todos:create", title, notes, status, source, priority, dueDate, projectId, aiGenerated, recurrence, type),
+    update: (id, title, notes, status, priority, dueDate, projectId, recurrence, type) => electron.ipcRenderer.invoke("todos:update", id, title, notes, status, priority, dueDate, projectId, recurrence, type),
     delete: (id) => electron.ipcRenderer.invoke("todos:delete", id)
   },
   // Projects

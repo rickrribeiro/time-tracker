@@ -5,7 +5,7 @@ interface TodoState {
   todos: Todo[]
   refresh: () => Promise<void>
   capture: (title: string, notes?: string | null) => Promise<void>
-  create: (title: string, status?: string) => Promise<void>
+  create: (title: string, status?: string, type?: string) => Promise<void>
   setStatus: (id: number, status: string) => Promise<void>
   update: (todo: Todo) => Promise<void>
   remove: (id: number) => Promise<void>
@@ -27,15 +27,15 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     await get().refresh()
   },
 
-  create: async (title, status = 'inbox') => {
-    await window.api.todos.create(title, null, status, 'manual')
+  create: async (title, status = 'inbox', type = 'projeto') => {
+    await window.api.todos.create(title, null, status, 'manual', 0, null, null, 0, null, type)
     await get().refresh()
   },
 
   setStatus: async (id, status) => {
     const t = get().todos.find((x) => x.id === id)
     if (!t) return
-    await window.api.todos.update(id, t.title, t.notes, status, t.priority, t.dueDate, t.projectId)
+    await window.api.todos.update(id, t.title, t.notes, status, t.priority, t.dueDate, t.projectId, t.recurrence, t.type)
     await get().refresh()
   },
 
@@ -48,7 +48,8 @@ export const useTodoStore = create<TodoState>((set, get) => ({
       todo.priority,
       todo.dueDate,
       todo.projectId,
-      todo.recurrence
+      todo.recurrence,
+      todo.type
     )
     await get().refresh()
   },

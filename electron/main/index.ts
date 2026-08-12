@@ -19,7 +19,6 @@ import {
   stopAllActiveTasks,
   getDailyStats,
   getTagStats,
-  fillGapsWithIdle,
   updateDayConfig,
   getTodos,
   createTodo,
@@ -301,8 +300,6 @@ ipcMain.handle(
 
 ipcMain.handle('tasks:stopAll', (_, endTime: string) => stopAllActiveTasks(endTime))
 ipcMain.handle('tasks:studyHours', () => getStudyHoursByTopic())
-
-ipcMain.handle('tasks:fillGaps', (_, date: string) => fillGapsWithIdle(date))
 
 // ── IPC: Stats ────────────────────────────────────────────────────────────────
 

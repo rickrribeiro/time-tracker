@@ -432,7 +432,6 @@ declare global {
           studyNodeId?: number | null
         ) => Promise<Task>
         stopAll: (endTime: string) => Promise<void>
-        fillGaps: (date: string) => Promise<void>
         studyHours: () => Promise<StudyTopicHours[]>
       }
       stats: {

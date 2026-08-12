@@ -1016,54 +1016,6 @@ async function updateDayConfig(date, isWorkDay) {
   const db2 = await getDb();
   run(db2, "INSERT OR REPLACE INTO day_configs (date, isWorkDay) VALUES (?, ?)", [date, isWorkDay]);
 }
-async function fillGapsWithIdle(date) {
-  const db2 = await getDb();
-  const dayStart = `${date}T00:00:00.000Z`;
-  const dayEnd = `${date}T23:59:59.999Z`;
-  const tasks = getAll(
-    db2,
-    `SELECT * FROM tasks WHERE startTime >= ? AND startTime <= ? ORDER BY startTime ASC`,
-    [dayStart, dayEnd]
-  );
-  if (tasks.length === 0) return;
-  for (let i = 0; i < tasks.length - 1; i++) {
-    const current = tasks[i];
-    const next = tasks[i + 1];
-    if (!current.endTime) continue;
-    const gap = new Date(next.startTime).getTime() - new Date(current.endTime).getTime();
-    if (gap > 6e4) {
-      run(db2, "INSERT INTO tasks (title, tagId, startTime, endTime) VALUES (?, 1, ?, ?)", [
-        "Idle",
-        current.endTime,
-        next.startTime
-      ]);
-    }
-  }
-  mergeConsecutiveSameTasksSync(db2);
-}
-function mergeConsecutiveSameTasksSync(db2) {
-  const tasks = getAll(
-    db2,
-    `SELECT * FROM tasks WHERE endTime IS NOT NULL ORDER BY startTime ASC`
-  );
-  const toDelete = [];
-  const toUpdate = [];
-  for (let i = 0; i < tasks.length - 1; i++) {
-    const current = tasks[i];
-    const next = tasks[i + 1];
-    if (toDelete.includes(current.id)) continue;
-    if (current.title === next.title && current.tagId === next.tagId && current.endTime === next.startTime) {
-      toUpdate.push({ id: current.id, endTime: next.endTime || current.endTime });
-      toDelete.push(next.id);
-    }
-  }
-  for (const upd of toUpdate) {
-    run(db2, "UPDATE tasks SET endTime = ? WHERE id = ?", [upd.endTime, upd.id]);
-  }
-  for (const id of toDelete) {
-    run(db2, "DELETE FROM tasks WHERE id = ?", [id]);
-  }
-}
 async function getTodos(status) {
   const db2 = await getDb();
   if (status) {
@@ -3062,7 +3014,6 @@ electron.ipcMain.handle(
 );
 electron.ipcMain.handle("tasks:stopAll", (_, endTime) => stopAllActiveTasks(endTime));
 electron.ipcMain.handle("tasks:studyHours", () => getStudyHoursByTopic());
-electron.ipcMain.handle("tasks:fillGaps", (_, date) => fillGapsWithIdle(date));
 electron.ipcMain.handle(
   "stats:daily",
   (_, startDate, endDate) => getDailyStats(startDate, endDate)

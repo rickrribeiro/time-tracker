@@ -32,7 +32,6 @@ const api = {
     add: (title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, endTime: string | null, studyNodeId?: number | null) =>
       ipcRenderer.invoke('tasks:add', title, tagId, secondaryTagId, startTime, endTime, studyNodeId ?? null),
     stopAll: (endTime: string) => ipcRenderer.invoke('tasks:stopAll', endTime),
-    fillGaps: (date: string) => ipcRenderer.invoke('tasks:fillGaps', date),
     studyHours: () => ipcRenderer.invoke('tasks:studyHours')
   },
   stats: {

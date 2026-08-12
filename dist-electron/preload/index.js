@@ -19,7 +19,6 @@ const api = {
     delete: (id) => electron.ipcRenderer.invoke("tasks:delete", id),
     add: (title, tagId, secondaryTagId, startTime, endTime, studyNodeId) => electron.ipcRenderer.invoke("tasks:add", title, tagId, secondaryTagId, startTime, endTime, studyNodeId ?? null),
     stopAll: (endTime) => electron.ipcRenderer.invoke("tasks:stopAll", endTime),
-    fillGaps: (date) => electron.ipcRenderer.invoke("tasks:fillGaps", date),
     studyHours: () => electron.ipcRenderer.invoke("tasks:studyHours")
   },
   stats: {

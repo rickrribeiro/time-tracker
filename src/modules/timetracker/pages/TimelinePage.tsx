@@ -57,11 +57,6 @@ export function TimelinePage(): React.ReactElement {
     refreshTasks(selectedDate)
   }, [activeTaskId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleFillGaps = async () => {
-    await window.api.tasks.fillGaps(selectedDate)
-    load()
-  }
-
   // Quick-start: most used task titles from today + yesterday
   const recentTitles = Array.from(
     new Set(todayTasks.map((t) => t.title).filter((t) => t !== 'Idle'))
@@ -101,9 +96,6 @@ export function TimelinePage(): React.ReactElement {
               })}
             </div>
           )}
-          <button className="btn btn-secondary btn-sm" onClick={handleFillGaps} title="Fill time gaps with Idle">
-            Fill Gaps
-          </button>
         </div>
       </div>
 

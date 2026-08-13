@@ -180,6 +180,24 @@ const MIGRATIONS: Migration[] = [
       // existing tasks default to the "projeto" kind
       try { db.run("ALTER TABLE todos ADD COLUMN type TEXT NOT NULL DEFAULT 'projeto';") } catch { /* exists */ }
     }
+  },
+  {
+    version: 14,
+    label: 'study_review_log backfill from lastReviewedAt',
+    run: (db) => {
+      // Seed the append-only review log with one row per already-reviewed card,
+      // so the heatmap isn't empty for existing databases. New reviews append going forward.
+      try {
+        db.run(
+          `INSERT INTO study_review_log (flashcardId, topicId, rating, reviewedAt)
+           SELECT id, topicId, NULL, lastReviewedAt
+           FROM study_flashcards
+           WHERE lastReviewedAt IS NOT NULL AND lastReviewedAt <> ''`
+        )
+      } catch {
+        // table missing or already seeded
+      }
+    }
   }
 ]
 

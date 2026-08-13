@@ -2034,14 +2034,15 @@ export async function deleteStudyFlashcard(id: number): Promise<void> {
   const db = await getDb()
   run(db, 'DELETE FROM study_flashcards WHERE id = ?', [id])
 }
-/** Persist the SRS schedule computed in the renderer. */
+/** Persist the SRS schedule computed in the renderer, and log the review. */
 export async function reviewStudyFlashcard(
   id: number,
   easeFactor: number,
   intervalDays: number,
   repetitions: number,
   nextReviewAt: string,
-  lastReviewedAt: string
+  lastReviewedAt: string,
+  rating?: string | null
 ): Promise<DbStudyFlashcard> {
   const db = await getDb()
   run(
@@ -2049,7 +2050,31 @@ export async function reviewStudyFlashcard(
     'UPDATE study_flashcards SET easeFactor = ?, intervalDays = ?, repetitions = ?, nextReviewAt = ?, lastReviewedAt = ? WHERE id = ?',
     [easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, id]
   )
-  return getOne<DbStudyFlashcard>(db, 'SELECT * FROM study_flashcards WHERE id = ?', [id])!
+  const card = getOne<DbStudyFlashcard>(db, 'SELECT * FROM study_flashcards WHERE id = ?', [id])!
+  run(
+    db,
+    'INSERT INTO study_review_log (flashcardId, topicId, rating, reviewedAt) VALUES (?, ?, ?, ?)',
+    [id, card.topicId, rating ?? null, lastReviewedAt]
+  )
+  return card
+}
+
+/** Contagem de flashcards revisados por dia (chave local YYYY-MM-DD) num intervalo [startISO, endISO). */
+export async function getStudyReviewCountsByDay(startISO: string, endISO: string): Promise<{ date: string; count: number }[]> {
+  const db = await getDb()
+  const rows = getAll<{ reviewedAt: string }>(
+    db,
+    'SELECT reviewedAt FROM study_review_log WHERE reviewedAt >= ? AND reviewedAt < ?',
+    [startISO, endISO]
+  )
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  const counts: Record<string, number> = {}
+  for (const r of rows) {
+    const d = new Date(r.reviewedAt)
+    const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+  return Object.entries(counts).map(([date, count]) => ({ date, count }))
 }
 
 // ── Quiz attempts ──

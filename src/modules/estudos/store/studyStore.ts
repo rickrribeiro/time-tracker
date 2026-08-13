@@ -48,6 +48,9 @@ interface StudyState {
   createFlashcard: (front: string, back: string, nodeId: number | null) => Promise<void>
   removeFlashcard: (id: number) => Promise<void>
   reviewCard: (id: number, rating: Rating) => Promise<void>
+
+  reviewCounts: Record<string, number>
+  refreshReviewCounts: (startISO: string, endISO: string) => Promise<void>
 }
 
 const NEXT_STATUS: Record<string, string> = { todo: 'doing', doing: 'done', done: 'todo' }
@@ -60,6 +63,7 @@ export const useStudyStore = create<StudyState>((set, get) => ({
   note: null,
   flashcards: [],
   dueCards: [],
+  reviewCounts: {},
 
   refreshTopics: async () => set({ topics: await window.api.study.topics() }),
 
@@ -153,7 +157,14 @@ export const useStudyStore = create<StudyState>((set, get) => ({
     const card = get().dueCards.find((c) => c.id === id) || get().flashcards.find((c) => c.id === id)
     if (!card) return
     const u = schedule(card, rating)
-    await window.api.study.reviewFlashcard(id, u.easeFactor, u.intervalDays, u.repetitions, u.nextReviewAt, u.lastReviewedAt)
+    await window.api.study.reviewFlashcard(id, u.easeFactor, u.intervalDays, u.repetitions, u.nextReviewAt, u.lastReviewedAt, rating)
     await get().refreshDue()
+  },
+
+  refreshReviewCounts: async (startISO, endISO) => {
+    const rows = await window.api.study.reviewCountsByDay(startISO, endISO)
+    const map: Record<string, number> = {}
+    for (const r of rows) map[r.date] = r.count
+    set({ reviewCounts: map })
   }
 }))

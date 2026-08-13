@@ -293,6 +293,15 @@ export const SCHEMA = `
     createdAt TEXT NOT NULL
   );
 
+  -- Log append-only de revisões de flashcards (1 linha por revisão) → heatmap
+  CREATE TABLE IF NOT EXISTS study_review_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    flashcardId INTEGER NOT NULL REFERENCES study_flashcards(id) ON DELETE CASCADE,
+    topicId INTEGER NOT NULL,
+    rating TEXT,                             -- again | hard | good | easy
+    reviewedAt TEXT NOT NULL                 -- ISO timestamp
+  );
+
   CREATE TABLE IF NOT EXISTS study_quiz_attempts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     topicId INTEGER NOT NULL REFERENCES study_topics(id) ON DELETE CASCADE,

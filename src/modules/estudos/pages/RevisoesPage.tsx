@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useUIStore } from '../../../store/uiStore'
 import { useStudyStore } from '../store/studyStore'
 import { Rating } from '../srs'
+import { ReviewHeatmap } from '../components/ReviewHeatmap'
 
 const RATINGS: { key: Rating; label: string; cls: string }[] = [
   { key: 'again', label: 'Again', cls: 'btn-danger' },
@@ -150,6 +151,8 @@ export function RevisoesPage(): React.ReactElement {
           )}
         </div>
       )}
+
+      <ReviewHeatmap />
     </div>
   )
 }

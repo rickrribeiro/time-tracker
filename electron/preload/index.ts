@@ -312,8 +312,9 @@ const api = {
       ipcRenderer.invoke('study:createFlashcard', topicId, nodeId, front, back),
     updateFlashcard: (id: number, front: string, back: string) => ipcRenderer.invoke('study:updateFlashcard', id, front, back),
     deleteFlashcard: (id: number) => ipcRenderer.invoke('study:deleteFlashcard', id),
-    reviewFlashcard: (id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string) =>
-      ipcRenderer.invoke('study:reviewFlashcard', id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt),
+    reviewFlashcard: (id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string, rating?: string | null) =>
+      ipcRenderer.invoke('study:reviewFlashcard', id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, rating),
+    reviewCountsByDay: (startISO: string, endISO: string) => ipcRenderer.invoke('study:reviewCountsByDay', startISO, endISO),
     quizAttempts: (topicId: number) => ipcRenderer.invoke('study:quizAttempts', topicId),
     saveQuizAttempt: (topicId: number, score: number, total: number, durationMs: number | null) =>
       ipcRenderer.invoke('study:saveQuizAttempt', topicId, score, total, durationMs),

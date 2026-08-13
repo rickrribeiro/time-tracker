@@ -120,6 +120,7 @@ import {
   updateStudyFlashcard,
   deleteStudyFlashcard,
   reviewStudyFlashcard,
+  getStudyReviewCountsByDay,
   getStudyQuizAttempts,
   createStudyQuizAttempt,
   getStudyBundle,
@@ -807,8 +808,9 @@ ipcMain.handle('study:createFlashcard', (_, topicId: number, nodeId: number | nu
   createStudyFlashcard(topicId, nodeId, front, back))
 ipcMain.handle('study:updateFlashcard', (_, id: number, front: string, back: string) => updateStudyFlashcard(id, front, back))
 ipcMain.handle('study:deleteFlashcard', (_, id: number) => deleteStudyFlashcard(id))
-ipcMain.handle('study:reviewFlashcard', (_, id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string) =>
-  reviewStudyFlashcard(id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt))
+ipcMain.handle('study:reviewFlashcard', (_, id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string, rating?: string | null) =>
+  reviewStudyFlashcard(id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, rating))
+ipcMain.handle('study:reviewCountsByDay', (_, startISO: string, endISO: string) => getStudyReviewCountsByDay(startISO, endISO))
 ipcMain.handle('study:quizAttempts', (_, topicId: number) => getStudyQuizAttempts(topicId))
 ipcMain.handle('study:saveQuizAttempt', (_, topicId: number, score: number, total: number, durationMs: number | null) =>
   createStudyQuizAttempt(topicId, score, total, durationMs))

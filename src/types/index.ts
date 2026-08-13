@@ -702,7 +702,8 @@ declare global {
         createFlashcard: (topicId: number, nodeId: number | null, front: string, back: string) => Promise<StudyFlashcard>
         updateFlashcard: (id: number, front: string, back: string) => Promise<StudyFlashcard>
         deleteFlashcard: (id: number) => Promise<void>
-        reviewFlashcard: (id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string) => Promise<StudyFlashcard>
+        reviewFlashcard: (id: number, easeFactor: number, intervalDays: number, repetitions: number, nextReviewAt: string, lastReviewedAt: string, rating?: string | null) => Promise<StudyFlashcard>
+        reviewCountsByDay: (startISO: string, endISO: string) => Promise<{ date: string; count: number }[]>
         quizAttempts: (topicId: number) => Promise<StudyQuizAttempt[]>
         saveQuizAttempt: (topicId: number, score: number, total: number, durationMs: number | null) => Promise<StudyQuizAttempt>
         exportMarkdown: (topicId: number) => Promise<StudyIoResult>

@@ -324,6 +324,15 @@ const SCHEMA = `
     createdAt TEXT NOT NULL
   );
 
+  -- Log append-only de revisões de flashcards (1 linha por revisão) → heatmap
+  CREATE TABLE IF NOT EXISTS study_review_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    flashcardId INTEGER NOT NULL REFERENCES study_flashcards(id) ON DELETE CASCADE,
+    topicId INTEGER NOT NULL,
+    rating TEXT,                             -- again | hard | good | easy
+    reviewedAt TEXT NOT NULL                 -- ISO timestamp
+  );
+
   CREATE TABLE IF NOT EXISTS study_quiz_attempts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     topicId INTEGER NOT NULL REFERENCES study_topics(id) ON DELETE CASCADE,
@@ -688,6 +697,21 @@ const MIGRATIONS = [
     run: (db2) => {
       try {
         db2.run("ALTER TABLE todos ADD COLUMN type TEXT NOT NULL DEFAULT 'projeto';");
+      } catch {
+      }
+    }
+  },
+  {
+    version: 14,
+    label: "study_review_log backfill from lastReviewedAt",
+    run: (db2) => {
+      try {
+        db2.run(
+          `INSERT INTO study_review_log (flashcardId, topicId, rating, reviewedAt)
+           SELECT id, topicId, NULL, lastReviewedAt
+           FROM study_flashcards
+           WHERE lastReviewedAt IS NOT NULL AND lastReviewedAt <> ''`
+        );
       } catch {
       }
     }
@@ -1988,14 +2012,36 @@ async function deleteStudyFlashcard(id) {
   const db2 = await getDb();
   run(db2, "DELETE FROM study_flashcards WHERE id = ?", [id]);
 }
-async function reviewStudyFlashcard(id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt) {
+async function reviewStudyFlashcard(id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, rating) {
   const db2 = await getDb();
   run(
     db2,
     "UPDATE study_flashcards SET easeFactor = ?, intervalDays = ?, repetitions = ?, nextReviewAt = ?, lastReviewedAt = ? WHERE id = ?",
     [easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, id]
   );
-  return getOne(db2, "SELECT * FROM study_flashcards WHERE id = ?", [id]);
+  const card = getOne(db2, "SELECT * FROM study_flashcards WHERE id = ?", [id]);
+  run(
+    db2,
+    "INSERT INTO study_review_log (flashcardId, topicId, rating, reviewedAt) VALUES (?, ?, ?, ?)",
+    [id, card.topicId, rating ?? null, lastReviewedAt]
+  );
+  return card;
+}
+async function getStudyReviewCountsByDay(startISO, endISO) {
+  const db2 = await getDb();
+  const rows = getAll(
+    db2,
+    "SELECT reviewedAt FROM study_review_log WHERE reviewedAt >= ? AND reviewedAt < ?",
+    [startISO, endISO]
+  );
+  const pad = (n) => String(n).padStart(2, "0");
+  const counts = {};
+  for (const r of rows) {
+    const d = new Date(r.reviewedAt);
+    const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return Object.entries(counts).map(([date, count2]) => ({ date, count: count2 }));
 }
 async function getStudyQuizAttempts(topicId) {
   const db2 = await getDb();
@@ -3400,7 +3446,8 @@ electron.ipcMain.handle("study:due", (_, nowISO) => getDueFlashcards(nowISO));
 electron.ipcMain.handle("study:createFlashcard", (_, topicId, nodeId, front, back) => createStudyFlashcard(topicId, nodeId, front, back));
 electron.ipcMain.handle("study:updateFlashcard", (_, id, front, back) => updateStudyFlashcard(id, front, back));
 electron.ipcMain.handle("study:deleteFlashcard", (_, id) => deleteStudyFlashcard(id));
-electron.ipcMain.handle("study:reviewFlashcard", (_, id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt) => reviewStudyFlashcard(id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt));
+electron.ipcMain.handle("study:reviewFlashcard", (_, id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, rating) => reviewStudyFlashcard(id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, rating));
+electron.ipcMain.handle("study:reviewCountsByDay", (_, startISO, endISO) => getStudyReviewCountsByDay(startISO, endISO));
 electron.ipcMain.handle("study:quizAttempts", (_, topicId) => getStudyQuizAttempts(topicId));
 electron.ipcMain.handle("study:saveQuizAttempt", (_, topicId, score, total, durationMs) => createStudyQuizAttempt(topicId, score, total, durationMs));
 function studySlug(s) {

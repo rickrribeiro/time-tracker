@@ -57,7 +57,7 @@ export function ReviewHeatmap(): React.ReactElement {
   const today = localDateStr()
 
   return (
-    <div className="chart-section" style={{ marginBottom: 16 }}>
+    <div className="chart-section" style={{ marginTop: 28, marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 700 }}>📊 Revisões por dia</div>

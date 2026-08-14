@@ -134,13 +134,7 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
       { id: 'ai-history', label: 'Histórico', icon: '🕐' }
     ]
   },
-  {
-    label: 'Jarvis',
-    groupIcon: '🧞',
-    items: [
-      { id: 'jarvis', label: 'Jarvis', icon: '🧞' }
-    ]
-  },
+  { label: '', items: [{ id: 'jarvis', label: 'Jarvis', icon: '🧞' }] },
   { label: '', items: [{ id: 'settings', label: 'Configurações', icon: '⚙️' }] },
   { label: '', items: [{ id: 'links', label: 'Links', icon: '🔗' }] }
 ]

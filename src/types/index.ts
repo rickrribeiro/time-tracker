@@ -389,6 +389,8 @@ export type Page =
   | 'destinations'
   | 'documents'
   | 'recommendations'
+  // Jarvis
+  | 'jarvis'
   // IA
   | 'ai'
   | 'ai-skills'

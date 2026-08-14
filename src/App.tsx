@@ -46,6 +46,7 @@ import { SkillsPage } from './modules/ai/pages/SkillsPage'
 import { AgentsPage } from './modules/ai/pages/AgentsPage'
 import { PromptRunnerPage } from './modules/ai/pages/PromptRunnerPage'
 import { HistoryPage } from './modules/ai/pages/HistoryPage'
+import { JarvisPage } from './modules/jarvis/pages/JarvisPage'
 import { Page } from './types'
 
 interface NavItem {
@@ -133,6 +134,13 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
       { id: 'ai-history', label: 'Histórico', icon: '🕐' }
     ]
   },
+  {
+    label: 'Jarvis',
+    groupIcon: '🧞',
+    items: [
+      { id: 'jarvis', label: 'Jarvis', icon: '🧞' }
+    ]
+  },
   { label: '', items: [{ id: 'settings', label: 'Configurações', icon: '⚙️' }] },
   { label: '', items: [{ id: 'links', label: 'Links', icon: '🔗' }] }
 ]
@@ -174,6 +182,7 @@ const PAGES: Record<Page, React.ComponentType> = {
   'ai-agents': AgentsPage,
   'ai-runner': PromptRunnerPage,
   'ai-history': HistoryPage,
+  jarvis: JarvisPage,
   settings: SettingsPage,
   links: LinksPage
 }

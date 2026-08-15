@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Contact } from '../../../types'
 import { useContactStore } from '../store/contactStore'
 import { ContactEditor } from '../components/ContactEditor'
+import { BRAZIL, BRAZIL_STATES } from '../geo'
 import { timeAgo, localDateStr } from '../../../utils/dates'
 
 /** Days until the next occurrence of a MM-DD / YYYY-MM-DD birthday, or null. */
@@ -67,15 +68,33 @@ export function CrmPage(): React.ReactElement {
   const [editing, setEditing] = useState<Contact | null>(null)
   const [creating, setCreating] = useState(false)
   const [suggest, setSuggest] = useState<Contact | null>(null)
+  const [nameFilter, setNameFilter] = useState('')
   const [countryFilter, setCountryFilter] = useState('')
+  const [stateFilter, setStateFilter] = useState('')
 
   useEffect(() => {
     refresh()
   }, [])
 
+  function onCountryFilterChange(value: string): void {
+    setCountryFilter(value)
+    if (value !== BRAZIL) setStateFilter('') // estado só se aplica ao Brasil
+  }
+
   // países distintos presentes nos contatos (para o filtro)
   const countries = Array.from(new Set(contacts.map((c) => c.country).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b))
-  const filtered = countryFilter ? contacts.filter((c) => c.country === countryFilter) : contacts
+  // estados distintos entre os contatos brasileiros (para o filtro por UF)
+  const brStates = Array.from(new Set(contacts.filter((c) => c.country === BRAZIL).map((c) => c.state).filter(Boolean) as string[]))
+    .sort((a, b) => a.localeCompare(b))
+  const ufLabel = (uf: string): string => BRAZIL_STATES.find((s) => s.uf === uf)?.name ?? uf
+
+  const nameQuery = nameFilter.trim().toLowerCase()
+  const filtered = contacts.filter((c) => {
+    if (nameQuery && !c.name.toLowerCase().includes(nameQuery)) return false
+    if (countryFilter && c.country !== countryFilter) return false
+    if (countryFilter === BRAZIL && stateFilter && c.state !== stateFilter) return false
+    return true
+  })
 
   const today = localDateStr(new Date())
   const needsAttention = (c: Contact): boolean => {
@@ -96,6 +115,7 @@ export function CrmPage(): React.ReactElement {
     return at - bt
   })
   const attentionCount = contacts.filter(needsAttention).length
+  const isFiltering = !!(nameQuery || countryFilter || stateFilter)
 
   return (
     <div className="module-page">
@@ -103,15 +123,29 @@ export function CrmPage(): React.ReactElement {
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700 }}>🤝 Pessoas</h2>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            {contacts.length} contatos · {attentionCount} precisam de atenção
+            {isFiltering ? `${filtered.length} de ${contacts.length} contatos` : `${contacts.length} contatos`} · {attentionCount} precisam de atenção
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <input
+            value={nameFilter}
+            onChange={(e) => setNameFilter(e.target.value)}
+            placeholder="🔍 Buscar por nome"
+            style={{ minWidth: 180 }}
+          />
           {countries.length > 0 && (
-            <select value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)} title="Filtrar por país">
+            <select value={countryFilter} onChange={(e) => onCountryFilterChange(e.target.value)} title="Filtrar por país">
               <option value="">🌎 Todos os países</option>
               {countries.map((c) => (
                 <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
+          {countryFilter === BRAZIL && brStates.length > 0 && (
+            <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} title="Filtrar por estado">
+              <option value="">📍 Todos os estados</option>
+              {brStates.map((uf) => (
+                <option key={uf} value={uf}>{uf} — {ufLabel(uf)}</option>
               ))}
             </select>
           )}
@@ -121,6 +155,7 @@ export function CrmPage(): React.ReactElement {
 
       <div className="list-stack">
         {contacts.length === 0 && <div className="empty-hint">Nenhuma pessoa. Adicione quem você quer manter por perto.</div>}
+        {contacts.length > 0 && sorted.length === 0 && <div className="empty-hint">Nenhum contato para os filtros selecionados.</div>}
         {sorted.map((c) => {
           const bd = daysToBirthday(c.birthday)
           const attention = needsAttention(c)

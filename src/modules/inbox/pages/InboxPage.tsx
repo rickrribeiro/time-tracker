@@ -87,6 +87,14 @@ export function InboxPage(): React.ReactElement {
               <button className="btn btn-primary btn-sm" onClick={() => setStatus(t.id, 'todo')}>
                 → TODO
               </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ color: '#10b981', borderColor: '#10b981' }}
+                title="Mover para TODO já concluído"
+                onClick={() => setStatus(t.id, 'done')}
+              >
+                ✓ Feito
+              </button>
               <button className="btn btn-secondary btn-sm" onClick={() => setProcessing(t)}>
                 Editar…
               </button>

@@ -20,10 +20,14 @@ export function MonitoringPage(): React.ReactElement {
   }, [])
 
   async function handleAdd(): Promise<void> {
-    if (!destination.trim()) return
+    if (!origin.trim() || !destination.trim()) {
+      setError('Informe origem e destino para monitorar.')
+      return
+    }
+    setError('')
     await addWatch(
       tripId === '' ? null : Number(tripId),
-      origin.trim() || null,
+      origin.trim(),
       destination.trim(),
       price ? parseFloat(price) : null,
       currency
@@ -75,7 +79,7 @@ export function MonitoringPage(): React.ReactElement {
 
       <div className="chart-section" style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <input placeholder="Origem" value={origin} onChange={(e) => setOrigin(e.target.value)} />
+          <input placeholder="Origem *" value={origin} onChange={(e) => setOrigin(e.target.value)} />
           <input placeholder="Destino *" value={destination} onChange={(e) => setDestination(e.target.value)} />
           <input type="number" placeholder="Preço" value={price} onChange={(e) => setPrice(e.target.value)} style={{ width: 100 }} />
           <select value={currency} onChange={(e) => setCurrency(e.target.value)}>

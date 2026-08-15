@@ -47,8 +47,8 @@ const api = {
   },
   contacts: {
     getAll: () => electron.ipcRenderer.invoke("contacts:getAll"),
-    create: (name, location, birthday, interests, context, nextFollowUp) => electron.ipcRenderer.invoke("contacts:create", name, location, birthday, interests, context, nextFollowUp),
-    update: (id, name, location, birthday, interests, context, lastContactAt, nextFollowUp) => electron.ipcRenderer.invoke("contacts:update", id, name, location, birthday, interests, context, lastContactAt, nextFollowUp),
+    create: (name, location, country, state, birthday, interests, context, nextFollowUp) => electron.ipcRenderer.invoke("contacts:create", name, location, country, state, birthday, interests, context, nextFollowUp),
+    update: (id, name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp) => electron.ipcRenderer.invoke("contacts:update", id, name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp),
     log: (id) => electron.ipcRenderer.invoke("contacts:log", id),
     delete: (id) => electron.ipcRenderer.invoke("contacts:delete", id)
   },

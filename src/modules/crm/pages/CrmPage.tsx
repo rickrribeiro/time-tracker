@@ -35,7 +35,7 @@ function SuggestModal({ contact, onClose }: { contact: Contact; onClose: () => v
       const prompt = `Sou nômade e quero manter viva minha relação com ${contact.name}. Com base no contexto abaixo, escreva 2 ou 3 opções curtas de mensagem calorosa e natural para retomar o contato (em português, tom pessoal, sem parecer robô). Se houver um gancho no contexto (ex.: um exame, uma viagem, um projeto), puxe por ele.
 
 Nome: ${contact.name}
-Local: ${contact.location ?? '—'}
+Local: ${[contact.location, contact.state, contact.country].filter(Boolean).join(', ') || '—'}
 Interesses: ${contact.interests ?? '—'}
 Última conversa: ${contact.lastContactAt ? new Date(contact.lastContactAt).toLocaleDateString('pt-BR') : '—'}
 Contexto: ${contact.context ?? '—'}`
@@ -67,10 +67,15 @@ export function CrmPage(): React.ReactElement {
   const [editing, setEditing] = useState<Contact | null>(null)
   const [creating, setCreating] = useState(false)
   const [suggest, setSuggest] = useState<Contact | null>(null)
+  const [countryFilter, setCountryFilter] = useState('')
 
   useEffect(() => {
     refresh()
   }, [])
+
+  // países distintos presentes nos contatos (para o filtro)
+  const countries = Array.from(new Set(contacts.map((c) => c.country).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b))
+  const filtered = countryFilter ? contacts.filter((c) => c.country === countryFilter) : contacts
 
   const today = localDateStr(new Date())
   const needsAttention = (c: Contact): boolean => {
@@ -82,7 +87,7 @@ export function CrmPage(): React.ReactElement {
   }
 
   // sort: attention first, then oldest contact first
-  const sorted = [...contacts].sort((a, b) => {
+  const sorted = [...filtered].sort((a, b) => {
     const aa = needsAttention(a) ? 0 : 1
     const bb = needsAttention(b) ? 0 : 1
     if (aa !== bb) return aa - bb
@@ -101,7 +106,17 @@ export function CrmPage(): React.ReactElement {
             {contacts.length} contatos · {attentionCount} precisam de atenção
           </p>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>＋ Pessoa</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {countries.length > 0 && (
+            <select value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)} title="Filtrar por país">
+              <option value="">🌎 Todos os países</option>
+              {countries.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
+          <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>＋ Pessoa</button>
+        </div>
       </div>
 
       <div className="list-stack">
@@ -115,6 +130,7 @@ export function CrmPage(): React.ReactElement {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span className="list-row-title">{c.name}</span>
                   {c.location && <span className="project-chip">📍 {c.location}</span>}
+                  {c.country && <span className="project-chip">🌎 {c.country}{c.state ? ` / ${c.state}` : ''}</span>}
                   {bd !== null && bd <= 7 && <span className="due-badge due-today">🎂 {bd === 0 ? 'hoje!' : `em ${bd}d`}</span>}
                   {c.nextFollowUp && <span className={`due-badge ${c.nextFollowUp <= today ? 'due-overdue' : 'due-future'}`}>↩ {c.nextFollowUp}</span>}
                 </div>

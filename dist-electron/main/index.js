@@ -381,7 +381,9 @@ const SCHEMA = `
   CREATE TABLE IF NOT EXISTS contacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    location TEXT,             -- cidade/país
+    location TEXT,             -- cidade/país (texto livre, legado)
+    country TEXT,              -- país (dropdown)
+    state TEXT,                -- estado/UF (dropdown quando país = Brasil)
     birthday TEXT,             -- MM-DD ou YYYY-MM-DD
     interests TEXT,
     context TEXT,              -- o que está acontecendo na vida dela
@@ -712,6 +714,20 @@ const MIGRATIONS = [
            FROM study_flashcards
            WHERE lastReviewedAt IS NOT NULL AND lastReviewedAt <> ''`
         );
+      } catch {
+      }
+    }
+  },
+  {
+    version: 15,
+    label: "contacts.country + contacts.state",
+    run: (db2) => {
+      try {
+        db2.run("ALTER TABLE contacts ADD COLUMN country TEXT;");
+      } catch {
+      }
+      try {
+        db2.run("ALTER TABLE contacts ADD COLUMN state TEXT;");
       } catch {
       }
     }
@@ -1753,21 +1769,21 @@ async function getContacts() {
   const db2 = await getDb();
   return getAll(db2, "SELECT * FROM contacts ORDER BY name COLLATE NOCASE ASC");
 }
-async function createContact(name, location, birthday, interests, context, nextFollowUp) {
+async function createContact(name, location, country, state, birthday, interests, context, nextFollowUp) {
   const db2 = await getDb();
   run(
     db2,
-    "INSERT INTO contacts (name, location, birthday, interests, context, nextFollowUp, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [name, location, birthday, interests, context, nextFollowUp, (/* @__PURE__ */ new Date()).toISOString()]
+    "INSERT INTO contacts (name, location, country, state, birthday, interests, context, nextFollowUp, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [name, location, country, state, birthday, interests, context, nextFollowUp, (/* @__PURE__ */ new Date()).toISOString()]
   );
   return getOne(db2, "SELECT * FROM contacts WHERE id = ?", [lastInsertId(db2)]);
 }
-async function updateContact(id, name, location, birthday, interests, context, lastContactAt, nextFollowUp) {
+async function updateContact(id, name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp) {
   const db2 = await getDb();
   run(
     db2,
-    "UPDATE contacts SET name = ?, location = ?, birthday = ?, interests = ?, context = ?, lastContactAt = ?, nextFollowUp = ? WHERE id = ?",
-    [name, location, birthday, interests, context, lastContactAt, nextFollowUp, id]
+    "UPDATE contacts SET name = ?, location = ?, country = ?, state = ?, birthday = ?, interests = ?, context = ?, lastContactAt = ?, nextFollowUp = ? WHERE id = ?",
+    [name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp, id]
   );
   return getOne(db2, "SELECT * FROM contacts WHERE id = ?", [id]);
 }
@@ -3098,8 +3114,8 @@ electron.ipcMain.handle("stays:addPricePoint", (_, p) => addStayPricePoint(p));
 electron.ipcMain.handle("stays:searchHistory", () => getStaySearchHistory());
 electron.ipcMain.handle("stays:addSearchHistory", (_, filters) => addStaySearchHistory(filters));
 electron.ipcMain.handle("contacts:getAll", () => getContacts());
-electron.ipcMain.handle("contacts:create", (_, name, location, birthday, interests, context, nextFollowUp) => createContact(name, location, birthday, interests, context, nextFollowUp));
-electron.ipcMain.handle("contacts:update", (_, id, name, location, birthday, interests, context, lastContactAt, nextFollowUp) => updateContact(id, name, location, birthday, interests, context, lastContactAt, nextFollowUp));
+electron.ipcMain.handle("contacts:create", (_, name, location, country, state, birthday, interests, context, nextFollowUp) => createContact(name, location, country, state, birthday, interests, context, nextFollowUp));
+electron.ipcMain.handle("contacts:update", (_, id, name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp) => updateContact(id, name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp));
 electron.ipcMain.handle("contacts:log", (_, id) => logContact(id));
 electron.ipcMain.handle("contacts:delete", (_, id) => deleteContact(id));
 electron.ipcMain.handle("rules:getAll", () => getRules());

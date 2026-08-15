@@ -1593,6 +1593,8 @@ export interface DbContact {
   id: number
   name: string
   location: string | null
+  country: string | null
+  state: string | null
   birthday: string | null
   interests: string | null
   context: string | null
@@ -1607,6 +1609,8 @@ export async function getContacts(): Promise<DbContact[]> {
 export async function createContact(
   name: string,
   location: string | null,
+  country: string | null,
+  state: string | null,
   birthday: string | null,
   interests: string | null,
   context: string | null,
@@ -1615,8 +1619,8 @@ export async function createContact(
   const db = await getDb()
   run(
     db,
-    'INSERT INTO contacts (name, location, birthday, interests, context, nextFollowUp, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [name, location, birthday, interests, context, nextFollowUp, new Date().toISOString()]
+    'INSERT INTO contacts (name, location, country, state, birthday, interests, context, nextFollowUp, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [name, location, country, state, birthday, interests, context, nextFollowUp, new Date().toISOString()]
   )
   return getOne<DbContact>(db, 'SELECT * FROM contacts WHERE id = ?', [lastInsertId(db)])!
 }
@@ -1624,6 +1628,8 @@ export async function updateContact(
   id: number,
   name: string,
   location: string | null,
+  country: string | null,
+  state: string | null,
   birthday: string | null,
   interests: string | null,
   context: string | null,
@@ -1633,8 +1639,8 @@ export async function updateContact(
   const db = await getDb()
   run(
     db,
-    'UPDATE contacts SET name = ?, location = ?, birthday = ?, interests = ?, context = ?, lastContactAt = ?, nextFollowUp = ? WHERE id = ?',
-    [name, location, birthday, interests, context, lastContactAt, nextFollowUp, id]
+    'UPDATE contacts SET name = ?, location = ?, country = ?, state = ?, birthday = ?, interests = ?, context = ?, lastContactAt = ?, nextFollowUp = ? WHERE id = ?',
+    [name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp, id]
   )
   return getOne<DbContact>(db, 'SELECT * FROM contacts WHERE id = ?', [id])!
 }

@@ -350,7 +350,9 @@ export const SCHEMA = `
   CREATE TABLE IF NOT EXISTS contacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    location TEXT,             -- cidade/país
+    location TEXT,             -- cidade/país (texto livre, legado)
+    country TEXT,              -- país (dropdown)
+    state TEXT,                -- estado/UF (dropdown quando país = Brasil)
     birthday TEXT,             -- MM-DD ou YYYY-MM-DD
     interests TEXT,
     context TEXT,              -- o que está acontecendo na vida dela

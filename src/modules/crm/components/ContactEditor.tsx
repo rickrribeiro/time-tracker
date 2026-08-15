@@ -1,22 +1,34 @@
 import React, { useState } from 'react'
 import { Contact } from '../../../types'
 import { useContactStore } from '../store/contactStore'
+import { COUNTRIES, BRAZIL_STATES, BRAZIL } from '../geo'
 
 /** Create (contact=null) or edit a personal-CRM contact. */
 export function ContactEditor({ contact, onClose }: { contact: Contact | null; onClose: () => void }): React.ReactElement {
   const { create, update } = useContactStore()
   const [name, setName] = useState(contact?.name ?? '')
   const [location, setLocation] = useState(contact?.location ?? '')
+  const [country, setCountry] = useState(contact?.country ?? '')
+  const [state, setState] = useState(contact?.state ?? '')
   const [birthday, setBirthday] = useState(contact?.birthday ?? '')
   const [interests, setInterests] = useState(contact?.interests ?? '')
   const [context, setContext] = useState(contact?.context ?? '')
   const [nextFollowUp, setNextFollowUp] = useState(contact?.nextFollowUp ?? '')
+
+  const isBrazil = country === BRAZIL
+
+  function onCountryChange(value: string): void {
+    setCountry(value)
+    if (value !== BRAZIL) setState('') // limpa a UF se não for mais Brasil
+  }
 
   async function save(): Promise<void> {
     if (!name.trim()) return
     const fields = {
       name: name.trim(),
       location: location.trim() || null,
+      country: country || null,
+      state: state.trim() || null,
       birthday: birthday.trim() || null,
       interests: interests.trim() || null,
       context: context.trim() || null,
@@ -37,8 +49,32 @@ export function ContactEditor({ contact, onClose }: { contact: Contact | null; o
             <input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           </div>
           <div className="editor-field">
-            <label>Cidade / país</label>
-            <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="ex: Lisboa, PT" />
+            <label>Cidade</label>
+            <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="ex: Lisboa" />
+          </div>
+        </div>
+        <div className="editor-row">
+          <div className="editor-field">
+            <label>País</label>
+            <select value={country} onChange={(e) => onCountryChange(e.target.value)}>
+              <option value="">— Selecione —</option>
+              {COUNTRIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div className="editor-field">
+            <label>Estado {isBrazil ? '(UF)' : ''}</label>
+            {isBrazil ? (
+              <select value={state} onChange={(e) => setState(e.target.value)}>
+                <option value="">— Selecione —</option>
+                {BRAZIL_STATES.map((s) => (
+                  <option key={s.uf} value={s.uf}>{s.uf} — {s.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input value={state} onChange={(e) => setState(e.target.value)} placeholder="ex: Califórnia" />
+            )}
           </div>
         </div>
         <div className="editor-row">

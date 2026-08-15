@@ -378,10 +378,10 @@ ipcMain.handle('stays:addSearchHistory', (_, filters: string) => addStaySearchHi
 
 // ── IPC: CRM (contatos) ───────────────────────────────────────────────────────
 ipcMain.handle('contacts:getAll', () => getContacts())
-ipcMain.handle('contacts:create', (_, name: string, location: string | null, birthday: string | null, interests: string | null, context: string | null, nextFollowUp: string | null) =>
-  createContact(name, location, birthday, interests, context, nextFollowUp))
-ipcMain.handle('contacts:update', (_, id: number, name: string, location: string | null, birthday: string | null, interests: string | null, context: string | null, lastContactAt: string | null, nextFollowUp: string | null) =>
-  updateContact(id, name, location, birthday, interests, context, lastContactAt, nextFollowUp))
+ipcMain.handle('contacts:create', (_, name: string, location: string | null, country: string | null, state: string | null, birthday: string | null, interests: string | null, context: string | null, nextFollowUp: string | null) =>
+  createContact(name, location, country, state, birthday, interests, context, nextFollowUp))
+ipcMain.handle('contacts:update', (_, id: number, name: string, location: string | null, country: string | null, state: string | null, birthday: string | null, interests: string | null, context: string | null, lastContactAt: string | null, nextFollowUp: string | null) =>
+  updateContact(id, name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp))
 ipcMain.handle('contacts:log', (_, id: number) => logContact(id))
 ipcMain.handle('contacts:delete', (_, id: number) => deleteContact(id))
 

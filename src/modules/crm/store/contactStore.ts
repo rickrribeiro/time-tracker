@@ -14,11 +14,11 @@ export const useContactStore = create<ContactState>((set, get) => ({
   contacts: [],
   refresh: async () => set({ contacts: await window.api.contacts.getAll() }),
   create: async (c) => {
-    await window.api.contacts.create(c.name, c.location, c.birthday, c.interests, c.context, c.nextFollowUp)
+    await window.api.contacts.create(c.name, c.location, c.country, c.state, c.birthday, c.interests, c.context, c.nextFollowUp)
     await get().refresh()
   },
   update: async (c) => {
-    await window.api.contacts.update(c.id, c.name, c.location, c.birthday, c.interests, c.context, c.lastContactAt, c.nextFollowUp)
+    await window.api.contacts.update(c.id, c.name, c.location, c.country, c.state, c.birthday, c.interests, c.context, c.lastContactAt, c.nextFollowUp)
     await get().refresh()
   },
   log: async (id) => {

@@ -312,6 +312,8 @@ export interface Contact {
   id: number
   name: string
   location: string | null
+  country: string | null
+  state: string | null
   birthday: string | null
   interests: string | null
   context: string | null
@@ -461,8 +463,8 @@ declare global {
       }
       contacts: {
         getAll: () => Promise<Contact[]>
-        create: (name: string, location: string | null, birthday: string | null, interests: string | null, context: string | null, nextFollowUp: string | null) => Promise<Contact>
-        update: (id: number, name: string, location: string | null, birthday: string | null, interests: string | null, context: string | null, lastContactAt: string | null, nextFollowUp: string | null) => Promise<Contact>
+        create: (name: string, location: string | null, country: string | null, state: string | null, birthday: string | null, interests: string | null, context: string | null, nextFollowUp: string | null) => Promise<Contact>
+        update: (id: number, name: string, location: string | null, country: string | null, state: string | null, birthday: string | null, interests: string | null, context: string | null, lastContactAt: string | null, nextFollowUp: string | null) => Promise<Contact>
         log: (id: number) => Promise<Contact>
         delete: (id: number) => Promise<void>
       }

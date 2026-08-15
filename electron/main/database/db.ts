@@ -198,6 +198,14 @@ const MIGRATIONS: Migration[] = [
         // table missing or already seeded
       }
     }
+  },
+  {
+    version: 15,
+    label: 'contacts.country + contacts.state',
+    run: (db) => {
+      try { db.run('ALTER TABLE contacts ADD COLUMN country TEXT;') } catch { /* exists */ }
+      try { db.run('ALTER TABLE contacts ADD COLUMN state TEXT;') } catch { /* exists */ }
+    }
   }
 ]
 

@@ -2207,19 +2207,13 @@ function decodeSecret(value) {
   if (value.startsWith(LEGACY_PREFIX)) return "";
   return value;
 }
-async function migrateLegacySecrets(decryptLegacy) {
-  let changed = 0;
+async function legacySecrets() {
+  const out = {};
   for (const key of SENSITIVE_KEYS) {
     const v = await getSetting(key);
-    if (!v || !v.startsWith(LEGACY_PREFIX)) continue;
-    try {
-      const plain = decryptLegacy(v.slice(LEGACY_PREFIX.length));
-      await setSetting(key, encodeSecret(key, plain));
-      changed++;
-    } catch {
-    }
+    if (v && v.startsWith(LEGACY_PREFIX)) out[key] = v.slice(LEGACY_PREFIX.length);
   }
-  return changed;
+  return out;
 }
 const TIMEOUT_MS = 12e4;
 function buildPath() {
@@ -3402,6 +3396,7 @@ ipcMain.handle(
 ipcMain.handle("habits:completionsForDate", (_, date) => getHabitCompletionsForDate(date));
 ipcMain.handle("settings:get", async (_, key) => decodeSecret(await getSetting(key)));
 ipcMain.handle("settings:set", (_, key, value) => setSetting(key, encodeSecret(key, value)));
+ipcMain.handle("settings:legacySecrets", () => legacySecrets());
 ipcMain.handle("settings:getAll", async () => {
   const all = await getAllSettings();
   for (const k of Object.keys(all)) all[k] = decodeSecret(all[k]) ?? "";
@@ -3923,10 +3918,27 @@ async function ensureServer() {
     serverUrl = local;
     return;
   }
-  embedded = await startServer({ port: PORT, host: "127.0.0.1", token: "" });
+  embedded = await startServer({ port: PORT, host: "127.0.0.1", token: "", staticDir: path.join(__dirname, "../../dist") });
   serverUrl = embedded.url;
-  if (electron.safeStorage.isEncryptionAvailable()) {
-    await migrateLegacySecrets((b64) => electron.safeStorage.decryptString(Buffer.from(b64, "base64"))).catch(() => 0);
+}
+async function rpc(channel, ...args) {
+  const res = await fetch(`${serverUrl}/api/rpc/${channel}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...serverToken ? { Authorization: `Bearer ${serverToken}` } : {} },
+    body: JSON.stringify({ args })
+  });
+  const j = await res.json();
+  if (!j.ok) throw new Error(j.error);
+  return j.result;
+}
+async function migrateLegacySecrets() {
+  if (!electron.safeStorage.isEncryptionAvailable()) return;
+  const legacy = await rpc("settings:legacySecrets");
+  for (const [key, b64] of Object.entries(legacy)) {
+    try {
+      await rpc("settings:set", key, electron.safeStorage.decryptString(Buffer.from(b64, "base64")));
+    } catch {
+    }
   }
 }
 electron.ipcMain.on("desktop:serverUrl", (e) => {
@@ -3972,6 +3984,7 @@ function createWindow() {
 electron.app.whenReady().then(async () => {
   try {
     await ensureServer();
+    await migrateLegacySecrets().catch((e) => console.error("[rickOS] migração de segredos:", e));
   } catch (e) {
     console.error("[rickOS] não foi possível iniciar o servidor:", e);
   }

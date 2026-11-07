@@ -90,7 +90,10 @@ electron/**/*.d.ts
 .cache/
 .eslintcache
 
-.claude/dist-server/
+.claude/
+
+# Build do servidor web (npm run build:web)
+dist-server/
 
 # Prints gerados por `npm run screenshots` (contêm dados pessoais)
 docs/screenshots/

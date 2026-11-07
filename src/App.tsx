@@ -48,6 +48,7 @@ import { PromptRunnerPage } from './modules/ai/pages/PromptRunnerPage'
 import { HistoryPage } from './modules/ai/pages/HistoryPage'
 import { JarvisPage } from './modules/jarvis/pages/JarvisPage'
 import { Page } from './types'
+import { AuthGate } from './components/AuthGate'
 
 interface NavItem {
   id: Page
@@ -245,10 +246,42 @@ export default function App(): React.ReactElement {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  const PageComponent = PAGES[currentPage]
+  // URL hash ⇄ current page: deep links, phone back button, screenshots.
+  useEffect(() => {
+    if (!PAGES[currentPage]) {
+      setPage('timeline')
+      return
+    }
+    const h = `#/${currentPage}`
+    if (window.location.hash !== h) window.history.pushState(null, '', h)
+  }, [currentPage, setPage])
+
+  useEffect(() => {
+    const onHash = (): void => {
+      const p = window.location.hash.replace(/^#\/?/, '').split('?')[0] as Page
+      if (p && PAGES[p] && p !== useUIStore.getState().currentPage) setPage(p)
+    }
+    window.addEventListener('hashchange', onHash)
+    window.addEventListener('popstate', onHash)
+    return () => {
+      window.removeEventListener('hashchange', onHash)
+      window.removeEventListener('popstate', onHash)
+    }
+  }, [setPage])
+
+  // Mobile: the sidebar becomes a drawer (CSS < 900px); closes on navigation.
+  const [navOpen, setNavOpen] = React.useState(false)
+  useEffect(() => setNavOpen(false), [currentPage])
+
+  const PageComponent = PAGES[currentPage] ?? TimelinePage
 
   return (
-    <div className="app">
+    <AuthGate>
+    <div className={`app ${navOpen ? 'nav-open' : ''}`}>
+      <button className="mobile-menu-btn" onClick={() => setNavOpen((v) => !v)} aria-label="Abrir menu">
+        ☰
+      </button>
+      <div className="nav-scrim" onClick={() => setNavOpen(false)} />
       <nav className="sidebar">
         <div className="sidebar-logo">
           <span className="logo-icon">🧭</span>
@@ -343,5 +376,6 @@ export default function App(): React.ReactElement {
 
       <QuickCapture />
     </div>
+    </AuthGate>
   )
 }

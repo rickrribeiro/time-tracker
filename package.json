@@ -1,12 +1,17 @@
 {
-  "name": "time-tracker",
+  "name": "rickos",
   "version": "1.0.0",
-  "description": "Local-First Desktop Time Tracking App",
+  "description": "RickOS — sistema pessoal local-first (desktop Electron + web/celular)",
   "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
+    "dev:web": "concurrently -k -n server,web -c green,cyan \"tsx watch server/main.ts\" \"vite --config vite.web.config.ts\"",
     "build": "tsc && electron-vite build",
-    "preview": "electron-vite preview"
+    "build:web": "vite build --config vite.web.config.ts && npm run build:server",
+    "build:server": "esbuild server/main.ts --bundle --platform=node --target=node18 --packages=external --format=cjs --outfile=dist-server/main.js",
+    "start": "node dist-server/main.js",
+    "preview": "electron-vite preview",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@fastify/static": "^7.0.4",

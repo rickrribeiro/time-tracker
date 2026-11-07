@@ -1,0 +1,136 @@
+/*
+ * Layout pieces needed by the web/phone version, valid for BOTH skins.
+ * Nothing here changes the desktop layout (>= 900px; the Electron window's minWidth is 900).
+ */
+
+.mobile-menu-btn,
+.nav-scrim {
+  display: none;
+}
+
+/* ── Token screen (server with RICKOS_TOKEN) ─────────────────────────────────── */
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--bg-primary);
+  z-index: 1000;
+}
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.auth-logo {
+  font-size: 20px;
+  font-weight: 700;
+}
+.auth-hint {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.auth-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+/* ── Tablet / phone ─────────────────────────────────────────────────────────── */
+@media (max-width: 899px) {
+  body {
+    overflow: auto;
+    user-select: auto;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app {
+    height: 100dvh;
+    width: 100%;
+    position: relative;
+  }
+
+  /* sidebar → off-canvas drawer */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(82vw, 300px);
+    min-width: 0;
+    z-index: 60;
+    transform: translateX(-102%);
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.45);
+  }
+  .app.nav-open .sidebar {
+    transform: translateX(0);
+  }
+  .nav-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(9, 9, 11, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .app.nav-open .nav-scrim {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .sidebar-shortcuts {
+    display: none;
+  }
+
+  .mobile-menu-btn {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    top: calc(8px + env(safe-area-inset-top));
+    left: 8px;
+    z-index: 50;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    font-size: 18px;
+  }
+
+  .main-content {
+    width: 100%;
+    min-width: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* leave room for the menu button in the top bar */
+  .main-content > :first-child {
+    padding-left: 60px;
+  }
+}
+
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px; /* iOS: avoid zoom on focus */
+  }
+  .btn {
+    min-height: 40px;
+  }
+  .page-content {
+    padding: 12px !important;
+  }
+}

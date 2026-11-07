@@ -12,10 +12,16 @@ interface UIState {
 }
 
 const today = new Date()
+
+/** Page from the URL hash (#/todo) — App validates it against the page registry. */
+function pageFromHash(): Page | null {
+  const p = window.location.hash.replace(/^#\/?/, '').split('?')[0]
+  return p ? (decodeURIComponent(p) as Page) : null
+}
 const todayStr = localDateStr(today)
 
 export const useUIStore = create<UIState>((set) => ({
-  currentPage: 'timeline',
+  currentPage: pageFromHash() ?? 'timeline',
   selectedDate: todayStr,
   selectedMonth: { year: today.getFullYear(), month: today.getMonth() },
 

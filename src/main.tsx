@@ -4,6 +4,7 @@ import App from './App'
 import { createApi } from './api/createApi'
 import { subscribe } from './api/transport'
 import './index.css'
+import './styles/responsive.css'
 
 // Same API on desktop and web: everything goes to the rickOS server over HTTP.
 window.api = createApi() as unknown as Window['api']

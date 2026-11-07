@@ -403,8 +403,26 @@ export type Page =
   | 'settings'
   | 'links'
 
+/**
+ * Native bridge — only present inside the Electron app (see electron/preload).
+ * Every feature must also work without it (web/phone): always use `window.desktop?.`.
+ */
+export interface DesktopBridge {
+  /** Base URL of the rickOS server the app talks to (embedded or remote). */
+  serverUrl: string
+  /** Bearer token for that server ('' when it runs locally without auth). */
+  token: string
+  /** Global shortcut Cmd/Ctrl+Shift+Space → open quick capture. Returns unsubscribe. */
+  onQuickCapture: (cb: () => void) => () => void
+  /** Native OS notification. */
+  notify: (title: string, body: string) => void
+  /** Open a URL in the system browser. */
+  openExternal: (url: string) => void
+}
+
 declare global {
   interface Window {
+    desktop?: DesktopBridge
     api: {
       tags: {
         getAll: () => Promise<Tag[]>

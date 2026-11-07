@@ -18,7 +18,7 @@ export function QuickCapture(): React.ReactElement | null {
     const off = window.api.on.quickCapture(() => setOpen(true))
 
     const onKey = (e: KeyboardEvent): void => {
-      if (e.ctrlKey && e.shiftKey && e.code === 'Space') {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'Space') {
         e.preventDefault()
         setOpen(true)
       }

@@ -1,5 +1,5 @@
 import initSqlJs, { Database } from 'sql.js'
-import { app } from 'electron'
+import { dataDir } from '../config'
 import path from 'path'
 import fs from 'fs'
 import { SCHEMA } from './schema'
@@ -229,7 +229,7 @@ function runMigrations(database: Database): void {
 export async function getDb(): Promise<Database> {
   if (db) return db
 
-  dbPath = path.join(app.getPath('userData'), 'timetracker.db')
+  dbPath = dbFilePath()
 
   // Locate wasm relative to sql.js module itself (works in dev + production)
   const sqlJsModulePath = require.resolve('sql.js')
@@ -256,6 +256,17 @@ export async function getDb(): Promise<Database> {
   return db
 }
 
+/** Absolute path of the live database file. */
+export function dbFilePath(): string {
+  return path.join(dataDir(), 'timetracker.db')
+}
+
+/** Replace the live DB with the given bytes (import). The next getDb() reloads it. */
+export function replaceDbFile(bytes: Buffer): void {
+  closeDb()
+  fs.writeFileSync(dbFilePath(), bytes)
+}
+
 export function saveDb(): void {
   if (!db || !dbPath) return
   const data = db.export()
@@ -274,7 +285,7 @@ export function closeDb(): void {
 const SNAP_KEEP = 3
 
 function snapshotsDir(): string {
-  const dir = path.join(app.getPath('userData'), 'snapshots')
+  const dir = path.join(dataDir(), 'snapshots')
   fs.mkdirSync(dir, { recursive: true })
   return dir
 }
@@ -327,8 +338,11 @@ export function snapshotDailyIfNeeded(): void {
 
 /** Restore a snapshot: overwrite the live DB file and reset the in-memory handle. */
 export function restoreSnapshot(snapPath: string): boolean {
-  if (!dbPath || !fs.existsSync(snapPath)) return false
+  // only files inside snapshots/ can be restored (the path comes from the client)
+  const resolved = path.resolve(snapPath)
+  if (path.dirname(resolved) !== path.resolve(snapshotsDir())) return false
+  if (!dbPath || !fs.existsSync(resolved)) return false
   closeDb()
-  fs.copyFileSync(snapPath, dbPath)
+  fs.copyFileSync(resolved, dbPath)
   return true
 }

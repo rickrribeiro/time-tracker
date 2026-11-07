@@ -1,7 +1,6 @@
 import http from 'http'
 import crypto from 'crypto'
 import fs from 'fs'
-import { shell } from 'electron'
 import { getSetting, setSetting, replaceGoogleEvents } from '../database/queries'
 import { decodeSecret, encodeSecret } from './secrets'
 
@@ -111,110 +110,162 @@ export async function uploadFileToDrive(
   return { name: j.name || fileName, link: j.webViewLink ?? null, account: acc.email }
 }
 
-/**
- * OAuth 2.0 "installed app" flow with a loopback redirect + PKCE.
- * Opens the system browser, catches the redirect on a temporary local server,
- * exchanges the code for tokens and stores the refresh token (encrypted).
- */
-export async function connectGoogle(): Promise<boolean> {
-  const { clientId, clientSecret } = await creds()
+// ── OAuth 2.0 (PKCE) ──────────────────────────────────────────────────────────
+// Two redirect modes:
+//  - loopback (default): a temporary server on 127.0.0.1:<random> catches the redirect.
+//    Works with a "Desktop app" OAuth client while the browser runs on the same machine.
+//  - public callback: when RICKOS_PUBLIC_URL is set, Google redirects to
+//    <PUBLIC_URL>/api/google/callback (register it in a "Web application" OAuth client).
+// The client opens the returned URL itself (window.open / openExternal) and then
+// waits on awaitGoogleConnect().
+
+interface PendingAuth {
+  state: string
+  verifier: string
+  redirectUri: string
+  promise: Promise<boolean>
+  resolve: (v: boolean) => void
+  reject: (e: Error) => void
+  cleanup: () => void
+}
+let pending: PendingAuth | null = null
+
+function resultPage(msg: string): string {
+  return `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:system-ui,sans-serif;background:#18181b;color:#f4f4f5;padding:40px"><h2>${msg}</h2><p>Pode fechar esta aba e voltar ao RickOS.</p></body></html>`
+}
+
+/** Handle the OAuth redirect (loopback or public route). Returns the HTML to show. */
+export async function finishGoogleConnect(params: URLSearchParams): Promise<string> {
+  const p = pending
+  if (!p) return resultPage('Nenhuma conexão pendente. Comece de novo pelo RickOS.')
+  const done = (ok: boolean, err?: Error): void => {
+    p.cleanup()
+    if (pending === p) pending = null
+    if (err) p.reject(err)
+    else p.resolve(ok)
+  }
+  const err = params.get('error')
+  if (err) {
+    done(false, new Error(`Google negou: ${err}`))
+    return resultPage('Autorização cancelada.')
+  }
+  if (params.get('state') !== p.state) {
+    done(false, new Error('state inválido no callback do Google.'))
+    return resultPage('Falha de segurança (state).')
+  }
+  try {
+    const { clientId, clientSecret } = await creds()
+    const tokenRes = await fetch(TOKEN_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: params.get('code') || '',
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: p.redirectUri,
+        grant_type: 'authorization_code',
+        code_verifier: p.verifier
+      })
+    })
+    const json = (await tokenRes.json()) as { refresh_token?: string; access_token?: string; error?: string }
+    if (!tokenRes.ok || !json.refresh_token) {
+      done(false, new Error(json.error || 'Sem refresh_token (revogue o acesso e tente de novo).'))
+      return resultPage('Falha ao trocar o código.')
+    }
+    // identify the account by its primary calendar id (= the account email)
+    let email = 'conta google'
+    if (json.access_token) {
+      const resolved = await fetchPrimaryEmail(json.access_token)
+      if (resolved) email = resolved
+    }
+    await addAccount(email, json.refresh_token)
+    done(true)
+    return resultPage(`✅ Conectado: ${email}`)
+  } catch (e) {
+    done(false, e instanceof Error ? e : new Error(String(e)))
+    return resultPage('Erro ao conectar.')
+  }
+}
+
+/** Start the OAuth flow and return the URL the client must open. */
+export async function beginGoogleConnect(publicUrl: string): Promise<{ authUrl: string }> {
+  const { clientId } = await creds()
+  if (pending) {
+    pending.cleanup()
+    pending.reject(new Error('Substituída por uma nova tentativa de conexão.'))
+    pending = null
+  }
   const verifier = base64url(crypto.randomBytes(32))
   const challenge = base64url(crypto.createHash('sha256').update(verifier).digest())
   const state = base64url(crypto.randomBytes(16))
 
-  return new Promise<boolean>((resolve, reject) => {
+  let redirectUri: string
+  let closeServer = (): void => {}
+  if (publicUrl) {
+    redirectUri = `${publicUrl}/api/google/callback`
+  } else {
     const server = http.createServer(async (req, res) => {
-      try {
-        const url = new URL(req.url || '', `http://127.0.0.1`)
-        if (!url.searchParams.get('code') && !url.searchParams.get('error')) {
-          res.end('OK')
-          return
-        }
-        const respond = (msg: string): void => {
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-          res.end(`<html><body style="font-family:sans-serif;background:#0f172a;color:#f1f5f9;padding:40px"><h2>${msg}</h2><p>Pode fechar esta aba e voltar ao RickOS.</p></body></html>`)
-        }
-        const err = url.searchParams.get('error')
-        if (err) {
-          respond('Autorização cancelada.')
-          cleanup()
-          reject(new Error(`Google negou: ${err}`))
-          return
-        }
-        if (url.searchParams.get('state') !== state) {
-          respond('Falha de segurança (state).')
-          cleanup()
-          reject(new Error('state inválido no callback do Google.'))
-          return
-        }
-        const code = url.searchParams.get('code') as string
-        const redirectUri = `http://127.0.0.1:${port}`
-        const body = new URLSearchParams({
-          code,
-          client_id: clientId,
-          client_secret: clientSecret,
-          redirect_uri: redirectUri,
-          grant_type: 'authorization_code',
-          code_verifier: verifier
-        })
-        const tokenRes = await fetch(TOKEN_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body
-        })
-        const json = (await tokenRes.json()) as { refresh_token?: string; access_token?: string; error?: string }
-        if (!tokenRes.ok || !json.refresh_token) {
-          respond('Falha ao trocar o código.')
-          cleanup()
-          reject(new Error(json.error || 'Sem refresh_token (revogue o acesso e tente de novo).'))
-          return
-        }
-        // identify the account by its primary calendar id (= the account email)
-        let email = 'conta google'
-        if (json.access_token) {
-          const resolved = await fetchPrimaryEmail(json.access_token)
-          if (resolved) email = resolved
-        }
-        await addAccount(email, json.refresh_token)
-        respond(`✅ Conectado: ${email}`)
-        cleanup()
-        resolve(true)
-      } catch (e) {
-        cleanup()
-        reject(e instanceof Error ? e : new Error(String(e)))
+      const url = new URL(req.url || '', 'http://127.0.0.1')
+      if (!url.searchParams.get('code') && !url.searchParams.get('error')) {
+        res.end('OK')
+        return
       }
+      const html = await finishGoogleConnect(url.searchParams)
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.end(html)
     })
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()))
+    redirectUri = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+    closeServer = () => server.close()
+  }
 
-    let port = 0
-    const timer = setTimeout(() => {
-      cleanup()
-      reject(new Error('Tempo esgotado aguardando a autorização do Google.'))
-    }, 180_000)
-
-    function cleanup(): void {
-      clearTimeout(timer)
-      server.close()
-    }
-
-    server.listen(0, '127.0.0.1', () => {
-      port = (server.address() as { port: number }).port
-      const redirectUri = `http://127.0.0.1:${port}`
-      const authUrl =
-        `${AUTH_ENDPOINT}?` +
-        new URLSearchParams({
-          client_id: clientId,
-          redirect_uri: redirectUri,
-          response_type: 'code',
-          scope: SCOPE,
-          access_type: 'offline',
-          prompt: 'consent',
-          state,
-          code_challenge: challenge,
-          code_challenge_method: 'S256'
-        }).toString()
-      shell.openExternal(authUrl)
-    })
+  let resolve!: (v: boolean) => void
+  let reject!: (e: Error) => void
+  const promise = new Promise<boolean>((res, rej) => {
+    resolve = res
+    reject = rej
   })
+  promise.catch(() => {}) // avoid unhandled rejection if nobody awaits
+  const timer = setTimeout(() => {
+    if (pending?.state === state) {
+      pending.cleanup()
+      pending = null
+      reject(new Error('Tempo esgotado aguardando a autorização do Google.'))
+    }
+  }, 300_000)
+  pending = {
+    state,
+    verifier,
+    redirectUri,
+    promise,
+    resolve,
+    reject,
+    cleanup: () => {
+      clearTimeout(timer)
+      closeServer()
+    }
+  }
+
+  const authUrl =
+    `${AUTH_ENDPOINT}?` +
+    new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: SCOPE,
+      access_type: 'offline',
+      prompt: 'consent',
+      state,
+      code_challenge: challenge,
+      code_challenge_method: 'S256'
+    }).toString()
+  return { authUrl }
+}
+
+/** Wait for the pending OAuth flow to finish (true = account connected). */
+export async function awaitGoogleConnect(): Promise<boolean> {
+  if (!pending) return false
+  return pending.promise
 }
 
 /** Whether at least one Google account is connected. */

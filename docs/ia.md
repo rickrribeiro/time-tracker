@@ -11,22 +11,24 @@
 **Perfil do usuário:** estuda tecnologia e idiomas em ciclos de hiperfoco; trabalha com engenharia/DevOps; quer centralizar tudo num app só em vez de Notion/Obsidian/Anki/planilhas.
 
 ### Stack técnica
-- **Electron** (main + preload + renderer), empacotado com `electron-vite`.
+- **Servidor Node** (`server/`, Fastify) dono do banco e das integrações; clientes **desktop** (Electron, `electron-vite`) e **web/celular** (PWA) compartilham o mesmo front React.
 - **React + TypeScript + Vite** no renderer.
-- **sql.js** (SQLite em WebAssembly) como banco — um arquivo `timetracker.db` em `userData`, carregado em memória e persistido a cada escrita.
+- **sql.js** (SQLite em WebAssembly) como banco — um arquivo `timetracker.db` em `RICKOS_DATA_DIR` (padrão: o userData antigo), carregado em memória pelo servidor e persistido a cada escrita.
 - **Zustand** para estado (um store por módulo).
 - **Sem bibliotecas pesadas**: gráficos, markdown, drag-and-drop, etc. são feitos à mão (CSS/JS puro). Tema escuro.
 - **IA**: executa o **Claude Code CLI local** via `child_process` (nada é mandado a APIs pagas pelo app).
 
 ### Arquitetura (padrão repetido em toda entidade)
 ```
-UI React → store Zustand → window.api.<ns>.<ação>()  (preload / contextBridge)
-        → ipcMain.handle('<ns>:<ação>')              (processo main)
+UI React → store Zustand → window.api.<ns>.<ação>()  (src/api/createApi.ts)
+        → POST /api/rpc/<ns>:<ação>                  (HTTP; eventos voltam por SSE)
+        → handler em server/rpc.ts                   (servidor)
         → queries.ts (sql.js)                          (dados)
 ```
 - Navegação: um `Page` union + `NAV_GROUPS` (sidebar) + registry `PAGES`. `uiStore.currentPage`/`setPage`.
-- Segurança: contextIsolation; credenciais sensíveis criptografadas com `safeStorage` do Electron.
-- Migrações: `PRAGMA user_version` (7 migrações até hoje). Tabela nova entra no schema; alteração de tabela vira migração.
+- Segurança: servidor só em 127.0.0.1 por padrão (token obrigatório fora disso); credenciais sensíveis com AES-256-GCM (`server/services/secrets.ts`).
+- **Toda feature precisa funcionar no desktop e na web/celular** (regra do `CLAUDE.md`).
+- Migrações: `PRAGMA user_version` (15 migrações até hoje). Tabela nova entra no schema; alteração de tabela vira migração.
 
 ---
 

@@ -15,7 +15,7 @@
 - Home ("Hoje") com horas da semana + tarefas + hábitos reais; finanças/viagens mockados.
 - `resolveJsonModule: true` no `tsconfig.web.json` (para mocks JSON).
 
-**Padrão para adicionar tabela/entidade (repetir sempre):** `schema.ts` → `queries.ts` (interface `Db*` + funções usando `getDb/getAll/getOne/run/lastInsertId`) → `electron/main/index.ts` (`ipcMain.handle`) → `electron/preload/index.ts` (bloco no `api`) → `src/types/index.ts` (interface + augment `Window.api`) → store Zustand → página. Molde: `createTag`.
+**Padrão para adicionar tabela/entidade (repetir sempre):** `server/database/schema.ts` → `server/database/queries.ts` (interface `Db*` + funções usando `getDb/getAll/getOne/run/lastInsertId`) → `server/rpc.ts` (`ipcMain.handle`, registry do servidor) → `src/api/createApi.ts` (bloco no `api`) → `src/types/index.ts` (interface + augment `Window.api`) → store Zustand → página. Molde: `createTag`. **Tem que funcionar no desktop e na web/celular.**
 
 ---
 

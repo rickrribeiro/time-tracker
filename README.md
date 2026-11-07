@@ -28,57 +28,75 @@ Pré-requisitos: **Node.js 18+** e npm. Para os recursos de IA, o **Claude Code 
 
 ```bash
 npm install
-npm run dev      # abre o app em modo desenvolvimento
+npm run dev        # desktop (Electron); o servidor sobe embutido
+npm run dev:web    # web: servidor + Vite em http://127.0.0.1:5317
 ```
+
+Desktop e web usam **o mesmo servidor e o mesmo banco**. Se o `dev:web` já estiver rodando, o Electron reaproveita o servidor dele.
 
 Build de produção:
 
 ```bash
-npm run build            # typecheck + bundle (main/preload/renderer)
-npm run preview          # pré-visualiza o build
+npm run build            # desktop: typecheck + bundle (main/preload/renderer)
 npx electron-builder     # empacota o app (saída em release/)
+npm run build:web        # web: front em dist/ + servidor em dist-server/
+npm start                # servidor de produção (serve a web em http://127.0.0.1:4318)
 ```
 
-> ⚠️ Mudanças no **processo principal ou no preload** (`electron/`) exigem **reiniciar o `npm run dev`** — o hot-reload cobre só o renderer.
+### Celular
+
+```bash
+RICKOS_HOST=0.0.0.0 RICKOS_TOKEN=<um-segredo-longo> npm start
+```
+
+Abra `http://<ip-do-mac>:4318` no celular, cole o token e use "Adicionar à tela inicial" (é um PWA). Para usar fora de casa, rode numa VPS atrás de HTTPS (Caddy/sslip.io) e defina `RICKOS_PUBLIC_URL` para o OAuth do Google.
+
+| Variável | Padrão | Uso |
+|---|---|---|
+| `RICKOS_DATA_DIR` | `~/Library/Application Support/time-tracker` | banco, snapshots e `secret.key` |
+| `RICKOS_PORT` | `4318` | porta do servidor |
+| `RICKOS_HOST` | `127.0.0.1` | `0.0.0.0` para acesso pela rede |
+| `RICKOS_TOKEN` | (vazio) | obrigatório fora do localhost |
+| `RICKOS_PUBLIC_URL` | (vazio) | URL pública (callback OAuth em `/api/google/callback`) |
+| `RICKOS_SERVER_URL` | (vazio) | faz o desktop usar um servidor remoto |
+
+> ⚠️ Mudanças em `electron/` ou `server/` exigem **reiniciar o `npm run dev`**. No `dev:web`, o servidor recarrega sozinho (`tsx watch`).
 
 ---
 
 ## 🧱 Arquitetura
 
 ```
+server/                 # servidor Node (sem Electron): ÚNICO dono do banco
+  index.ts              # Fastify: POST /api/rpc/:canal, GET /api/events (SSE), export, OAuth
+  rpc.ts                # TODOS os handlers '<ns>:<ação>' + agendador (regras, agentes, Google)
+  events.ts             # broadcast → SSE
+  config.ts             # variáveis RICKOS_*
+  database/             # schema.ts, db.ts (migrações), queries.ts, aiSeeds.ts
+  services/             # claude, github, google, pluggy, flights, secrets (AES-256-GCM)
 electron/
-  main/
-    index.ts            # bootstrap, janela, TODOS os ipcMain.handle
-    database/
-      schema.ts         # SCHEMA: CREATE TABLE IF NOT EXISTS (roda todo boot)
-      db.ts             # sql.js init + migrações (PRAGMA user_version) + seeds
-      queries.ts        # CRUD por entidade (helpers getDb/getAll/getOne/run)
-      aiSeeds.ts        # skills/agentes de exemplo
-    services/           # integrações externas (efeitos colaterais)
-      claude.ts         # roda o Claude Code CLI (spawn, streaming)
-      github.ts  google.ts  pluggy.ts  flights.ts  secrets.ts
-  preload/
-    index.ts            # contextBridge → window.api.* (única ponte IPC)
+  main/index.ts         # janela, atalho global, notificações; sobe o servidor embutido
+  preload/index.ts      # window.desktop (só o que é nativo)
 src/
-  App.tsx               # NAV_GROUPS + registry PAGES (Record<Page, Component>)
-  types/index.ts        # interfaces + Page union + tipagem de window.api
-  store/                # stores globais (uiStore: currentPage)
-  utils/                # helpers de data
-  modules/<módulo>/
-    pages/  components/  store/   # cada módulo é autocontido (Zustand)
-  index.css             # estilos (tema escuro, sem framework de CSS)
+  api/                  # createApi (window.api sobre HTTP), transport (fetch + SSE), files
+  App.tsx               # NAV_GROUPS + registry PAGES; página atual ⇄ #/hash da URL
+  types/index.ts        # interfaces + Page union + tipagem de window.api / window.desktop
+  modules/<módulo>/     # pages/ components/ store/
+  index.css             # skin clássica
+  styles/               # skin-devlytics.css, responsive.css, skin.ts (DEFAULT_SKIN)
 ```
 
 **Fluxo de dados (padrão em toda entidade):**
 
 ```
-UI (React) → store Zustand → window.api.<ns>.<ação>()   [preload]
-           → ipcMain.handle('<ns>:<ação>')              [main]
-           → queries.ts (sql.js)                         [dados]
+UI (React) → store Zustand → window.api.<ns>.<ação>()      [src/api/createApi.ts]
+           → POST /api/rpc/<ns>:<ação>                       [HTTP]
+           → ipcMain.handle('<ns>:<ação>') (registry)        [server/rpc.ts]
+           → queries.ts (sql.js)                             [dados]
 ```
 
-- **Uma fonte de verdade**: todo o banco vive num único arquivo em `app.getPath('userData')/timetracker.db` (sql.js em memória, persistido em disco após cada escrita).
-- **Segurança**: `contextIsolation` + preload; nada de Node no renderer. Credenciais sensíveis são criptografadas com o `safeStorage` do Electron (`services/secrets.ts`).
+- **Uma fonte de verdade**: o banco é um único arquivo (`timetracker.db` em `RICKOS_DATA_DIR`), carregado em memória pelo servidor e persistido a cada escrita. Só o servidor toca nele.
+- **Segurança**: o servidor escuta só em `127.0.0.1` por padrão; fora disso exige `RICKOS_TOKEN`. Credenciais sensíveis são criptografadas com AES-256-GCM (`server/services/secrets.ts`, chave em `secret.key`).
 - **Migrações**: tabela nova entra só no `schema.ts`; alteração de tabela existente ganha uma entrada em `MIGRATIONS` (`db.ts`), versionada por `PRAGMA user_version`.
 
 ---
@@ -110,7 +128,7 @@ A data/hora da última sincronização de cada integração aparece em Configura
 
 ## 💾 Backup e dados
 
-- **Exportar/Importar banco** (botões na sidebar): snapshot `.sqlite` completo — **localmente** ou direto para o **Google Drive**.
+- **Exportar/Importar banco** (botões na sidebar): snapshot `.sqlite` completo, baixado no dispositivo ou enviado ao **Google Drive**.
 - **Estudos**: export por tópico como caderno `.md`, backup JSON ou pasta Markdown (compatível com Obsidian).
 - Como tudo é um arquivo SQLite, o backup completo já inclui todos os módulos.
 
@@ -132,13 +150,14 @@ A data/hora da última sincronização de cada integração aparece em Configura
 Typecheck (nunca use `tsc -b`; os projetos são separados):
 
 ```bash
-npx tsc -p tsconfig.node.json --noEmit   # processo main/preload
+npx tsc -p tsconfig.node.json --noEmit   # servidor + main/preload
 npx tsc -p tsconfig.web.json  --noEmit   # renderer (React)
 npm run build                            # bundle completo
 ```
 
 **Convenções**
-- Ao adicionar uma entidade, toque nos 6 pontos: `schema.ts` → `queries.ts` → `index.ts` (IPC) → `preload/index.ts` → `types/index.ts` (interface + `Page` + `window.api`) → store Zustand. Molde: `todos`/`habits`.
+- **Toda feature precisa funcionar no desktop e na web/celular** (ver `CLAUDE.md`).
+- Ao adicionar uma entidade: `server/database/schema.ts` → `queries.ts` → `server/rpc.ts` → `src/api/createApi.ts` → `types/index.ts` (interface + `Page` + `window.api`) → store Zustand. Molde: `todos`/`habits`.
 - Nova página: registre em `NAV_GROUPS` **e** no `PAGES` (o `Record<Page, …>` obriga a sincronia via TS).
 - sql.js **não** aceita parâmetros em `db.exec` — sempre `prepare/step` (helpers `getAll/getOne/run`).
 - Sem bibliotecas pesadas (charts, markdown, DnD são feitos à mão, em CSS/JS puro).

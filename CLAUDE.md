@@ -1,3 +1,39 @@
+# rickOS: Desktop + Web (LEIA PRIMEIRO)
+
+O rickOS roda em **dois clientes que compartilham o mesmo servidor e os mesmos dados**:
+
+* **Desktop** (Electron): `npm run dev`. O main sobe o servidor embutido.
+* **Web/celular** (navegador, PWA): `npm run dev:web` (http://127.0.0.1:5317). Em produção, `npm run build:web && npm start`.
+
+## Regra obrigatória
+
+**Toda funcionalidade nova (ou alteração) precisa funcionar no desktop E na web/celular.**
+Não pode haver feature exclusiva de uma plataforma sem uma alternativa equivalente na outra.
+
+## Como adicionar algo (receita)
+
+`server/database/schema.ts` (ou uma migração em `server/database/db.ts`) → `server/database/queries.ts` → handler `ipcMain.handle('<ns>:<ação>')` em `server/rpc.ts` → método em `src/api/createApi.ts` → tipo em `src/types/index.ts` (`Window.api`) → store Zustand → página.
+
+* O front **nunca** usa `ipcMain`/`ipcRenderer`, `fs`, `child_process` nem APIs do Electron/Node. Tudo passa por `window.api` (HTTP RPC + SSE para o servidor).
+* Efeitos colaterais (CLI do Claude, `gh`, Google, Pluggy, arquivos) ficam **no servidor** (`server/`), que não importa nada do Electron.
+* Recursos realmente nativos ficam em `window.desktop` (`electron/preload`), **sempre** com alternativa web: use `window.desktop?.x ?? <fallback web>`.
+* Arquivos: use download/upload (`src/api/files.ts`), nunca diálogos nativos.
+* Eventos do servidor para os clientes: `broadcast()` em `server/events.ts` + `subscribe()` em `src/api/transport.ts`.
+
+## UI
+
+* Toda tela precisa funcionar em **desktop (≥ 900px)** e **celular (390px)**. Layout mobile: `src/styles/responsive.css`.
+* O visual vale para as duas skins (`classic` = `src/index.css`, `devlytics` = `src/styles/skin-devlytics.css`) e para os temas escuro e claro. Use as variáveis CSS (`--bg-*`, `--text-*`, `--accent`, `--border`), nunca cores fixas.
+* Skin padrão por plataforma: `DEFAULT_SKIN` em `src/styles/skin.ts`.
+
+## Verificação antes de concluir
+
+* `npx tsc -p tsconfig.node.json --noEmit` e `npx tsc -p tsconfig.web.json --noEmit`
+* Testar no desktop (`npm run dev`) e na web (`npm run dev:web`), inclusive em viewport de celular.
+* `npm run screenshots` gera os prints (clássico × novo, desktop × celular) em `docs/screenshots/`.
+
+---
+
 # CLAUDE.md
 
 You are a senior full-stack engineer. Your task is to generate a COMPLETE, WORKING desktop application — not a demo.

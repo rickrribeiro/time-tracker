@@ -31,8 +31,18 @@ needs_build() {
 script_server_pid() {
   [ -f "$PID_FILE" ] || return 0
   local pid
-  pid="$(cat "$PID_FILE")"
+  pid="$(awk '{print $1}' "$PID_FILE")"
   if ps -p "$pid" -o command= 2>/dev/null | grep -q "dist-server/main.js"; then echo "$pid"; fi
+}
+
+build_stamp() {
+  stat -f %m "${ROOT}/dist-server/main.js" 2>/dev/null || echo 0
+}
+
+# The running script server was started from an older build than the one on disk.
+running_is_stale() {
+  [ -f "$PID_FILE" ] || return 1
+  [ "$(awk '{print $2}' "$PID_FILE")" != "$(build_stamp)" ]
 }
 
 ensure_server() {
@@ -40,7 +50,7 @@ ensure_server() {
   if server_up; then
     local pid
     pid="$(script_server_pid)"
-    if [ -n "$pid" ] && needs_build; then
+    if [ -n "$pid" ] && { needs_build || running_is_stale; }; then
       echo "… código mudou: reiniciando o servidor com a versão nova"
       kill "$pid" 2>/dev/null
       for _ in $(seq 1 20); do server_up || break; sleep 0.25; done
@@ -61,7 +71,7 @@ ensure_server() {
   fi
   echo "… subindo o servidor (log: ${LOG_DIR}/server.log)"
   nohup node "${ROOT}/dist-server/main.js" >>"${LOG_DIR}/server.log" 2>&1 &
-  echo $! >"$PID_FILE"
+  echo "$! $(build_stamp)" >"$PID_FILE"
   for _ in $(seq 1 40); do
     server_up && break
     sleep 0.25

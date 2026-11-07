@@ -3,11 +3,17 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { createApi } from './api/createApi'
 import { subscribe } from './api/transport'
+import { applySkin } from './styles/skin'
+import '@fontsource-variable/geist'
+import '@fontsource-variable/geist-mono'
 import './index.css'
 import './styles/responsive.css'
+import './styles/skin-devlytics.css'
 
 // Same API on desktop and web: everything goes to the rickOS server over HTTP.
 window.api = createApi() as unknown as Window['api']
+
+applySkin()
 
 // Server push: notifications (rules engine, agents) and DB swaps (import/restore).
 subscribe('notify', (p) => {

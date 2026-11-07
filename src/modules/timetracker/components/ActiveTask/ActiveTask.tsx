@@ -27,6 +27,8 @@ export function ActiveTask(): React.ReactElement {
   const [newStudyNodeId, setNewStudyNodeId] = useState<number | null>(null)
   const [studyOptions, setStudyOptions] = useState<StudyOption[]>([])
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  // Phone: the switch form is collapsed behind a "Trocar" button (CSS < 900px only).
+  const [switchOpen, setSwitchOpen] = useState(false)
 
   // Load "Tópico › Nó" options for optionally linking a focus session to a study node.
   useEffect(() => {
@@ -60,6 +62,7 @@ export function ActiveTask(): React.ReactElement {
     if (!newTitle.trim()) return
     await switchTask(newTitle.trim(), newTagId, newSecondaryTagId, newStudyNodeId)
     setNewTitle('')
+    setSwitchOpen(false)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -70,7 +73,7 @@ export function ActiveTask(): React.ReactElement {
   }
 
   return (
-    <div className="active-task-bar">
+    <div className={`active-task-bar ${switchOpen ? 'switch-open' : ''} ${activeTask ? 'has-active' : ''}`}>
       {activeTask ? (
         <>
           <div className="active-task-info">
@@ -101,6 +104,13 @@ export function ActiveTask(): React.ReactElement {
             </div>
           </div>
           <div className="active-task-timer">{timer}</div>
+          <button
+            className="btn btn-secondary btn-sm mobile-switch-toggle"
+            onClick={() => setSwitchOpen((v) => !v)}
+            aria-expanded={switchOpen}
+          >
+            {switchOpen ? '✕' : '⇄ Trocar'}
+          </button>
           <div className="active-task-controls">
             <div className="task-input-row">
               <input

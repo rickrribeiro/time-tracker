@@ -22,7 +22,7 @@ function heatmapColor(minutes: number, maxMinutes: number): string {
   if (minutes === 0 || maxMinutes === 0) return 'var(--bg-secondary)'
   const ratio = minutes / maxMinutes
   const alpha = 0.2 + ratio * 0.8
-  return `rgba(99, 102, 241, ${alpha})`
+  return `color-mix(in srgb, var(--accent) ${Math.round(alpha * 100)}%, transparent)`
 }
 
 export function CalendarView({

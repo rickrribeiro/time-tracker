@@ -4,7 +4,8 @@
  */
 
 .mobile-menu-btn,
-.nav-scrim {
+.nav-scrim,
+.mobile-switch-toggle {
   display: none;
 }
 
@@ -117,7 +118,94 @@
   }
   /* leave room for the menu button in the top bar */
   .main-content > :first-child {
-    padding-left: 60px;
+    padding-left: 60px !important;
+    padding-right: 12px !important;
+  }
+
+  /* active task bar: compact row (title · timer · Trocar · Stop), switch form collapsible */
+  .active-task-bar {
+    flex-wrap: wrap;
+    row-gap: 10px;
+    column-gap: 10px;
+    min-height: 60px;
+  }
+  .active-task-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .active-task-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .active-task-bar.has-active .mobile-switch-toggle {
+    display: inline-flex;
+  }
+  .active-task-controls {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+  .active-task-bar.has-active:not(.switch-open) .active-task-controls .task-input-row,
+  .active-task-bar.has-active:not(.switch-open) .pomodoro-widget {
+    display: none;
+  }
+  .active-task-bar.has-active:not(.switch-open) .active-task-controls {
+    flex: 0 0 auto;
+  }
+  .task-input-row {
+    flex-wrap: wrap;
+    flex: 1 1 100%;
+  }
+  .task-input-row input {
+    flex: 1 1 100%;
+  }
+  .task-input-row select {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+
+  .module-page {
+    padding: 16px 14px;
+  }
+  .module-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .quick-add-row {
+    flex-wrap: wrap;
+  }
+  .quick-add-row input {
+    flex: 1 1 100%;
+  }
+
+  /* generic rows: title on its own line, meta/actions wrap below */
+  .list-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .list-row-title {
+    flex: 1 1 calc(100% - 64px);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .list-row-actions {
+    margin-left: auto;
+  }
+
+  /* boards scroll sideways instead of squeezing */
+  .kanban-board,
+  .pipeline-board {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal {
+    min-width: 0 !important;
+    width: calc(100vw - 24px);
+    max-width: 480px;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
   }
 }
 
@@ -130,7 +218,17 @@
   .btn {
     min-height: 40px;
   }
-  .page-content {
-    padding: 12px !important;
+  /* multi-column grids (classes and inline styles) collapse to one column */
+  .cards-grid,
+  .stats-grid,
+  .md-split,
+  .runner-grid,
+  .study-workspace,
+  [style*='grid-template-columns'] {
+    grid-template-columns: 1fr !important;
+  }
+  .active-task-timer {
+    font-size: 20px;
+    min-width: 0;
   }
 }

@@ -5,6 +5,7 @@ import { useCalendarStore } from '../../calendar/store/calendarStore'
 import { useFinanceStore } from '../../finance/store/financeStore'
 import { PluggyConnect } from 'react-pluggy-connect'
 import { SnapshotsSection } from '../components/SnapshotsSection'
+import { AppearanceSection } from '../components/AppearanceSection'
 
 const FX_CURRENCIES = ['BRL', 'USD', 'JPY', 'EUR']
 
@@ -259,10 +260,12 @@ export function SettingsPage(): React.ReactElement {
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 700 }}>⚙️ Configurações</h2>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            Integrações e preferências. Tokens ficam no banco local (userData).
+            Integrações e preferências. Tokens ficam no banco do servidor rickOS (criptografados).
           </p>
         </div>
       </div>
+
+      <AppearanceSection />
 
       <div className="chart-section" style={{ maxWidth: 560 }}>
         <div className="chart-title">🐙 GitHub</div>

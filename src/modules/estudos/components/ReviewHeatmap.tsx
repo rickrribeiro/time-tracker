@@ -11,7 +11,7 @@ const MONTH_NAMES = [
 function heatColor(count: number, max: number): string {
   if (count === 0 || max === 0) return 'var(--bg-secondary)'
   const alpha = 0.2 + (count / max) * 0.8
-  return `rgba(99, 102, 241, ${alpha})`
+  return `color-mix(in srgb, var(--accent) ${Math.round(alpha * 100)}%, transparent)`
 }
 
 /** Heatmap mensal de quantos flashcards foram revisados em cada dia. */

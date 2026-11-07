@@ -191,7 +191,7 @@ export function Dashboard(): React.ReactElement {
                       <div
                         key={d.date}
                         className="bar-chart-bar"
-                        style={{ height: `${Math.max(2, heightPct)}%`, background: '#6366f1', position: 'relative' }}
+                        style={{ height: `${Math.max(2, heightPct)}%`, background: 'var(--accent)', position: 'relative' }}
                         title={`${d.date}: ${formatHours(d.totalMinutes)} (${Math.round(prodPct)}% prod, ${Math.round(erosPct)}% eros, ${Math.round(semiPct)}% semi)`}
                       >
                         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${prodPct}%`, background: '#22c55e', borderRadius: 'inherit', zIndex: 3 }} />
@@ -204,7 +204,7 @@ export function Dashboard(): React.ReactElement {
                 </div>
                 <div style={{ marginTop: 28, display: 'flex', gap: 16, fontSize: 11, color: 'var(--text-muted)' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: '#6366f1', display: 'inline-block' }} /> Total
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent)', display: 'inline-block' }} /> Total
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ width: 10, height: 10, borderRadius: 2, background: '#22c55e', display: 'inline-block' }} /> Productive

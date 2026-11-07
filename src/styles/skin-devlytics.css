@@ -1,0 +1,438 @@
+/*
+ * Skin "devlytics" — Geist, zinc neutrals, green accent, glass panels.
+ * Everything is scoped to :root[data-skin='devlytics'] so the classic look
+ * (src/index.css) stays byte-for-byte intact when the skin is off.
+ * Toggle: src/styles/skin.ts (DEFAULT_SKIN) or Configurações → Aparência.
+ */
+
+/* ── Tokens ─────────────────────────────────────────────────────────────────── */
+:root[data-skin='devlytics'] {
+  /* remap of the variables used across index.css + inline styles */
+  --bg-primary: #18181b;
+  --bg-secondary: #222225;
+  --bg-tertiary: #2a2a2e;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent: #22c55e;
+  --accent-hover: #86efac;
+  --accent-dim: rgba(34, 197, 94, 0.14);
+  --success: #22c55e;
+  --warning: #facc15;
+  --danger: #f87171;
+  --radius: 6px;
+  --radius-sm: 4px;
+  --radius-lg: 8px;
+
+  /* skin-only tokens */
+  --dl-line-strong: rgba(255, 255, 255, 0.14);
+  --dl-glass: rgba(39, 39, 42, 0.55);
+  --dl-glass-hi: rgba(255, 255, 255, 0.06);
+  --dl-glass-blur: blur(18px) saturate(170%);
+  --dl-side: rgba(24, 24, 27, 0.62);
+  --dl-sunk: rgba(255, 255, 255, 0.04);
+  --dl-ring: rgba(34, 197, 94, 0.3);
+  --dl-scrim: rgba(9, 9, 11, 0.56);
+  --dl-glow-1: rgba(34, 197, 94, 0.16);
+  --dl-glow-2: rgba(14, 165, 233, 0.11);
+  --dl-on-accent: #052e16;
+  --dl-grad: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  --dl-grad-text: linear-gradient(100deg, #86efac 0%, #22c55e 50%, #2dd4bf 100%);
+  --dl-gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 70%);
+  --dl-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 18px 44px -12px rgba(0, 0, 0, 0.75);
+  --dl-modal-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.5), 0 48px 96px -24px rgba(0, 0, 0, 0.6);
+  --dl-font: 'Geist Variable', 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --dl-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  color-scheme: dark;
+}
+
+:root[data-skin='devlytics'][data-theme='light'] {
+  --bg-primary: #f4f4f5;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #fafafa;
+  --bg-hover: rgba(24, 24, 27, 0.05);
+  --border: rgba(24, 24, 27, 0.09);
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --accent: #16a34a;
+  --accent-hover: #15803d;
+  --accent-dim: rgba(22, 163, 74, 0.1);
+  --warning: #ca8a04;
+  --danger: #dc2626;
+
+  --dl-line-strong: rgba(24, 24, 27, 0.16);
+  --dl-glass: rgba(255, 255, 255, 0.62);
+  --dl-glass-hi: rgba(255, 255, 255, 0.9);
+  --dl-side: rgba(255, 255, 255, 0.55);
+  --dl-sunk: rgba(24, 24, 27, 0.04);
+  --dl-ring: rgba(34, 197, 94, 0.28);
+  --dl-scrim: rgba(24, 24, 27, 0.3);
+  --dl-glow-1: rgba(134, 239, 172, 0.45);
+  --dl-glow-2: rgba(125, 211, 252, 0.3);
+  --dl-on-accent: #ffffff;
+  --dl-grad-text: linear-gradient(100deg, #15803d 0%, #16a34a 45%, #0d9488 100%);
+  --dl-gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 70%);
+  --dl-shadow: 0 1px 2px rgba(24, 24, 27, 0.06), 0 12px 28px -10px rgba(24, 24, 27, 0.2);
+  --dl-modal-shadow: 0 1px 2px rgba(24, 24, 27, 0.06), 0 12px 28px -10px rgba(24, 24, 27, 0.22),
+    0 40px 80px -24px rgba(24, 24, 27, 0.3);
+  color-scheme: light;
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────────── */
+:root[data-skin='devlytics'] body {
+  font-family: var(--dl-font);
+  font-feature-settings: 'ss01', 'cv11';
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--bg-primary);
+  background-image: radial-gradient(900px 520px at 12% -10%, var(--dl-glow-1), transparent 60%),
+    radial-gradient(760px 480px at 100% 0%, var(--dl-glow-2), transparent 60%);
+  background-attachment: fixed;
+}
+
+:root[data-skin='devlytics'] code,
+:root[data-skin='devlytics'] pre,
+:root[data-skin='devlytics'] kbd,
+:root[data-skin='devlytics'] .md-code {
+  font-family: var(--dl-mono);
+}
+
+:root[data-skin='devlytics'] ::selection {
+  background: var(--dl-ring);
+}
+
+:root[data-skin='devlytics'] * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--dl-line-strong) transparent;
+}
+:root[data-skin='devlytics'] ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+:root[data-skin='devlytics'] ::-webkit-scrollbar-thumb {
+  background: var(--dl-line-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+:root[data-skin='devlytics'] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* form controls: sunk fields with a green focus ring */
+:root[data-skin='devlytics'] input,
+:root[data-skin='devlytics'] textarea,
+:root[data-skin='devlytics'] select {
+  background: var(--dl-sunk);
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+:root[data-skin='devlytics'] input:hover,
+:root[data-skin='devlytics'] textarea:hover,
+:root[data-skin='devlytics'] select:hover {
+  border-color: var(--dl-line-strong);
+}
+:root[data-skin='devlytics'] input:focus,
+:root[data-skin='devlytics'] textarea:focus,
+:root[data-skin='devlytics'] select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--dl-ring);
+}
+:root[data-skin='devlytics'] select option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+:root[data-skin='devlytics'] input[type='checkbox'],
+:root[data-skin='devlytics'] input[type='radio'] {
+  accent-color: var(--accent);
+  box-shadow: none;
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────────────── */
+:root[data-skin='devlytics'] .app {
+  background: transparent;
+}
+
+:root[data-skin='devlytics'] .sidebar {
+  width: 224px;
+  min-width: 224px;
+  background: var(--dl-side);
+  backdrop-filter: var(--dl-glass-blur);
+  -webkit-backdrop-filter: var(--dl-glass-blur);
+  border-right: 1px solid var(--border);
+}
+:root[data-skin='devlytics'] .sidebar-logo {
+  border-bottom-color: var(--border);
+}
+:root[data-skin='devlytics'] .logo-text {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: var(--dl-grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+:root[data-skin='devlytics'] .nav-btn {
+  position: relative;
+  padding: 7px 12px;
+  font-size: 13.5px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+:root[data-skin='devlytics'] .nav-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+:root[data-skin='devlytics'] .nav-btn.active {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+:root[data-skin='devlytics'] .nav-btn.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+:root[data-skin='devlytics'] .nav-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 14px 12px 4px;
+}
+:root[data-skin='devlytics'] .nav-group-label:hover {
+  color: var(--text-secondary);
+}
+:root[data-skin='devlytics'] .collapse-all-btn,
+:root[data-skin='devlytics'] .shortcut-hint {
+  color: var(--text-muted);
+}
+:root[data-skin='devlytics'] .sidebar-footer .nav-btn {
+  font-size: 12.5px;
+}
+
+/* active task bar = glass top bar */
+:root[data-skin='devlytics'] .active-task-bar {
+  background: var(--dl-glass);
+  backdrop-filter: var(--dl-glass-blur);
+  -webkit-backdrop-filter: var(--dl-glass-blur);
+  border-bottom: 1px solid var(--border);
+  min-height: 60px;
+  padding: 10px 20px;
+}
+:root[data-skin='devlytics'] .active-task-timer {
+  font-family: var(--dl-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  background: var(--dl-grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+:root[data-skin='devlytics'] .active-task-dot {
+  box-shadow: 0 0 0 4px var(--accent-dim);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────────── */
+:root[data-skin='devlytics'] .btn {
+  border-radius: var(--radius-sm);
+  font-weight: 550;
+  letter-spacing: -0.005em;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s, filter 0.15s;
+}
+:root[data-skin='devlytics'] .btn:active {
+  transform: translateY(1px);
+}
+:root[data-skin='devlytics'] .btn-primary {
+  background: var(--dl-gloss), var(--dl-grad);
+  color: var(--dl-on-accent);
+  border: 1px solid rgba(22, 163, 74, 0.6);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 6px 16px -8px rgba(34, 197, 94, 0.6);
+}
+:root[data-skin='devlytics'] .btn-primary:hover {
+  background: var(--dl-gloss), var(--dl-grad);
+  filter: brightness(1.07);
+}
+:root[data-skin='devlytics'] .btn-secondary {
+  background: var(--dl-sunk);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+:root[data-skin='devlytics'] .btn-secondary:hover {
+  background: var(--bg-hover);
+  border-color: var(--dl-line-strong);
+}
+:root[data-skin='devlytics'] .btn-danger {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--danger);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+:root[data-skin='devlytics'] .btn-danger:hover {
+  background: rgba(248, 113, 113, 0.2);
+}
+:root[data-skin='devlytics'] .seg-toggle {
+  border-radius: var(--radius-sm);
+  background: var(--dl-sunk);
+  padding: 2px;
+  gap: 2px;
+}
+:root[data-skin='devlytics'] .seg-btn {
+  background: transparent;
+  border-radius: 3px;
+}
+:root[data-skin='devlytics'] .seg-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--dl-line-strong), 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+:root[data-skin='devlytics'] .period-btn.active,
+:root[data-skin='devlytics'] .quick-start-btn:hover {
+  border-color: var(--accent);
+}
+
+/* ── Surfaces: cards, rows, columns ─────────────────────────────────────────── */
+:root[data-skin='devlytics'] :is(
+    .stat-card,
+    .chart-section,
+    .list-row,
+    .kanban-column,
+    .pipeline-column,
+    .tag-item,
+    .task-row,
+    .stay-card,
+    .flashcard,
+    .pomodoro-panel,
+    .task-edit-panel,
+    .tag-form,
+    .calendar-day,
+    .runner-col,
+    .study-col,
+    .md-preview-pane,
+    .auth-card
+  ) {
+  background: var(--dl-glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 0 var(--dl-glass-hi) inset;
+}
+:root[data-skin='devlytics'] :is(.list-row, .task-row, .tag-item, .stay-card, .kanban-card, .pipeline-card) {
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+:root[data-skin='devlytics'] :is(.list-row, .task-row, .tag-item, .stay-card, .kanban-card, .pipeline-card):hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+:root[data-skin='devlytics'] :is(.kanban-card, .pipeline-card) {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+:root[data-skin='devlytics'] :is(.kanban-column-header, .pipeline-column-header) {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+:root[data-skin='devlytics'] .stat-card-value {
+  font-family: var(--dl-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+:root[data-skin='devlytics'] .stat-card-label,
+:root[data-skin='devlytics'] .chart-title {
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+:root[data-skin='devlytics'] .module-header h2,
+:root[data-skin='devlytics'] .dashboard-title,
+:root[data-skin='devlytics'] .calendar-title,
+:root[data-skin='devlytics'] .tasks-list-title {
+  letter-spacing: -0.025em;
+}
+
+:root[data-skin='devlytics'] .calendar-day:hover {
+  border-color: var(--dl-line-strong);
+}
+
+/* timeline grid lines a bit quieter */
+:root[data-skin='devlytics'] .timeline-hour-line {
+  border-color: var(--border);
+  background: var(--border);
+}
+:root[data-skin='devlytics'] .timeline-hour-label {
+  font-family: var(--dl-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+:root[data-skin='devlytics'] .timeline-block {
+  border-radius: var(--radius-sm);
+}
+
+/* tables */
+:root[data-skin='devlytics'] .report-table th {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+/* ── Modals ─────────────────────────────────────────────────────────────────── */
+:root[data-skin='devlytics'] .modal-overlay {
+  background: var(--dl-scrim);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+:root[data-skin='devlytics'] .modal {
+  background: color-mix(in srgb, var(--bg-secondary) 96%, transparent);
+  border: 1px solid var(--dl-line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--dl-modal-shadow);
+}
+
+/* ── Light theme fixes for colors hardcoded in index.css ───────────────────── */
+:root[data-skin='devlytics'][data-theme='light'] .seg-btn.active {
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgba(24, 24, 27, 0.08);
+}
+:root[data-skin='devlytics'][data-theme='light'] .active-task-dot {
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.14);
+}
+
+/* ── Mobile refinements (layout itself lives in responsive.css) ────────────── */
+@media (max-width: 899px) {
+  :root[data-skin='devlytics'] .sidebar {
+    width: min(82vw, 300px);
+    min-width: 0;
+    background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+  }
+  :root[data-skin='devlytics'] .mobile-menu-btn {
+    background: var(--dl-glass);
+    backdrop-filter: var(--dl-glass-blur);
+    -webkit-backdrop-filter: var(--dl-glass-blur);
+    border-radius: var(--radius);
+  }
+  :root[data-skin='devlytics'] .nav-scrim {
+    background: var(--dl-scrim);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-skin='devlytics'] * {
+    transition: none !important;
+  }
+}

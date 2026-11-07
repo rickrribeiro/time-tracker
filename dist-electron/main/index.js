@@ -22,13 +22,42 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 const electron = require("electron");
-const crypto = require("crypto");
 const path = require("path");
+const Fastify = require("fastify");
+const fastifyStatic = require("@fastify/static");
+const crypto = require("crypto");
 const fs = require("fs");
+const os = require("os");
 const initSqlJs = require("sql.js");
 const child_process = require("child_process");
-const os = require("os");
 const http = require("http");
+function defaultDataDir() {
+  const home = os.homedir();
+  if (process.platform === "darwin") return path.join(home, "Library", "Application Support", "time-tracker");
+  if (process.platform === "win32") return path.join(process.env.APPDATA || path.join(home, "AppData", "Roaming"), "time-tracker");
+  return path.join(process.env.XDG_CONFIG_HOME || path.join(home, ".config"), "time-tracker");
+}
+const config = {
+  dataDir: process.env.RICKOS_DATA_DIR || defaultDataDir(),
+  port: Number(process.env.RICKOS_PORT || 4318),
+  host: process.env.RICKOS_HOST || "127.0.0.1",
+  token: process.env.RICKOS_TOKEN || "",
+  publicUrl: (process.env.RICKOS_PUBLIC_URL || "").replace(/\/+$/, ""),
+  staticDir: process.env.RICKOS_STATIC_DIR || null
+};
+function getConfig() {
+  return config;
+}
+function setConfig(patch) {
+  Object.assign(config, patch);
+}
+function dataDir() {
+  fs.mkdirSync(config.dataDir, { recursive: true });
+  return config.dataDir;
+}
+function isLocalHost(host) {
+  return host === "127.0.0.1" || host === "localhost" || host === "::1";
+}
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -749,7 +778,7 @@ function runMigrations(database) {
 }
 async function getDb() {
   if (db) return db;
-  dbPath = path.join(electron.app.getPath("userData"), "timetracker.db");
+  dbPath = dbFilePath();
   const sqlJsModulePath = require.resolve("sql.js");
   const wasmPath = path.join(path.dirname(sqlJsModulePath), "sql-wasm.wasm");
   const SQL = await initSqlJs({
@@ -768,6 +797,13 @@ async function getDb() {
   saveDb();
   return db;
 }
+function dbFilePath() {
+  return path.join(dataDir(), "timetracker.db");
+}
+function replaceDbFile(bytes) {
+  closeDb();
+  fs.writeFileSync(dbFilePath(), bytes);
+}
 function saveDb() {
   if (!db || !dbPath) return;
   const data = db.export();
@@ -782,7 +818,7 @@ function closeDb() {
 }
 const SNAP_KEEP = 3;
 function snapshotsDir() {
-  const dir = path.join(electron.app.getPath("userData"), "snapshots");
+  const dir = path.join(dataDir(), "snapshots");
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -816,9 +852,11 @@ function snapshotDailyIfNeeded() {
   }
 }
 function restoreSnapshot(snapPath) {
-  if (!dbPath || !fs.existsSync(snapPath)) return false;
+  const resolved = path.resolve(snapPath);
+  if (path.dirname(resolved) !== path.resolve(snapshotsDir())) return false;
+  if (!dbPath || !fs.existsSync(resolved)) return false;
   closeDb();
-  fs.copyFileSync(snapPath, dbPath);
+  fs.copyFileSync(resolved, dbPath);
   return true;
 }
 function getOne(db2, sql, params = []) {
@@ -1022,8 +1060,8 @@ async function getDailyStats(startDate, endDate) {
     "SELECT date, isWorkDay FROM day_configs WHERE date >= ? AND date <= ?",
     [firstDay, lastDay]
   );
-  for (const config of configs) {
-    bucket(config.date).isWorkDay = config.isWorkDay;
+  for (const config2 of configs) {
+    bucket(config2.date).isWorkDay = config2.isWorkDay;
   }
   return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -2132,19 +2170,56 @@ const SENSITIVE_KEYS = /* @__PURE__ */ new Set([
   "pluggy_client_secret",
   "skyscanner_rapidapi_key"
 ]);
-const ENC_PREFIX = "enc:";
+const AES_PREFIX = "aes:";
+const LEGACY_PREFIX = "enc:";
+let cachedKey = null;
+function secretKey() {
+  if (cachedKey) return cachedKey;
+  const file = path.join(dataDir(), "secret.key");
+  if (fs.existsSync(file)) {
+    cachedKey = Buffer.from(fs.readFileSync(file, "utf8").trim(), "base64");
+  } else {
+    cachedKey = crypto.randomBytes(32);
+    fs.writeFileSync(file, cachedKey.toString("base64"), { mode: 384 });
+  }
+  return cachedKey;
+}
 function encodeSecret(key, value) {
   if (!SENSITIVE_KEYS.has(key) || !value) return value;
-  if (!electron.safeStorage.isEncryptionAvailable()) return value;
-  return ENC_PREFIX + electron.safeStorage.encryptString(value).toString("base64");
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", secretKey(), iv);
+  const enc = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return AES_PREFIX + Buffer.concat([iv, tag, enc]).toString("base64");
 }
 function decodeSecret(value) {
-  if (value == null || !value.startsWith(ENC_PREFIX)) return value;
-  try {
-    return electron.safeStorage.decryptString(Buffer.from(value.slice(ENC_PREFIX.length), "base64"));
-  } catch {
-    return "";
+  if (value == null) return value;
+  if (value.startsWith(AES_PREFIX)) {
+    try {
+      const raw = Buffer.from(value.slice(AES_PREFIX.length), "base64");
+      const decipher = crypto.createDecipheriv("aes-256-gcm", secretKey(), raw.subarray(0, 12));
+      decipher.setAuthTag(raw.subarray(12, 28));
+      return Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString("utf8");
+    } catch {
+      return "";
+    }
   }
+  if (value.startsWith(LEGACY_PREFIX)) return "";
+  return value;
+}
+async function migrateLegacySecrets(decryptLegacy) {
+  let changed = 0;
+  for (const key of SENSITIVE_KEYS) {
+    const v = await getSetting(key);
+    if (!v || !v.startsWith(LEGACY_PREFIX)) continue;
+    try {
+      const plain = decryptLegacy(v.slice(LEGACY_PREFIX.length));
+      await setSetting(key, encodeSecret(key, plain));
+      changed++;
+    } catch {
+    }
+  }
+  return changed;
 }
 const TIMEOUT_MS = 12e4;
 function buildPath() {
@@ -2560,98 +2635,133 @@ Content-Type: application/octet-stream\r
   const j = await res.json();
   return { name: j.name || fileName, link: j.webViewLink ?? null, account: acc.email };
 }
-async function connectGoogle() {
-  const { clientId, clientSecret } = await creds();
+let pending = null;
+function resultPage(msg) {
+  return `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:system-ui,sans-serif;background:#18181b;color:#f4f4f5;padding:40px"><h2>${msg}</h2><p>Pode fechar esta aba e voltar ao RickOS.</p></body></html>`;
+}
+async function finishGoogleConnect(params) {
+  const p = pending;
+  if (!p) return resultPage("Nenhuma conexão pendente. Comece de novo pelo RickOS.");
+  const done = (ok, err2) => {
+    p.cleanup();
+    if (pending === p) pending = null;
+    if (err2) p.reject(err2);
+    else p.resolve(ok);
+  };
+  const err = params.get("error");
+  if (err) {
+    done(false, new Error(`Google negou: ${err}`));
+    return resultPage("Autorização cancelada.");
+  }
+  if (params.get("state") !== p.state) {
+    done(false, new Error("state inválido no callback do Google."));
+    return resultPage("Falha de segurança (state).");
+  }
+  try {
+    const { clientId, clientSecret } = await creds();
+    const tokenRes = await fetch(TOKEN_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code: params.get("code") || "",
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: p.redirectUri,
+        grant_type: "authorization_code",
+        code_verifier: p.verifier
+      })
+    });
+    const json = await tokenRes.json();
+    if (!tokenRes.ok || !json.refresh_token) {
+      done(false, new Error(json.error || "Sem refresh_token (revogue o acesso e tente de novo)."));
+      return resultPage("Falha ao trocar o código.");
+    }
+    let email = "conta google";
+    if (json.access_token) {
+      const resolved = await fetchPrimaryEmail(json.access_token);
+      if (resolved) email = resolved;
+    }
+    await addAccount(email, json.refresh_token);
+    done(true);
+    return resultPage(`✅ Conectado: ${email}`);
+  } catch (e) {
+    done(false, e instanceof Error ? e : new Error(String(e)));
+    return resultPage("Erro ao conectar.");
+  }
+}
+async function beginGoogleConnect(publicUrl) {
+  const { clientId } = await creds();
+  if (pending) {
+    pending.cleanup();
+    pending.reject(new Error("Substituída por uma nova tentativa de conexão."));
+    pending = null;
+  }
   const verifier = base64url(crypto.randomBytes(32));
   const challenge = base64url(crypto.createHash("sha256").update(verifier).digest());
   const state = base64url(crypto.randomBytes(16));
-  return new Promise((resolve, reject) => {
+  let redirectUri;
+  let closeServer = () => {
+  };
+  if (publicUrl) {
+    redirectUri = `${publicUrl}/api/google/callback`;
+  } else {
     const server = http.createServer(async (req, res) => {
-      try {
-        const url = new URL(req.url || "", `http://127.0.0.1`);
-        if (!url.searchParams.get("code") && !url.searchParams.get("error")) {
-          res.end("OK");
-          return;
-        }
-        const respond = (msg) => {
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-          res.end(`<html><body style="font-family:sans-serif;background:#0f172a;color:#f1f5f9;padding:40px"><h2>${msg}</h2><p>Pode fechar esta aba e voltar ao RickOS.</p></body></html>`);
-        };
-        const err = url.searchParams.get("error");
-        if (err) {
-          respond("Autorização cancelada.");
-          cleanup();
-          reject(new Error(`Google negou: ${err}`));
-          return;
-        }
-        if (url.searchParams.get("state") !== state) {
-          respond("Falha de segurança (state).");
-          cleanup();
-          reject(new Error("state inválido no callback do Google."));
-          return;
-        }
-        const code = url.searchParams.get("code");
-        const redirectUri = `http://127.0.0.1:${port}`;
-        const body = new URLSearchParams({
-          code,
-          client_id: clientId,
-          client_secret: clientSecret,
-          redirect_uri: redirectUri,
-          grant_type: "authorization_code",
-          code_verifier: verifier
-        });
-        const tokenRes = await fetch(TOKEN_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body
-        });
-        const json = await tokenRes.json();
-        if (!tokenRes.ok || !json.refresh_token) {
-          respond("Falha ao trocar o código.");
-          cleanup();
-          reject(new Error(json.error || "Sem refresh_token (revogue o acesso e tente de novo)."));
-          return;
-        }
-        let email = "conta google";
-        if (json.access_token) {
-          const resolved = await fetchPrimaryEmail(json.access_token);
-          if (resolved) email = resolved;
-        }
-        await addAccount(email, json.refresh_token);
-        respond(`✅ Conectado: ${email}`);
-        cleanup();
-        resolve(true);
-      } catch (e) {
-        cleanup();
-        reject(e instanceof Error ? e : new Error(String(e)));
+      const url = new URL(req.url || "", "http://127.0.0.1");
+      if (!url.searchParams.get("code") && !url.searchParams.get("error")) {
+        res.end("OK");
+        return;
       }
+      const html = await finishGoogleConnect(url.searchParams);
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(html);
     });
-    let port = 0;
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error("Tempo esgotado aguardando a autorização do Google."));
-    }, 18e4);
-    function cleanup() {
-      clearTimeout(timer);
-      server.close();
-    }
-    server.listen(0, "127.0.0.1", () => {
-      port = server.address().port;
-      const redirectUri = `http://127.0.0.1:${port}`;
-      const authUrl = `${AUTH_ENDPOINT}?` + new URLSearchParams({
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        response_type: "code",
-        scope: SCOPE,
-        access_type: "offline",
-        prompt: "consent",
-        state,
-        code_challenge: challenge,
-        code_challenge_method: "S256"
-      }).toString();
-      electron.shell.openExternal(authUrl);
-    });
+    await new Promise((r) => server.listen(0, "127.0.0.1", () => r()));
+    redirectUri = `http://127.0.0.1:${server.address().port}`;
+    closeServer = () => server.close();
+  }
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
   });
+  promise.catch(() => {
+  });
+  const timer = setTimeout(() => {
+    if (pending?.state === state) {
+      pending.cleanup();
+      pending = null;
+      reject(new Error("Tempo esgotado aguardando a autorização do Google."));
+    }
+  }, 3e5);
+  pending = {
+    state,
+    verifier,
+    redirectUri,
+    promise,
+    resolve,
+    reject,
+    cleanup: () => {
+      clearTimeout(timer);
+      closeServer();
+    }
+  };
+  const authUrl = `${AUTH_ENDPOINT}?` + new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: SCOPE,
+    access_type: "offline",
+    prompt: "consent",
+    state,
+    code_challenge: challenge,
+    code_challenge_method: "S256"
+  }).toString();
+  return { authUrl };
+}
+async function awaitGoogleConnect() {
+  if (!pending) return false;
+  return pending.promise;
 }
 async function googleConnected() {
   return (await getAccounts()).length > 0;
@@ -2975,30 +3085,32 @@ async function refreshWatchPrice(id) {
   await updateFlightWatchPrice(id, price, (/* @__PURE__ */ new Date()).toISOString());
   return (await getFlightWatches()).find((x) => x.id === id);
 }
-function createWindow() {
-  const win = new electron.BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
-    backgroundColor: "#0f172a",
-    webPreferences: {
-      preload: path.join(__dirname, "../preload/index.js"),
-      sandbox: false,
-      nodeIntegration: false,
-      contextIsolation: true
+const listeners = /* @__PURE__ */ new Set();
+function subscribe(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+function broadcast(channel, payload) {
+  for (const fn of listeners) {
+    try {
+      fn(channel, payload);
+    } catch {
     }
-  });
-  win.on("ready-to-show", () => win.show());
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    electron.shell.openExternal(url);
-    return { action: "deny" };
-  });
-  if (process.env["ELECTRON_RENDERER_URL"]) {
-    win.loadURL(process.env["ELECTRON_RENDERER_URL"]);
-  } else {
-    win.loadFile(path.join(__dirname, "../../dist/index.html"));
   }
+}
+function notify(title, body) {
+  broadcast("notify", { title, body });
+}
+const handlers = /* @__PURE__ */ new Map();
+const ipcMain = {
+  handle(channel, fn) {
+    handlers.set(channel, fn);
+  }
+};
+async function callRpc(channel, args) {
+  const fn = handlers.get(channel);
+  if (!fn) throw new Error(`Canal RPC desconhecido: ${channel}`);
+  return fn({ source: "rpc" }, ...args);
 }
 const DAY_MS = 24 * 60 * 60 * 1e3;
 async function maybeAutoSyncGoogle() {
@@ -3012,125 +3124,105 @@ async function maybeAutoSyncGoogle() {
   } catch {
   }
 }
-electron.app.whenReady().then(() => {
-  createWindow();
-  electron.globalShortcut.register("CommandOrControl+Shift+Space", () => {
-    const win = electron.BrowserWindow.getAllWindows()[0];
-    if (!win) return;
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.focus();
-    win.webContents.send("quick-capture:open");
-  });
-  getDb().then(() => snapshotDailyIfNeeded());
+let schedulerStarted = false;
+function startScheduler() {
+  if (schedulerStarted) return;
+  schedulerStarted = true;
   setTimeout(() => void evaluateRules(), 15e3);
   setInterval(() => void evaluateRules(), 60 * 1e3);
   setTimeout(() => void runScheduledJobs(), 2e4);
   setInterval(() => void runScheduledJobs(), 5 * 60 * 1e3);
   setTimeout(() => void maybeAutoSyncGoogle(), 8e3);
   setInterval(() => void maybeAutoSyncGoogle(), 6 * 60 * 60 * 1e3);
-  electron.app.on("activate", () => {
-    if (electron.BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-});
-electron.app.on("will-quit", () => {
-  electron.globalShortcut.unregisterAll();
-});
-electron.app.on("window-all-closed", () => {
-  closeDb();
-  if (process.platform !== "darwin") electron.app.quit();
-});
-electron.ipcMain.handle("tags:getAll", () => getAllTags());
-electron.ipcMain.handle(
+}
+ipcMain.handle("tags:getAll", () => getAllTags());
+ipcMain.handle(
   "tags:create",
   (_, name, color, isProductive) => createTag(name, color, isProductive)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "tags:update",
   (_, id, name, color, isProductive) => updateTag(id, name, color, isProductive)
 );
-electron.ipcMain.handle("tags:delete", (_, id) => deleteTag(id));
-electron.ipcMain.handle("tasks:getAll", () => getAllTasks());
-electron.ipcMain.handle(
+ipcMain.handle("tags:delete", (_, id) => deleteTag(id));
+ipcMain.handle("tasks:getAll", () => getAllTasks());
+ipcMain.handle(
   "tasks:getForRange",
   (_, startDate, endDate) => getTasksForRange(startDate, endDate)
 );
-electron.ipcMain.handle("tasks:getActive", () => getActiveTask());
-electron.ipcMain.handle("tasks:start", async (_, title, tagId, secondaryTagId, startTime, studyNodeId) => {
+ipcMain.handle("tasks:getActive", () => getActiveTask());
+ipcMain.handle("tasks:start", async (_, title, tagId, secondaryTagId, startTime, studyNodeId) => {
   const now = startTime || (/* @__PURE__ */ new Date()).toISOString();
   await stopAllActiveTasks(now);
   return createTask(title, tagId, secondaryTagId, now, null, studyNodeId ?? null);
 });
-electron.ipcMain.handle("tasks:stop", async (_, id, endTime) => {
+ipcMain.handle("tasks:stop", async (_, id, endTime) => {
   const now = endTime || (/* @__PURE__ */ new Date()).toISOString();
   await stopTask(id, now);
 });
-electron.ipcMain.handle(
+ipcMain.handle(
   "tasks:update",
   (_, id, title, tagId, secondaryTagId, startTime, endTime) => updateTask(id, title, tagId, secondaryTagId, startTime, endTime)
 );
-electron.ipcMain.handle("tasks:delete", (_, id) => deleteTask(id));
-electron.ipcMain.handle(
+ipcMain.handle("tasks:delete", (_, id) => deleteTask(id));
+ipcMain.handle(
   "tasks:add",
   (_, title, tagId, secondaryTagId, startTime, endTime, studyNodeId) => createTask(title, tagId, secondaryTagId, startTime, endTime, studyNodeId ?? null)
 );
-electron.ipcMain.handle("tasks:stopAll", (_, endTime) => stopAllActiveTasks(endTime));
-electron.ipcMain.handle("tasks:studyHours", () => getStudyHoursByTopic());
-electron.ipcMain.handle(
+ipcMain.handle("tasks:stopAll", (_, endTime) => stopAllActiveTasks(endTime));
+ipcMain.handle("tasks:studyHours", () => getStudyHoursByTopic());
+ipcMain.handle(
   "stats:daily",
   (_, startDate, endDate) => getDailyStats(startDate, endDate)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "stats:byTag",
   (_, startDate, endDate) => getTagStats(startDate, endDate)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "dayConfig:update",
   (_, date, isWorkDay) => updateDayConfig(date, isWorkDay)
 );
-electron.ipcMain.handle("todos:getAll", (_, status) => getTodos(status));
-electron.ipcMain.handle(
+ipcMain.handle("todos:getAll", (_, status) => getTodos(status));
+ipcMain.handle(
   "todos:create",
   (_, title, notes, status, source, priority, dueDate, projectId, aiGenerated, recurrence, type) => createTodo(title, notes, status, source, priority, dueDate, projectId, aiGenerated ?? 0, recurrence ?? null, type ?? "projeto")
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "todos:update",
   (_, id, title, notes, status, priority, dueDate, projectId, recurrence, type) => updateTodo(id, title, notes, status, priority, dueDate, projectId, recurrence, type)
 );
-electron.ipcMain.handle("todos:delete", (_, id) => deleteTodo(id));
-electron.ipcMain.handle("goals:getForMonth", (_, month) => getGoals(month));
-electron.ipcMain.handle("goals:create", (_, month, title, kind, refId, target, unit) => createGoal(month, title, kind, refId, target, unit));
-electron.ipcMain.handle("goals:update", (_, id, title, target, current, unit, done) => updateGoal(id, title, target, current, unit, done));
-electron.ipcMain.handle("goals:delete", (_, id) => deleteGoal(id));
-electron.ipcMain.handle("stays:favorites", () => getStayFavorites());
-electron.ipcMain.handle("stays:addFavorite", (_, f) => addStayFavorite(f));
-electron.ipcMain.handle("stays:removeFavorite", (_, id) => removeStayFavorite(id));
-electron.ipcMain.handle("stays:watches", () => getStayWatches());
-electron.ipcMain.handle("stays:addWatch", (_, w) => addStayWatch(w));
-electron.ipcMain.handle("stays:updateWatchPrice", (_, id, current, best, at) => updateStayWatchPrice(id, current, best, at));
-electron.ipcMain.handle("stays:removeWatch", (_, id) => removeStayWatch(id));
-electron.ipcMain.handle("stays:priceHistory", (_, watchId) => getStayPriceHistory(watchId));
-electron.ipcMain.handle("stays:addPricePoint", (_, p) => addStayPricePoint(p));
-electron.ipcMain.handle("stays:searchHistory", () => getStaySearchHistory());
-electron.ipcMain.handle("stays:addSearchHistory", (_, filters) => addStaySearchHistory(filters));
-electron.ipcMain.handle("contacts:getAll", () => getContacts());
-electron.ipcMain.handle("contacts:create", (_, name, location, country, state, birthday, interests, context, nextFollowUp) => createContact(name, location, country, state, birthday, interests, context, nextFollowUp));
-electron.ipcMain.handle("contacts:update", (_, id, name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp) => updateContact(id, name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp));
-electron.ipcMain.handle("contacts:log", (_, id) => logContact(id));
-electron.ipcMain.handle("contacts:delete", (_, id) => deleteContact(id));
-electron.ipcMain.handle("rules:getAll", () => getRules());
-electron.ipcMain.handle("rules:create", (_, type, params) => createRule(type, params));
-electron.ipcMain.handle("rules:update", (_, id, enabled, params) => updateRule(id, enabled, params));
-electron.ipcMain.handle("rules:delete", (_, id) => deleteRule(id));
-electron.ipcMain.handle("jobs:getAll", () => getScheduledJobs());
-electron.ipcMain.handle("jobs:create", (_, name, prompt, hour) => createScheduledJob(name, prompt, hour));
-electron.ipcMain.handle("jobs:update", (_, id, name, prompt, hour, enabled) => updateScheduledJob(id, name, prompt, hour, enabled));
-electron.ipcMain.handle("jobs:delete", (_, id) => deleteScheduledJob(id));
+ipcMain.handle("todos:delete", (_, id) => deleteTodo(id));
+ipcMain.handle("goals:getForMonth", (_, month) => getGoals(month));
+ipcMain.handle("goals:create", (_, month, title, kind, refId, target, unit) => createGoal(month, title, kind, refId, target, unit));
+ipcMain.handle("goals:update", (_, id, title, target, current, unit, done) => updateGoal(id, title, target, current, unit, done));
+ipcMain.handle("goals:delete", (_, id) => deleteGoal(id));
+ipcMain.handle("stays:favorites", () => getStayFavorites());
+ipcMain.handle("stays:addFavorite", (_, f) => addStayFavorite(f));
+ipcMain.handle("stays:removeFavorite", (_, id) => removeStayFavorite(id));
+ipcMain.handle("stays:watches", () => getStayWatches());
+ipcMain.handle("stays:addWatch", (_, w) => addStayWatch(w));
+ipcMain.handle("stays:updateWatchPrice", (_, id, current, best, at) => updateStayWatchPrice(id, current, best, at));
+ipcMain.handle("stays:removeWatch", (_, id) => removeStayWatch(id));
+ipcMain.handle("stays:priceHistory", (_, watchId) => getStayPriceHistory(watchId));
+ipcMain.handle("stays:addPricePoint", (_, p) => addStayPricePoint(p));
+ipcMain.handle("stays:searchHistory", () => getStaySearchHistory());
+ipcMain.handle("stays:addSearchHistory", (_, filters) => addStaySearchHistory(filters));
+ipcMain.handle("contacts:getAll", () => getContacts());
+ipcMain.handle("contacts:create", (_, name, location, country, state, birthday, interests, context, nextFollowUp) => createContact(name, location, country, state, birthday, interests, context, nextFollowUp));
+ipcMain.handle("contacts:update", (_, id, name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp) => updateContact(id, name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp));
+ipcMain.handle("contacts:log", (_, id) => logContact(id));
+ipcMain.handle("contacts:delete", (_, id) => deleteContact(id));
+ipcMain.handle("rules:getAll", () => getRules());
+ipcMain.handle("rules:create", (_, type, params) => createRule(type, params));
+ipcMain.handle("rules:update", (_, id, enabled, params) => updateRule(id, enabled, params));
+ipcMain.handle("rules:delete", (_, id) => deleteRule(id));
+ipcMain.handle("jobs:getAll", () => getScheduledJobs());
+ipcMain.handle("jobs:create", (_, name, prompt, hour) => createScheduledJob(name, prompt, hour));
+ipcMain.handle("jobs:update", (_, id, name, prompt, hour, enabled) => updateScheduledJob(id, name, prompt, hour, enabled));
+ipcMain.handle("jobs:delete", (_, id) => deleteScheduledJob(id));
 function notifyNative(title, body) {
-  try {
-    if (electron.Notification.isSupported()) new electron.Notification({ title, body }).show();
-  } catch {
-  }
+  notify(title, body);
 }
 function todayRangeISO() {
   const n = /* @__PURE__ */ new Date();
@@ -3238,8 +3330,8 @@ async function evaluateRules() {
     evaluatingRules = false;
   }
 }
-electron.ipcMain.handle("inbox:ocr", async (_, base64, ext) => {
-  const dir = path.join(electron.app.getPath("temp"), "rickos-ocr");
+ipcMain.handle("inbox:ocr", async (_, base64, ext) => {
+  const dir = path.join(os.tmpdir(), "rickos-ocr");
   fs.mkdirSync(dir, { recursive: true });
   const safeExt = /^[a-z0-9]{1,5}$/i.test(ext) ? ext : "png";
   const file = path.join(dir, `${crypto.randomUUID()}.${safeExt}`);
@@ -3273,199 +3365,200 @@ Regras:
     }
   }
 });
-electron.ipcMain.handle("projects:getAll", () => getProjects());
-electron.ipcMain.handle(
+ipcMain.handle("projects:getAll", () => getProjects());
+ipcMain.handle(
   "projects:create",
   (_, name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience) => createProject(name, description, githubRepoUrl, color, claudeCommand, localPath ?? null, stage ?? "ideia", businessModel ?? null, pricing ?? null, audience ?? null)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "projects:update",
   (_, id, name, description, githubRepoUrl, color, archived, claudeCommand, localPath, stage, businessModel, pricing, audience) => updateProject(id, name, description, githubRepoUrl, color, archived, claudeCommand, localPath ?? null, stage ?? "ideia", businessModel ?? null, pricing ?? null, audience ?? null)
 );
-electron.ipcMain.handle("projects:setStage", (_, id, stage) => setProjectStage(id, stage));
-electron.ipcMain.handle("projects:delete", (_, id) => deleteProject(id));
-electron.ipcMain.handle("milestones:getAll", () => getProjectMilestones());
-electron.ipcMain.handle("milestones:create", (_, projectId, title, targetDate) => createProjectMilestone(projectId, title, targetDate));
-electron.ipcMain.handle("milestones:toggle", (_, id, done) => toggleProjectMilestone(id, done));
-electron.ipcMain.handle("milestones:delete", (_, id) => deleteProjectMilestone(id));
-electron.ipcMain.handle("habits:getAll", () => getHabits());
-electron.ipcMain.handle(
+ipcMain.handle("projects:setStage", (_, id, stage) => setProjectStage(id, stage));
+ipcMain.handle("projects:delete", (_, id) => deleteProject(id));
+ipcMain.handle("milestones:getAll", () => getProjectMilestones());
+ipcMain.handle("milestones:create", (_, projectId, title, targetDate) => createProjectMilestone(projectId, title, targetDate));
+ipcMain.handle("milestones:toggle", (_, id, done) => toggleProjectMilestone(id, done));
+ipcMain.handle("milestones:delete", (_, id) => deleteProjectMilestone(id));
+ipcMain.handle("habits:getAll", () => getHabits());
+ipcMain.handle(
   "habits:create",
   (_, name, frequency, target) => createHabit(name, frequency, target)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "habits:update",
   (_, id, name, frequency, target, active) => updateHabit(id, name, frequency, target, active)
 );
-electron.ipcMain.handle("habits:delete", (_, id) => deleteHabit(id));
-electron.ipcMain.handle("habits:getEntries", (_, date) => getHabitEntries(date));
-electron.ipcMain.handle(
+ipcMain.handle("habits:delete", (_, id) => deleteHabit(id));
+ipcMain.handle("habits:getEntries", (_, date) => getHabitEntries(date));
+ipcMain.handle(
   "habits:getEntriesRange",
   (_, startDate, endDate) => getHabitEntriesForRange(startDate, endDate)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "habits:toggleEntry",
   (_, habitId, date, completed) => toggleHabitEntry(habitId, date, completed)
 );
-electron.ipcMain.handle("habits:completionsForDate", (_, date) => getHabitCompletionsForDate(date));
-electron.ipcMain.handle("settings:get", async (_, key) => decodeSecret(await getSetting(key)));
-electron.ipcMain.handle("settings:set", (_, key, value) => setSetting(key, encodeSecret(key, value)));
-electron.ipcMain.handle("settings:getAll", async () => {
+ipcMain.handle("habits:completionsForDate", (_, date) => getHabitCompletionsForDate(date));
+ipcMain.handle("settings:get", async (_, key) => decodeSecret(await getSetting(key)));
+ipcMain.handle("settings:set", (_, key, value) => setSetting(key, encodeSecret(key, value)));
+ipcMain.handle("settings:getAll", async () => {
   const all = await getAllSettings();
   for (const k of Object.keys(all)) all[k] = decodeSecret(all[k]) ?? "";
   return all;
 });
-electron.ipcMain.handle("github:getIssues", () => getGithubIssues());
-electron.ipcMain.handle("github:sync", () => syncGithubIssues(true));
-electron.ipcMain.handle(
+ipcMain.handle("github:getIssues", () => getGithubIssues());
+ipcMain.handle("github:sync", () => syncGithubIssues(true));
+ipcMain.handle(
   "github:createLocal",
   (_, repo, title, body) => createLocalIssue(repo, title, body)
 );
-electron.ipcMain.handle("github:deleteIssue", (_, id) => deleteGithubIssue(id));
-electron.ipcMain.handle("github:createOnGithub", (_, id) => createIssueViaClaude(id));
-electron.ipcMain.handle(
+ipcMain.handle("github:deleteIssue", (_, id) => deleteGithubIssue(id));
+ipcMain.handle("github:createOnGithub", (_, id) => createIssueViaClaude(id));
+ipcMain.handle(
   "calendar:upcoming",
   (_, fromISO, limit) => getUpcomingEvents(fromISO, limit)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "calendar:range",
   (_, startISO, endISO) => getEventsForRange(startISO, endISO)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "calendar:create",
   (_, title, startTime, endTime, location) => createCalendarEvent(title, startTime, endTime, location)
 );
-electron.ipcMain.handle("calendar:delete", (_, id) => deleteCalendarEvent(id));
-electron.ipcMain.handle("google:connect", () => connectGoogle());
-electron.ipcMain.handle("google:status", () => googleConnected());
-electron.ipcMain.handle("google:accounts", () => listGoogleAccounts());
-electron.ipcMain.handle("google:disconnect", () => disconnectGoogle());
-electron.ipcMain.handle("google:disconnectAccount", (_, email) => disconnectGoogleAccount(email));
-electron.ipcMain.handle("google:sync", async () => {
+ipcMain.handle("calendar:delete", (_, id) => deleteCalendarEvent(id));
+ipcMain.handle("google:beginConnect", () => beginGoogleConnect(getConfig().publicUrl));
+ipcMain.handle("google:awaitConnect", () => awaitGoogleConnect());
+ipcMain.handle("google:status", () => googleConnected());
+ipcMain.handle("google:accounts", () => listGoogleAccounts());
+ipcMain.handle("google:disconnect", () => disconnectGoogle());
+ipcMain.handle("google:disconnectAccount", (_, email) => disconnectGoogleAccount(email));
+ipcMain.handle("google:sync", async () => {
   const n = await syncGoogleCalendar();
   await setSetting("google_last_sync", (/* @__PURE__ */ new Date()).toISOString());
   return n;
 });
-electron.ipcMain.handle("accounts:getAll", () => getAccounts$1());
-electron.ipcMain.handle("accounts:create", (_, name, currency, balance) => createAccount(name, currency, balance));
-electron.ipcMain.handle("accounts:update", (_, id, name, currency, balance) => updateAccount(id, name, currency, balance));
-electron.ipcMain.handle("accounts:delete", (_, id) => deleteAccount(id));
-electron.ipcMain.handle("categories:getAll", () => getCategories());
-electron.ipcMain.handle("categories:create", (_, name, type, color) => createCategory(name, type, color));
-electron.ipcMain.handle("categories:delete", (_, id) => deleteCategory(id));
-electron.ipcMain.handle("transactions:getAll", (_, month) => getTransactions(month));
-electron.ipcMain.handle(
+ipcMain.handle("accounts:getAll", () => getAccounts$1());
+ipcMain.handle("accounts:create", (_, name, currency, balance) => createAccount(name, currency, balance));
+ipcMain.handle("accounts:update", (_, id, name, currency, balance) => updateAccount(id, name, currency, balance));
+ipcMain.handle("accounts:delete", (_, id) => deleteAccount(id));
+ipcMain.handle("categories:getAll", () => getCategories());
+ipcMain.handle("categories:create", (_, name, type, color) => createCategory(name, type, color));
+ipcMain.handle("categories:delete", (_, id) => deleteCategory(id));
+ipcMain.handle("transactions:getAll", (_, month) => getTransactions(month));
+ipcMain.handle(
   "transactions:create",
   (_, accountId, categoryId, amount, currency, type, description, date) => createTransaction(accountId, categoryId, amount, currency, type, description, date)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "transactions:update",
   (_, id, accountId, categoryId, amount, currency, type, description, date) => updateTransaction(id, accountId, categoryId, amount, currency, type, description, date)
 );
-electron.ipcMain.handle("transactions:delete", (_, id) => deleteTransaction(id));
-electron.ipcMain.handle("transactions:bulk", (_, rows) => bulkInsertTransactions(rows));
-electron.ipcMain.handle("budgets:getForMonth", (_, month) => getBudgets(month));
-electron.ipcMain.handle("budgets:set", (_, categoryId, month, amount) => setBudget(categoryId, month, amount));
-electron.ipcMain.handle("investments:getAll", () => getInvestments());
-electron.ipcMain.handle("investments:history", () => getInvestmentHistory());
-electron.ipcMain.handle("investments:create", (_, name, type, amount, currency) => createInvestment(name, type, amount, currency));
-electron.ipcMain.handle("investments:setValue", (_, investmentId, month, amount) => setInvestmentValue(investmentId, month, amount));
-electron.ipcMain.handle("investments:delete", (_, id) => deleteInvestment(id));
-electron.ipcMain.handle("pluggy:sync", async () => {
+ipcMain.handle("transactions:delete", (_, id) => deleteTransaction(id));
+ipcMain.handle("transactions:bulk", (_, rows) => bulkInsertTransactions(rows));
+ipcMain.handle("budgets:getForMonth", (_, month) => getBudgets(month));
+ipcMain.handle("budgets:set", (_, categoryId, month, amount) => setBudget(categoryId, month, amount));
+ipcMain.handle("investments:getAll", () => getInvestments());
+ipcMain.handle("investments:history", () => getInvestmentHistory());
+ipcMain.handle("investments:create", (_, name, type, amount, currency) => createInvestment(name, type, amount, currency));
+ipcMain.handle("investments:setValue", (_, investmentId, month, amount) => setInvestmentValue(investmentId, month, amount));
+ipcMain.handle("investments:delete", (_, id) => deleteInvestment(id));
+ipcMain.handle("pluggy:sync", async () => {
   const r = await syncPluggy();
   await setSetting("pluggy_last_sync", (/* @__PURE__ */ new Date()).toISOString());
   return r;
 });
-electron.ipcMain.handle("pluggy:status", () => pluggyConfigured());
-electron.ipcMain.handle("pluggy:connectToken", () => createConnectToken());
-electron.ipcMain.handle("trips:getAll", () => getTrips());
-electron.ipcMain.handle(
+ipcMain.handle("pluggy:status", () => pluggyConfigured());
+ipcMain.handle("pluggy:connectToken", () => createConnectToken());
+ipcMain.handle("trips:getAll", () => getTrips());
+ipcMain.handle(
   "trips:create",
   (_, origin, destination, startDate, endDate, budget, currency, status) => createTrip(origin, destination, startDate, endDate, budget, currency, status)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "trips:update",
   (_, id, origin, destination, startDate, endDate, budget, currency, status) => updateTrip(id, origin, destination, startDate, endDate, budget, currency, status)
 );
-electron.ipcMain.handle("trips:delete", (_, id) => deleteTrip(id));
-electron.ipcMain.handle("flights:getAll", () => getFlightWatches());
-electron.ipcMain.handle(
+ipcMain.handle("trips:delete", (_, id) => deleteTrip(id));
+ipcMain.handle("flights:getAll", () => getFlightWatches());
+ipcMain.handle(
   "flights:create",
   (_, tripId, origin, destination, price, currency) => createFlightWatch(tripId, origin, destination, price, currency, (/* @__PURE__ */ new Date()).toISOString())
 );
-electron.ipcMain.handle("flights:delete", (_, id) => deleteFlightWatch(id));
-electron.ipcMain.handle("flights:search", async (_, origin, destination, currency, date) => {
+ipcMain.handle("flights:delete", (_, id) => deleteFlightWatch(id));
+ipcMain.handle("flights:search", async (_, origin, destination, currency, date) => {
   const r = await searchFlightPrice(origin, destination, currency, date);
   await setSetting("skyscanner_last_sync", (/* @__PURE__ */ new Date()).toISOString());
   return r;
 });
-electron.ipcMain.handle("flights:refreshWatch", async (_, id) => {
+ipcMain.handle("flights:refreshWatch", async (_, id) => {
   const r = await refreshWatchPrice(id);
   await setSetting("skyscanner_last_sync", (/* @__PURE__ */ new Date()).toISOString());
   return r;
 });
-electron.ipcMain.handle("tripDocs:get", (_, tripId) => getTripDocuments(tripId));
-electron.ipcMain.handle(
+ipcMain.handle("tripDocs:get", (_, tripId) => getTripDocuments(tripId));
+ipcMain.handle(
   "tripDocs:set",
   (_, tripId, item, checked) => setTripDocument(tripId, item, checked)
 );
-electron.ipcMain.handle("skills:getAll", () => getSkills());
-electron.ipcMain.handle(
+ipcMain.handle("skills:getAll", () => getSkills());
+ipcMain.handle(
   "skills:create",
   (_, name, description, category, tags, content) => createSkill(name, description, category, tags, content)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "skills:update",
   (_, id, name, description, category, tags, content) => updateSkill(id, name, description, category, tags, content)
 );
-electron.ipcMain.handle("skills:delete", (_, id) => deleteSkill(id));
-electron.ipcMain.handle("skills:toggleFavorite", (_, id) => toggleSkillFavorite(id));
-electron.ipcMain.handle("agents:getAll", () => getAgents());
-electron.ipcMain.handle(
+ipcMain.handle("skills:delete", (_, id) => deleteSkill(id));
+ipcMain.handle("skills:toggleFavorite", (_, id) => toggleSkillFavorite(id));
+ipcMain.handle("agents:getAll", () => getAgents());
+ipcMain.handle(
   "agents:create",
   (_, name, description, role, systemPrompt, defaultSkillIds, tags) => createAgent(name, description, role, systemPrompt, defaultSkillIds, tags)
 );
-electron.ipcMain.handle(
+ipcMain.handle(
   "agents:update",
   (_, id, name, description, role, systemPrompt, defaultSkillIds, tags) => updateAgent(id, name, description, role, systemPrompt, defaultSkillIds, tags)
 );
-electron.ipcMain.handle("agents:delete", (_, id) => deleteAgent(id));
-electron.ipcMain.handle("agents:toggleFavorite", (_, id) => toggleAgentFavorite(id));
-electron.ipcMain.handle("executions:getAll", () => getExecutions());
-electron.ipcMain.handle(
+ipcMain.handle("agents:delete", (_, id) => deleteAgent(id));
+ipcMain.handle("agents:toggleFavorite", (_, id) => toggleAgentFavorite(id));
+ipcMain.handle("executions:getAll", () => getExecutions());
+ipcMain.handle(
   "executions:create",
   (_, agentId, skillIds, userPrompt, finalPrompt, response) => createExecution(agentId, skillIds, userPrompt, finalPrompt, response)
 );
-electron.ipcMain.handle("executions:delete", (_, id) => deleteExecution(id));
-electron.ipcMain.handle("links:getAll", () => getLinks());
-electron.ipcMain.handle("links:create", (_, title, url, tags) => createLink(title, url, tags));
-electron.ipcMain.handle("links:update", (_, id, title, url, tags) => updateLink(id, title, url, tags));
-electron.ipcMain.handle("links:setChecked", (_, id, checked) => setLinkChecked(id, checked));
-electron.ipcMain.handle("links:markOpened", (_, id) => setLinkOpened(id));
-electron.ipcMain.handle("links:delete", (_, id) => deleteLink(id));
-electron.ipcMain.handle("study:topics", () => getStudyTopics());
-electron.ipcMain.handle("study:createTopic", (_, name, category, status, targetDate, priority, color) => createStudyTopic(name, category, status, targetDate, priority, color));
-electron.ipcMain.handle("study:updateTopic", (_, id, name, category, status, targetDate, priority, color) => updateStudyTopic(id, name, category, status, targetDate, priority, color));
-electron.ipcMain.handle("study:deleteTopic", (_, id) => deleteStudyTopic(id));
-electron.ipcMain.handle("study:nodes", (_, topicId) => getStudyNodes(topicId));
-electron.ipcMain.handle("study:allNodes", () => getAllStudyNodes());
-electron.ipcMain.handle("study:allNotes", () => getAllStudyNotes());
-electron.ipcMain.handle("study:createNode", (_, topicId, parentId, title, description, estimatedHours) => createStudyNode(topicId, parentId, title, description, estimatedHours));
-electron.ipcMain.handle("study:updateNode", (_, id, title, description, status, estimatedHours) => updateStudyNode(id, title, description, status, estimatedHours));
-electron.ipcMain.handle("study:deleteNode", (_, id) => deleteStudyNode(id));
-electron.ipcMain.handle("study:moveNode", (_, id, dir) => moveStudyNode(id, dir));
-electron.ipcMain.handle("study:reorderNode", (_, id, newParentId, newIndex) => reorderStudyNode(id, newParentId, newIndex));
-electron.ipcMain.handle("study:getNote", (_, topicId, nodeId) => getStudyNote(topicId, nodeId));
-electron.ipcMain.handle("study:saveNote", (_, topicId, nodeId, content) => saveStudyNote(topicId, nodeId, content));
-electron.ipcMain.handle("study:flashcards", (_, topicId) => getStudyFlashcards(topicId));
-electron.ipcMain.handle("study:due", (_, nowISO) => getDueFlashcards(nowISO));
-electron.ipcMain.handle("study:createFlashcard", (_, topicId, nodeId, front, back) => createStudyFlashcard(topicId, nodeId, front, back));
-electron.ipcMain.handle("study:updateFlashcard", (_, id, front, back) => updateStudyFlashcard(id, front, back));
-electron.ipcMain.handle("study:deleteFlashcard", (_, id) => deleteStudyFlashcard(id));
-electron.ipcMain.handle("study:reviewFlashcard", (_, id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, rating) => reviewStudyFlashcard(id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, rating));
-electron.ipcMain.handle("study:reviewCountsByDay", (_, startISO, endISO) => getStudyReviewCountsByDay(startISO, endISO));
-electron.ipcMain.handle("study:quizAttempts", (_, topicId) => getStudyQuizAttempts(topicId));
-electron.ipcMain.handle("study:saveQuizAttempt", (_, topicId, score, total, durationMs) => createStudyQuizAttempt(topicId, score, total, durationMs));
+ipcMain.handle("executions:delete", (_, id) => deleteExecution(id));
+ipcMain.handle("links:getAll", () => getLinks());
+ipcMain.handle("links:create", (_, title, url, tags) => createLink(title, url, tags));
+ipcMain.handle("links:update", (_, id, title, url, tags) => updateLink(id, title, url, tags));
+ipcMain.handle("links:setChecked", (_, id, checked) => setLinkChecked(id, checked));
+ipcMain.handle("links:markOpened", (_, id) => setLinkOpened(id));
+ipcMain.handle("links:delete", (_, id) => deleteLink(id));
+ipcMain.handle("study:topics", () => getStudyTopics());
+ipcMain.handle("study:createTopic", (_, name, category, status, targetDate, priority, color) => createStudyTopic(name, category, status, targetDate, priority, color));
+ipcMain.handle("study:updateTopic", (_, id, name, category, status, targetDate, priority, color) => updateStudyTopic(id, name, category, status, targetDate, priority, color));
+ipcMain.handle("study:deleteTopic", (_, id) => deleteStudyTopic(id));
+ipcMain.handle("study:nodes", (_, topicId) => getStudyNodes(topicId));
+ipcMain.handle("study:allNodes", () => getAllStudyNodes());
+ipcMain.handle("study:allNotes", () => getAllStudyNotes());
+ipcMain.handle("study:createNode", (_, topicId, parentId, title, description, estimatedHours) => createStudyNode(topicId, parentId, title, description, estimatedHours));
+ipcMain.handle("study:updateNode", (_, id, title, description, status, estimatedHours) => updateStudyNode(id, title, description, status, estimatedHours));
+ipcMain.handle("study:deleteNode", (_, id) => deleteStudyNode(id));
+ipcMain.handle("study:moveNode", (_, id, dir) => moveStudyNode(id, dir));
+ipcMain.handle("study:reorderNode", (_, id, newParentId, newIndex) => reorderStudyNode(id, newParentId, newIndex));
+ipcMain.handle("study:getNote", (_, topicId, nodeId) => getStudyNote(topicId, nodeId));
+ipcMain.handle("study:saveNote", (_, topicId, nodeId, content) => saveStudyNote(topicId, nodeId, content));
+ipcMain.handle("study:flashcards", (_, topicId) => getStudyFlashcards(topicId));
+ipcMain.handle("study:due", (_, nowISO) => getDueFlashcards(nowISO));
+ipcMain.handle("study:createFlashcard", (_, topicId, nodeId, front, back) => createStudyFlashcard(topicId, nodeId, front, back));
+ipcMain.handle("study:updateFlashcard", (_, id, front, back) => updateStudyFlashcard(id, front, back));
+ipcMain.handle("study:deleteFlashcard", (_, id) => deleteStudyFlashcard(id));
+ipcMain.handle("study:reviewFlashcard", (_, id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, rating) => reviewStudyFlashcard(id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, rating));
+ipcMain.handle("study:reviewCountsByDay", (_, startISO, endISO) => getStudyReviewCountsByDay(startISO, endISO));
+ipcMain.handle("study:quizAttempts", (_, topicId) => getStudyQuizAttempts(topicId));
+ipcMain.handle("study:saveQuizAttempt", (_, topicId, score, total, durationMs) => createStudyQuizAttempt(topicId, score, total, durationMs));
 function studySlug(s) {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "topico";
 }
@@ -3489,40 +3582,29 @@ function studyToMarkdown(bundle) {
   walk(null, 1);
   return lines.join("\n");
 }
-electron.ipcMain.handle("study:exportMarkdown", async (_, topicId) => {
+ipcMain.handle("study:exportMarkdown", async (_, topicId) => {
   const bundle = await getStudyBundle(topicId);
-  if (!bundle) return { ok: false };
-  const result = await electron.dialog.showSaveDialog({
-    title: "Exportar caderno",
-    defaultPath: `${studySlug(bundle.topic.name)}.md`,
-    filters: [{ name: "Markdown", extensions: ["md"] }]
-  });
-  if (result.canceled || !result.filePath) return { ok: false };
-  fs.writeFileSync(result.filePath, studyToMarkdown(bundle));
-  return { ok: true, message: `Caderno salvo em ${result.filePath}` };
+  if (!bundle) return null;
+  return { name: `${studySlug(bundle.topic.name)}.md`, mime: "text/markdown", content: studyToMarkdown(bundle) };
 });
-electron.ipcMain.handle("study:exportJson", async (_, topicId) => {
+ipcMain.handle("study:exportJson", async (_, topicId) => {
   const bundle = await getStudyBundle(topicId);
-  if (!bundle) return false;
-  return exportJson(`${studySlug(bundle.topic.name)}.study.json`, bundle);
+  if (!bundle) return null;
+  return { name: `${studySlug(bundle.topic.name)}.study.json`, mime: "application/json", content: JSON.stringify(bundle, null, 2) };
 });
-electron.ipcMain.handle("study:importJson", async () => {
-  const bundle = await readJson();
-  if (!bundle || !bundle.topic) return { ok: false };
-  const topicId = await importStudyBundle(bundle);
-  return { ok: true, topicId };
+ipcMain.handle("study:importBundle", async (_, bundle) => {
+  if (!bundle || !bundle.topic) return { ok: false, error: "Arquivo inválido (sem tópico)." };
+  try {
+    const topicId = await importStudyBundle(bundle);
+    return { ok: true, topicId };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 });
-electron.ipcMain.handle("study:exportFolder", async (_, topicId) => {
+ipcMain.handle("study:exportFolderFiles", async (_, topicId) => {
   const bundle = await getStudyBundle(topicId);
-  if (!bundle) return { ok: false };
-  const result = await electron.dialog.showOpenDialog({
-    title: "Escolha a pasta de destino",
-    properties: ["openDirectory", "createDirectory"]
-  });
-  if (result.canceled || !result.filePaths[0]) return { ok: false };
-  const root = path.join(result.filePaths[0], studySlug(bundle.topic.name));
-  fs.mkdirSync(root, { recursive: true });
-  fs.writeFileSync(path.join(root, "roadmap.json"), JSON.stringify(bundle, null, 2));
+  if (!bundle) return null;
+  const files = [{ name: "roadmap.json", mime: "application/json", content: JSON.stringify(bundle, null, 2) }];
   const noteByNode = /* @__PURE__ */ new Map();
   for (const n of bundle.notes) noteByNode.set(n.nodeId, n.content);
   for (const node of bundle.nodes) {
@@ -3530,59 +3612,25 @@ electron.ipcMain.handle("study:exportFolder", async (_, topicId) => {
     const body = `# ${node.title}
 
 ${node.description ? node.description + "\n\n" : ""}${note}`;
-    fs.writeFileSync(path.join(root, `${String(node.orderIndex).padStart(3, "0")}-${studySlug(node.title)}.md`), body);
+    files.push({ name: `${String(node.orderIndex).padStart(3, "0")}-${studySlug(node.title)}.md`, mime: "text/markdown", content: body });
   }
-  return { ok: true, message: `Exportado para ${root}` };
+  return { folder: studySlug(bundle.topic.name), files };
 });
-electron.ipcMain.handle("study:importFolder", async () => {
-  const result = await electron.dialog.showOpenDialog({ title: "Escolha a pasta do tópico", properties: ["openDirectory"] });
-  if (result.canceled || !result.filePaths[0]) return { ok: false };
-  const roadmapPath = path.join(result.filePaths[0], "roadmap.json");
-  if (!fs.existsSync(roadmapPath)) return { ok: false, error: "roadmap.json não encontrado na pasta." };
-  try {
-    const bundle = JSON.parse(fs.readFileSync(roadmapPath, "utf8"));
-    const topicId = await importStudyBundle(bundle);
-    return { ok: true, topicId };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
-  }
-});
-async function exportJson(defaultName, data) {
-  const result = await electron.dialog.showSaveDialog({
-    title: "Exportar",
-    defaultPath: defaultName,
-    filters: [{ name: "JSON", extensions: ["json"] }]
-  });
-  if (result.canceled || !result.filePath) return false;
-  fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2));
-  return true;
-}
-async function readJson() {
-  const result = await electron.dialog.showOpenDialog({
-    title: "Importar",
-    filters: [{ name: "JSON", extensions: ["json"] }],
-    properties: ["openFile"]
-  });
-  if (result.canceled || !result.filePaths[0]) return null;
-  return JSON.parse(fs.readFileSync(result.filePaths[0], "utf8"));
-}
-electron.ipcMain.handle("skills:export", async (_, id) => {
+ipcMain.handle("skills:exportFile", async (_, id) => {
   const skill = (await getSkills()).find((s) => s.id === id);
-  if (!skill) return false;
-  return exportJson(`${skill.name}.skill.json`, skill);
+  if (!skill) return null;
+  return { name: `${skill.name}.skill.json`, mime: "application/json", content: JSON.stringify(skill, null, 2) };
 });
-electron.ipcMain.handle("skills:import", async () => {
-  const obj = await readJson();
+ipcMain.handle("skills:importData", async (_, obj) => {
   if (!obj || !obj.name) return null;
   return importSkill(obj);
 });
-electron.ipcMain.handle("agents:export", async (_, id) => {
+ipcMain.handle("agents:exportFile", async (_, id) => {
   const agent = (await getAgents()).find((a) => a.id === id);
-  if (!agent) return false;
-  return exportJson(`${agent.name}.agent.json`, agent);
+  if (!agent) return null;
+  return { name: `${agent.name}.agent.json`, mime: "application/json", content: JSON.stringify(agent, null, 2) };
 });
-electron.ipcMain.handle("agents:import", async () => {
-  const obj = await readJson();
+ipcMain.handle("agents:importData", async (_, obj) => {
   if (!obj || !obj.name) return null;
   return importAgent(obj);
 });
@@ -3635,14 +3683,11 @@ async function buildProjectContext(projectId) {
   }
   return lines.join("\n") + "\n\n";
 }
-electron.ipcMain.handle("ai:run", async (_, prompt, projectId, model) => {
+ipcMain.handle("ai:run", async (_, prompt, projectId, model) => {
   return runClaude(prompt, await resolveClaudeCommand(projectId), { model: await resolveModel(model) });
 });
 const aiRuns = /* @__PURE__ */ new Map();
-function broadcast(channel, payload) {
-  for (const w of electron.BrowserWindow.getAllWindows()) if (!w.webContents.isDestroyed()) w.webContents.send(channel, payload);
-}
-electron.ipcMain.handle("ai:start", async (_, params) => {
+ipcMain.handle("ai:start", async (_, params) => {
   const runId = crypto.randomUUID();
   const run2 = { id: runId, status: "running", output: "", error: null };
   aiRuns.set(runId, run2);
@@ -3691,11 +3736,11 @@ electron.ipcMain.handle("ai:start", async (_, params) => {
   });
   return runId;
 });
-electron.ipcMain.handle("ai:getRun", (_, runId) => {
+ipcMain.handle("ai:getRun", (_, runId) => {
   const r = aiRuns.get(runId);
   return r ? { status: r.status, output: r.output, error: r.error } : null;
 });
-electron.ipcMain.handle("ai:runStream", async (event, prompt, projectId, model, runId) => {
+ipcMain.handle("ai:runStream", async (_, prompt, projectId, model, runId) => {
   const command = await resolveClaudeCommand(projectId);
   const context = await buildProjectContext(projectId);
   const extraArgs = await resolveAllowedToolsArgs();
@@ -3705,11 +3750,11 @@ electron.ipcMain.handle("ai:runStream", async (event, prompt, projectId, model, 
     extraArgs,
     cwd,
     onChunk: (text) => {
-      if (!event.sender.isDestroyed()) event.sender.send("ai:chunk", { runId, text });
+      broadcast("ai:chunk", { runId, text });
     }
   });
 });
-electron.ipcMain.handle("ai:cancel", (_, runId) => {
+ipcMain.handle("ai:cancel", (_, runId) => {
   const r = aiRuns.get(runId);
   if (r?.kill) {
     r.status = "cancelled";
@@ -3718,79 +3763,240 @@ electron.ipcMain.handle("ai:cancel", (_, runId) => {
   }
   return false;
 });
-electron.ipcMain.handle("app:openExternal", (_, url) => electron.shell.openExternal(url));
-electron.ipcMain.handle("app:exportDb", async () => {
+ipcMain.handle("app:exportDbToDrive", async (_, email) => {
+  try {
+    await getDb();
+    saveDb();
+    const now = /* @__PURE__ */ new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+    const fileName = `timetracker_snapshot_${stamp}.sqlite`;
+    const r = await uploadFileToDrive(dbFilePath(), fileName, email);
+    return { ok: true, target: "drive", message: `Enviado ao Google Drive (${r.account}): ${r.name}`, link: r.link };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+});
+ipcMain.handle("app:importDbData", async (_, base64) => {
+  const bytes = Buffer.from(base64.includes(",") ? base64.split(",")[1] : base64, "base64");
+  if (bytes.subarray(0, 15).toString("latin1") !== "SQLite format 3") {
+    return { ok: false, error: "O arquivo não é um banco SQLite." };
+  }
+  replaceDbFile(bytes);
   await getDb();
-  saveDb();
-  const dbPath2 = path.join(electron.app.getPath("userData"), "timetracker.db");
-  const connected = await googleConnected();
-  const buttons = connected ? ["Baixar localmente", "Google Drive", "Cancelar"] : ["Baixar localmente", "Cancelar"];
-  const choice = await electron.dialog.showMessageBox({
-    type: "question",
-    message: "Exportar backup do banco",
-    detail: connected ? "Escolha o destino do backup." : "Dica: conecte o Google em Configurações para habilitar o envio ao Drive.",
-    buttons,
-    defaultId: 0,
-    cancelId: buttons.length - 1
-  });
-  const picked = buttons[choice.response];
-  if (picked === "Baixar localmente") {
-    const result = await electron.dialog.showSaveDialog({
-      title: "Exportar banco",
-      defaultPath: "timetracker_snapshot.sqlite",
-      buttonLabel: "Exportar",
-      filters: [{ name: "SQLite Database", extensions: ["sqlite", "db"] }]
-    });
-    if (result.canceled || !result.filePath) return { ok: false };
-    fs.copyFileSync(dbPath2, result.filePath);
-    return { ok: true, target: "local", message: `Backup salvo em ${result.filePath}` };
-  }
-  if (picked === "Google Drive") {
-    try {
-      const accounts = await listGoogleAccounts();
-      let email = accounts[0];
-      if (accounts.length > 1) {
-        const accBtns = [...accounts, "Cancelar"];
-        const pick = await electron.dialog.showMessageBox({
-          type: "question",
-          message: "Enviar para qual conta Google?",
-          buttons: accBtns,
-          defaultId: 0,
-          cancelId: accBtns.length - 1
-        });
-        if (accBtns[pick.response] === "Cancelar") return { ok: false };
-        email = accBtns[pick.response];
-      }
-      const now = /* @__PURE__ */ new Date();
-      const pad = (n) => String(n).padStart(2, "0");
-      const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
-      const fileName = `timetracker_snapshot_${stamp}.sqlite`;
-      const r = await uploadFileToDrive(dbPath2, fileName, email);
-      return { ok: true, target: "drive", message: `Enviado ao Google Drive (${r.account}): ${r.name}`, link: r.link };
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
-    }
-  }
-  return { ok: false };
+  broadcast("db:replaced", {});
+  return { ok: true };
 });
-electron.ipcMain.handle("app:importDb", async (event) => {
-  const result = await electron.dialog.showOpenDialog({
-    title: "Import Database Snapshot",
-    buttonLabel: "Import",
-    filters: [{ name: "SQLite Database", extensions: ["sqlite", "db"] }],
-    properties: ["openFile"]
-  });
-  if (result.canceled || !result.filePaths[0]) return false;
-  const dbPath2 = path.join(electron.app.getPath("userData"), "timetracker.db");
-  closeDb();
-  fs.copyFileSync(result.filePaths[0], dbPath2);
-  const win = electron.BrowserWindow.fromWebContents(event.sender);
-  win?.webContents.reload();
-  return true;
-});
-electron.ipcMain.handle("app:snapshots", () => listSnapshots());
-electron.ipcMain.handle("app:restoreSnapshot", async (event, snapPath) => {
+ipcMain.handle("app:snapshots", () => listSnapshots());
+ipcMain.handle("app:restoreSnapshot", async (_, snapPath) => {
   const ok = restoreSnapshot(snapPath);
-  if (ok) electron.BrowserWindow.fromWebContents(event.sender)?.webContents.reload();
+  if (ok) {
+    await getDb();
+    broadcast("db:replaced", {});
+  }
   return ok;
+});
+function tokenMatches(given, expected) {
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+async function startServer(overrides = {}) {
+  setConfig(overrides);
+  const cfg2 = getConfig();
+  if (!isLocalHost(cfg2.host) && !cfg2.token) {
+    throw new Error(`RICKOS_TOKEN é obrigatório quando o servidor escuta em ${cfg2.host} (fora do localhost).`);
+  }
+  await getDb();
+  snapshotDailyIfNeeded();
+  const app = Fastify({ bodyLimit: 200 * 1024 * 1024 });
+  app.addHook("onRequest", async (req, reply) => {
+    reply.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+    reply.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    reply.header("Vary", "Origin");
+    if (req.method === "OPTIONS") {
+      reply.code(204).send();
+      return reply;
+    }
+  });
+  const requireAuth = async (req, reply) => {
+    if (!cfg2.token) return;
+    const header = req.headers.authorization || "";
+    const query = req.query?.token || "";
+    const given = header.startsWith("Bearer ") ? header.slice(7) : query;
+    if (!given || !tokenMatches(given, cfg2.token)) {
+      reply.code(401).send({ ok: false, error: "unauthorized" });
+    }
+  };
+  app.get("/api/health", async () => ({ ok: true, auth: !!cfg2.token, channels: handlers.size }));
+  app.post(
+    "/api/rpc/:channel",
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const args = Array.isArray(req.body?.args) ? [...req.body.args] : [];
+      for (const i of req.body?.undef ?? []) if (Number.isInteger(i) && i >= 0 && i < 64) args[i] = void 0;
+      try {
+        const result = await callRpc(req.params.channel, args);
+        return { ok: true, result: result === void 0 ? null : result };
+      } catch (e) {
+        reply.code(handlers.has(req.params.channel) ? 500 : 404);
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
+    }
+  );
+  app.get("/api/events", { preHandler: requireAuth }, (req, reply) => {
+    reply.hijack();
+    const res = reply.raw;
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+      "Access-Control-Allow-Origin": req.headers.origin || "*"
+    });
+    res.write("retry: 3000\n\n");
+    const off = subscribe((channel, payload) => {
+      res.write(`event: message
+data: ${JSON.stringify({ channel, payload })}
+
+`);
+    });
+    const ping = setInterval(() => res.write(": ping\n\n"), 25e3);
+    req.raw.on("close", () => {
+      clearInterval(ping);
+      off();
+    });
+  });
+  app.get("/api/export/db", { preHandler: requireAuth }, async (_req, reply) => {
+    await getDb();
+    saveDb();
+    const now = /* @__PURE__ */ new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const name = `timetracker_snapshot_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.sqlite`;
+    reply.header("Content-Type", "application/x-sqlite3");
+    reply.header("Content-Disposition", `attachment; filename="${name}"`);
+    return reply.send(fs.readFileSync(dbFilePath()));
+  });
+  app.get("/api/google/callback", async (req, reply) => {
+    const params = new URLSearchParams(req.query);
+    reply.header("Content-Type", "text/html; charset=utf-8");
+    return finishGoogleConnect(params);
+  });
+  const staticDir = path.resolve(cfg2.staticDir || path.join(process.cwd(), "dist"));
+  if (fs.existsSync(path.join(staticDir, "index.html"))) {
+    await app.register(fastifyStatic, { root: staticDir, prefix: "/" });
+    app.setNotFoundHandler((req, reply) => {
+      if (req.url.startsWith("/api/")) return reply.code(404).send({ ok: false, error: "not found" });
+      return reply.sendFile("index.html");
+    });
+  }
+  startScheduler();
+  await app.listen({ port: cfg2.port, host: cfg2.host });
+  const url = `http://${cfg2.host === "0.0.0.0" ? "127.0.0.1" : cfg2.host}:${cfg2.port}`;
+  return {
+    app,
+    url,
+    close: async () => {
+      await app.close();
+      closeDb();
+    }
+  };
+}
+const PORT = Number(process.env.RICKOS_PORT || 4318);
+let serverUrl = process.env.RICKOS_SERVER_URL?.replace(/\/+$/, "") || "";
+const serverToken = process.env.RICKOS_TOKEN || "";
+let embedded = null;
+async function isRickosServer(url) {
+  try {
+    const r = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(1500) });
+    const j = await r.json();
+    return !!j.ok && typeof j.channels === "number";
+  } catch {
+    return false;
+  }
+}
+async function ensureServer() {
+  if (serverUrl) return;
+  const local = `http://127.0.0.1:${PORT}`;
+  if (await isRickosServer(local)) {
+    serverUrl = local;
+    return;
+  }
+  embedded = await startServer({ port: PORT, host: "127.0.0.1", token: "" });
+  serverUrl = embedded.url;
+  if (electron.safeStorage.isEncryptionAvailable()) {
+    await migrateLegacySecrets((b64) => electron.safeStorage.decryptString(Buffer.from(b64, "base64"))).catch(() => 0);
+  }
+}
+electron.ipcMain.on("desktop:serverUrl", (e) => {
+  e.returnValue = serverUrl;
+});
+electron.ipcMain.on("desktop:token", (e) => {
+  e.returnValue = serverToken;
+});
+electron.ipcMain.on("desktop:notify", (_e, title, body) => {
+  try {
+    if (electron.Notification.isSupported()) new electron.Notification({ title, body }).show();
+  } catch {
+  }
+});
+electron.ipcMain.on("desktop:openExternal", (_e, url) => {
+  if (/^https?:\/\//i.test(url) || url.startsWith("mailto:")) void electron.shell.openExternal(url);
+});
+function createWindow() {
+  const win = new electron.BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 900,
+    minHeight: 600,
+    backgroundColor: "#18181b",
+    webPreferences: {
+      preload: path.join(__dirname, "../preload/index.js"),
+      sandbox: false,
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+  win.on("ready-to-show", () => win.show());
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    void electron.shell.openExternal(url);
+    return { action: "deny" };
+  });
+  if (process.env["ELECTRON_RENDERER_URL"]) {
+    win.loadURL(process.env["ELECTRON_RENDERER_URL"]);
+  } else {
+    win.loadFile(path.join(__dirname, "../../dist/index.html"));
+  }
+}
+electron.app.whenReady().then(async () => {
+  try {
+    await ensureServer();
+  } catch (e) {
+    console.error("[rickOS] não foi possível iniciar o servidor:", e);
+  }
+  createWindow();
+  electron.globalShortcut.register("CommandOrControl+Shift+Space", () => {
+    const win = electron.BrowserWindow.getAllWindows()[0];
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    win.webContents.send("quick-capture:open");
+  });
+  electron.app.on("activate", () => {
+    if (electron.BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+electron.app.on("will-quit", () => {
+  electron.globalShortcut.unregisterAll();
+});
+electron.app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    void embedded?.close();
+    electron.app.quit();
+  }
+});
+electron.app.on("before-quit", () => {
+  void embedded?.close();
 });

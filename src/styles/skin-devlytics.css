@@ -244,6 +244,22 @@
   box-shadow: 0 0 0 4px var(--accent-dim);
 }
 
+/* switch form: selects shrink so Switch/Stop never fall off the bar */
+:root[data-skin='devlytics'] .active-task-bar .task-input-row {
+  min-width: 0;
+}
+:root[data-skin='devlytics'] .active-task-bar .task-input-row input {
+  min-width: 120px;
+}
+:root[data-skin='devlytics'] .active-task-bar .task-input-row select {
+  flex: 0 1 150px;
+  min-width: 84px;
+}
+:root[data-skin='devlytics'] .active-task-controls {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* ── Buttons ────────────────────────────────────────────────────────────────── */
 :root[data-skin='devlytics'] .btn {
   border-radius: var(--radius-sm);

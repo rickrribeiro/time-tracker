@@ -91,3 +91,6 @@ electron/**/*.d.ts
 .eslintcache
 
 .claude/dist-server/
+
+# Prints gerados por `npm run screenshots` (contêm dados pessoais)
+docs/screenshots/

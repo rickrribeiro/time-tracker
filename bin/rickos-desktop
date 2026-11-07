@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Abre o TimeTracker.app. Sobe o servidor antes, se ele não estiver rodando,
+# para a web continuar disponível mesmo depois de fechar o app.
+set -euo pipefail
+# shellcheck source=bin/_server.sh
+source "$(dirname "${BASH_SOURCE[0]}")/_server.sh"
+
+APP="/Applications/TimeTracker.app"
+if [ ! -d "$APP" ]; then
+  echo "✗ ${APP} não encontrado. Instale com: npm run app:install" >&2
+  exit 1
+fi
+
+ensure_server
+open -a "$APP"

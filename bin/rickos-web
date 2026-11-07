@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Abre o rickOS no navegador. Sobe o servidor antes, se ele não estiver rodando.
+set -euo pipefail
+# shellcheck source=bin/_server.sh
+source "$(dirname "${BASH_SOURCE[0]}")/_server.sh"
+
+ensure_server
+open "${URL}/#/home"

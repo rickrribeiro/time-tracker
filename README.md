@@ -32,6 +32,19 @@ npm run dev        # desktop (Electron); o servidor sobe embutido
 npm run dev:web    # web: servidor + Vite em http://127.0.0.1:5317
 ```
 
+### Uso no dia a dia
+
+```bash
+npm run app:install   # gera o TimeTracker.app e instala em /Applications (rode de novo após mudanças)
+npm run desktop       # bin/rickos-desktop: sobe o servidor (se preciso) e abre o TimeTracker.app
+npm run web           # bin/rickos-web: sobe o servidor (se preciso) e abre http://127.0.0.1:4318
+npm run stop          # bin/rickos-stop: desliga o servidor iniciado pelos scripts
+```
+
+- O servidor só sobe quando você roda um dos scripts e fica ligado até o `stop`. Os logs ficam em `~/Library/Logs/rickOS/`.
+- Os scripts recompilam a web sozinhos quando o código muda.
+- Abrir o `TimeTracker.app` direto (Dock/Spotlight) também funciona: sem servidor rodando, o app sobe um embutido, que serve a web em `:4318` e desliga ao sair do app.
+
 Desktop e web usam **o mesmo servidor e o mesmo banco**. Se o `dev:web` já estiver rodando, o Electron reaproveita o servidor dele.
 
 Build de produção:

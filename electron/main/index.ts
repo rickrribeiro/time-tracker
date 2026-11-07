@@ -31,7 +31,8 @@ async function ensureServer(): Promise<void> {
     serverUrl = local
     return
   }
-  embedded = await startServer({ port: PORT, host: '127.0.0.1', token: '' })
+  // The embedded server also serves the web front (http://127.0.0.1:4318) while the app is open.
+  embedded = await startServer({ port: PORT, host: '127.0.0.1', token: '', staticDir: join(__dirname, '../../dist') })
   serverUrl = embedded.url
 }
 

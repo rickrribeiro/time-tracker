@@ -1,5 +1,5 @@
 {
-  "name": "rickos",
+  "name": "time-tracker",
   "version": "1.0.0",
   "description": "RickOS — sistema pessoal local-first (desktop Electron + web/celular)",
   "main": "dist-electron/main/index.js",

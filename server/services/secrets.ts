@@ -63,21 +63,15 @@ export function decodeSecret(value: string | null): string | null {
 }
 
 /**
- * Convert values encrypted by the old Electron build (`enc:` + safeStorage) to the
- * AES format. Electron passes its safeStorage decryptor; returns how many changed.
+ * Values still encrypted by the old Electron build (`enc:` + OS keychain), as
+ * `{ key: base64 }`. Only the desktop app can decrypt them (safeStorage); it then
+ * saves the plaintext back through `settings:set`, which re-encrypts with AES.
  */
-export async function migrateLegacySecrets(decryptLegacy: (b64: string) => string): Promise<number> {
-  let changed = 0
+export async function legacySecrets(): Promise<Record<string, string>> {
+  const out: Record<string, string> = {}
   for (const key of SENSITIVE_KEYS) {
     const v = await getSetting(key)
-    if (!v || !v.startsWith(LEGACY_PREFIX)) continue
-    try {
-      const plain = decryptLegacy(v.slice(LEGACY_PREFIX.length))
-      await setSetting(key, encodeSecret(key, plain))
-      changed++
-    } catch {
-      // not decryptable on this machine — leave it
-    }
+    if (v && v.startsWith(LEGACY_PREFIX)) out[key] = v.slice(LEGACY_PREFIX.length)
   }
-  return changed
+  return out
 }

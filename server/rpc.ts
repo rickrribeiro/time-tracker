@@ -162,7 +162,7 @@ import { runClaude } from './services/claude'
 import { beginGoogleConnect, awaitGoogleConnect, googleConnected, listGoogleAccounts, disconnectGoogle, disconnectGoogleAccount, syncGoogleCalendar, uploadFileToDrive } from './services/google'
 import { syncPluggy, pluggyConfigured, createConnectToken } from './services/pluggy'
 import { searchFlightPrice, refreshWatchPrice } from './services/flights'
-import { encodeSecret, decodeSecret } from './services/secrets'
+import { encodeSecret, decodeSecret, legacySecrets } from './services/secrets'
 import { broadcast, notify } from './events'
 import { getConfig } from './config'
 
@@ -595,6 +595,7 @@ ipcMain.handle('habits:completionsForDate', (_, date: string) => getHabitComplet
 
 ipcMain.handle('settings:get', async (_, key: string) => decodeSecret(await getSetting(key)))
 ipcMain.handle('settings:set', (_, key: string, value: string) => setSetting(key, encodeSecret(key, value)))
+ipcMain.handle('settings:legacySecrets', () => legacySecrets())
 ipcMain.handle('settings:getAll', async () => {
   const all = await getAllSettings()
   for (const k of Object.keys(all)) all[k] = decodeSecret(all[k]) ?? ''

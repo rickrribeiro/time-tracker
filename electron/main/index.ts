@@ -1,7 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, globalShortcut, Notification, safeStorage } from 'electron'
 import { join } from 'path'
 import { startServer, StartedServer } from '../../server/index'
-import { migrateLegacySecrets } from '../../server/services/secrets'
 
 /**
  * The desktop app is a client of the rickOS server — same as the web version.
@@ -34,9 +33,33 @@ async function ensureServer(): Promise<void> {
   }
   embedded = await startServer({ port: PORT, host: '127.0.0.1', token: '' })
   serverUrl = embedded.url
-  // One-time: secrets encrypted by the old build with the OS keychain → AES (server-readable).
-  if (safeStorage.isEncryptionAvailable()) {
-    await migrateLegacySecrets((b64) => safeStorage.decryptString(Buffer.from(b64, 'base64'))).catch(() => 0)
+}
+
+async function rpc<T>(channel: string, ...args: unknown[]): Promise<T> {
+  const res = await fetch(`${serverUrl}/api/rpc/${channel}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(serverToken ? { Authorization: `Bearer ${serverToken}` } : {}) },
+    body: JSON.stringify({ args })
+  })
+  const j = (await res.json()) as { ok: boolean; result: T; error?: string }
+  if (!j.ok) throw new Error(j.error)
+  return j.result
+}
+
+/**
+ * One-time: secrets the old build encrypted with the OS keychain (safeStorage) can
+ * only be read here. Decrypt them and save through the server, which re-encrypts
+ * with its own key — works for the embedded server and for one already running.
+ */
+async function migrateLegacySecrets(): Promise<void> {
+  if (!safeStorage.isEncryptionAvailable()) return
+  const legacy = await rpc<Record<string, string>>('settings:legacySecrets')
+  for (const [key, b64] of Object.entries(legacy)) {
+    try {
+      await rpc('settings:set', key, safeStorage.decryptString(Buffer.from(b64, 'base64')))
+    } catch {
+      // not decryptable on this machine — leave it
+    }
   }
 }
 
@@ -89,6 +112,7 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   try {
     await ensureServer()
+    await migrateLegacySecrets().catch((e) => console.error('[rickOS] migração de segredos:', e))
   } catch (e) {
     console.error('[rickOS] não foi possível iniciar o servidor:', e)
   }

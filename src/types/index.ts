@@ -321,6 +321,63 @@ export interface Contact {
   nextFollowUp: string | null
   createdAt: string
 }
+// ── Git: worktrees & branches (server/services/gitscan.ts) ───────────────────
+export type GitBranchStatus = 'orphan' | 'risk' | 'forgotten' | 'active' | 'merged' | 'base'
+export interface GitPullRequest {
+  number: number
+  state: 'OPEN' | 'MERGED' | 'CLOSED'
+  url: string
+  title: string
+}
+export interface GitBranch {
+  id: string
+  repoPath: string
+  repoName: string
+  projectId: number | null
+  projectName: string | null
+  branch: string | null
+  isBase: boolean
+  worktreePath: string | null
+  worktreeMissing: boolean
+  lastCommitAt: string | null
+  lastCommitSubject: string | null
+  lastCommitAuthor: string | null
+  ahead: number
+  behind: number
+  upstream: string | null
+  upstreamGone: boolean
+  localOnly: number | null
+  dirty: number | null
+  untracked: number | null
+  merged: boolean
+  agent: boolean
+  pr: GitPullRequest | null
+  idleDays: number | null
+  status: GitBranchStatus
+}
+export interface GitRepo {
+  path: string
+  name: string
+  projectId: number | null
+  projectName: string | null
+  base: string
+  remoteUrl: string | null
+  hasRemote: boolean
+  ghAvailable: boolean
+  error: string | null
+}
+export interface GitScan {
+  scannedAt: string
+  staleDays: number
+  repos: GitRepo[]
+  branches: GitBranch[]
+}
+export interface GitBranchDetails {
+  commits: { hash: string; subject: string; author: string; date: string }[]
+  files: { status: string; path: string }[]
+  diffStat: string
+}
+
 export interface Rule {
   id: number
   type: string
@@ -378,6 +435,7 @@ export type Page =
   // Projetos
   | 'projects'
   | 'issues'
+  | 'worktrees'
   // Finanças
   | 'finance-dashboard'
   | 'transactions'
@@ -589,6 +647,16 @@ declare global {
         createLocal: (repo: string, title: string, body: string | null) => Promise<GithubIssue>
         deleteIssue: (id: number) => Promise<void>
         createOnGithub: (id: number) => Promise<GithubIssue>
+      }
+      git: {
+        scan: (opts?: { prs?: boolean; refreshPrs?: boolean }) => Promise<GitScan>
+        summary: () => Promise<GitScan>
+        details: (repoPath: string, branch: string | null, worktreePath: string | null) => Promise<GitBranchDetails>
+        prune: (repoPath: string) => Promise<string>
+        fetch: (repoPath: string) => Promise<string>
+        deleteBranch: (repoPath: string, branch: string) => Promise<string>
+        createPr: (repoPath: string, branch: string) => Promise<{ url: string }>
+        openPath: (target: string, app: 'vscode' | 'finder' | 'terminal') => Promise<void>
       }
       calendar: {
         upcoming: (fromISO: string, limit: number) => Promise<CalendarEvent[]>

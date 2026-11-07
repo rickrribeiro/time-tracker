@@ -164,6 +164,16 @@ import { syncPluggy, pluggyConfigured, createConnectToken } from './services/plu
 import { searchFlightPrice, refreshWatchPrice } from './services/flights'
 import { encodeSecret, decodeSecret, legacySecrets } from './services/secrets'
 import { broadcast, notify } from './events'
+import {
+  scanGit,
+  cachedScan,
+  branchDetails,
+  pruneWorktrees,
+  fetchRepo,
+  deleteMergedBranch,
+  createPullRequest,
+  openPath
+} from './services/gitscan'
 import { getConfig } from './config'
 
 /**
@@ -421,7 +431,7 @@ async function evaluateRules(): Promise<void> {
     const rules = (await getRules()).filter((r) => r.enabled)
     const now = Date.now()
     for (const r of rules) {
-      let params: { minutes?: number; startHour?: number; endHour?: number; count?: number; percent?: number } = {}
+      let params: { minutes?: number; startHour?: number; endHour?: number; count?: number; percent?: number; days?: number } = {}
       try {
         params = JSON.parse(r.params)
       } catch {
@@ -458,6 +468,21 @@ async function evaluateRules(): Promise<void> {
           const due = await getDueFlashcards(new Date().toISOString())
           if (due.length > count) {
             notifyNative('🔁 Revisões acumulando', `${due.length} flashcards vencidos — hora de revisar.`)
+            await setRuleFired(r.id, new Date().toISOString())
+          }
+        } else if (r.type === 'stale_branches') {
+          const days = params.days ?? 3
+          if (now - last < 24 * 3600 * 1000) continue
+          const scan = await cachedScan(30 * 60 * 1000)
+          const lost = scan.branches.filter(
+            (b) => (b.status === 'risk' || b.status === 'forgotten') && (b.idleDays ?? 0) >= days
+          )
+          if (lost.length) {
+            const repos = [...new Set(lost.map((b) => b.repoName))]
+            notifyNative(
+              '🌿 Trabalho esquecido em branches',
+              `${lost.length} branch(es) parada(s) há ${days}+ dias com código não entregue: ${repos.slice(0, 4).join(', ')}${repos.length > 4 ? '…' : ''}`
+            )
             await setRuleFired(r.id, new Date().toISOString())
           }
         } else if (r.type === 'budget_threshold') {
@@ -611,6 +636,17 @@ ipcMain.handle('github:createLocal', (_, repo: string, title: string, body: stri
 )
 ipcMain.handle('github:deleteIssue', (_, id: number) => deleteGithubIssue(id))
 ipcMain.handle('github:createOnGithub', (_, id: number) => createIssueViaClaude(id))
+
+// ── IPC: Git (worktrees & branches) ─────────────────────────────────────────
+ipcMain.handle('git:scan', (_, opts?: { prs?: boolean; refreshPrs?: boolean }) => scanGit(opts ?? {}))
+ipcMain.handle('git:summary', () => cachedScan(10 * 60 * 1000))
+ipcMain.handle('git:details', (_, repoPath: string, branch: string | null, worktreePath: string | null) =>
+  branchDetails(repoPath, branch, worktreePath))
+ipcMain.handle('git:prune', (_, repoPath: string) => pruneWorktrees(repoPath))
+ipcMain.handle('git:fetch', (_, repoPath: string) => fetchRepo(repoPath))
+ipcMain.handle('git:deleteBranch', (_, repoPath: string, branch: string) => deleteMergedBranch(repoPath, branch))
+ipcMain.handle('git:createPr', (_, repoPath: string, branch: string) => createPullRequest(repoPath, branch))
+ipcMain.handle('git:openPath', (_, target: string, app: 'vscode' | 'finder' | 'terminal') => openPath(target, app))
 
 // ── IPC: Calendar ─────────────────────────────────────────────────────────────
 

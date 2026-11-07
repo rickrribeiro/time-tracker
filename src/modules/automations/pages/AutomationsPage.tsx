@@ -35,6 +35,14 @@ const RULE_DEFS: RuleDef[] = [
     fields: [{ key: 'percent', label: '% do orçamento', min: 1, max: 100 }]
   },
   {
+    type: 'stale_branches',
+    label: '🌿 Trabalho esquecido em branches',
+    describe: (p) =>
+      `Se alguma branch/worktree tiver código não entregue (sem PR, não enviado ou não commitado) parada há ${p.days ?? 3}+ dias → notifica (1×/dia).`,
+    defaults: { days: 3 },
+    fields: [{ key: 'days', label: 'Dias parada', min: 1 }]
+  },
+  {
     type: 'due_flashcards',
     label: '🔁 Flashcards acumulando',
     describe: (p) => `Se houver mais de ${p.count ?? 30} flashcards vencidos → notifica.`,

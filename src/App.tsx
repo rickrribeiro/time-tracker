@@ -22,6 +22,7 @@ import { TopicWorkspacePage } from './modules/estudos/pages/TopicWorkspacePage'
 import { RevisoesPage } from './modules/estudos/pages/RevisoesPage'
 import { ProjectsPage } from './modules/projects/pages/ProjectsPage'
 import { IssuesPage } from './modules/projects/pages/IssuesPage'
+import { WorktreesPage } from './modules/projects/pages/WorktreesPage'
 import { HabitsPage } from './modules/habits/pages/HabitsPage'
 import { KnowledgePage } from './modules/knowledge/pages/KnowledgePage'
 import { QuickCapture } from './modules/inbox/components/QuickCapture'
@@ -108,7 +109,8 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
     groupIcon: '📁',
     items: [
       { id: 'projects', label: 'Projetos', icon: '🗂' },
-      { id: 'issues', label: 'Issues (Kanban)', icon: '📌' }
+      { id: 'issues', label: 'Issues (Kanban)', icon: '📌' },
+      { id: 'worktrees', label: 'Worktrees & Branches', icon: '🌿' }
     ]
   },
   
@@ -159,6 +161,7 @@ const PAGES: Record<Page, React.ComponentType> = {
   'estudos-review': RevisoesPage,
   projects: ProjectsPage,
   issues: IssuesPage,
+  worktrees: WorktreesPage,
   habits: HabitsPage,
   knowledge: KnowledgePage,
   'finance-dashboard': FinanceDashboardPage,

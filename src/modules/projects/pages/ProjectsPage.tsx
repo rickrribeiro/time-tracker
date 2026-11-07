@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { Project, ProjectMilestone } from '../../../types'
 import { useProjectStore } from '../store/projectStore'
 import { ProgressModal } from '../components/ProgressModal'
+import { useUIStore } from '../../../store/uiStore'
+import { WORKTREES_FILTER_KEY } from '../git'
 
 const PRESET_COLORS = ['#6366f1', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#06b6d4']
 
@@ -167,6 +169,22 @@ export function ProjectsPage(): React.ReactElement {
           <button className="btn btn-secondary btn-sm" onClick={() => toggleArchive(p)}>
             {p.archived ? 'Desarquivar' : 'Arquivar'}
           </button>
+          {(p.localPath || p.githubRepoUrl) && (
+            <button
+              className="btn btn-secondary btn-sm"
+              title="Ver worktrees e branches locais deste projeto"
+              onClick={() => {
+                try {
+                  localStorage.setItem(WORKTREES_FILTER_KEY, `p:${p.id}`)
+                } catch {
+                  // storage unavailable — the page opens unfiltered
+                }
+                useUIStore.getState().setPage('worktrees')
+              }}
+            >
+              🌿 Branches
+            </button>
+          )}
         </div>
       </div>
     )

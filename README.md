@@ -17,6 +17,7 @@ Um "sistema operacional pessoal" de mesa, **local-first**: começou como time tr
 | **💰 Finanças** | Contas, transações (import CSV), orçamento, investimentos com **histórico mensal e gráfico de evolução**, relatórios, câmbio manual, modo privacidade (ocultar valores), e Open Finance via **Pluggy**. |
 | **✈️ Viagens** | Viagens, monitoramento de preços de voos (Skyscanner/RapidAPI), destinos, documentos e recomendações. |
 | **📌 Projetos** | Projetos + Issues (Kanban) sincronizados com o **GitHub** (token ou SSH), criação de issues via Claude local. |
+| **🌿 Worktrees & Branches** | Estado de todas as branches/worktrees locais (projetos + pastas escaneadas): 🔴 em risco, 🟠 esquecida, 👻 órfã, 🟡 em andamento, 🟢 pode limpar. Detalhes (commits/arquivos/diff), criar PR, continuar no Prompt Runner, limpar mergeadas, prune; card na Home e regra de aviso em Automações. |
 | **🤖 IA** | Assistente, biblioteca de **Skills** e **Agentes**, **Prompt Runner** (abas paralelas, executa via Claude local com streaming), e Histórico de execuções. |
 | **⚙️ Configurações / 🔗 Links** | Integrações (GitHub, Google Calendar multi-conta, Pluggy, Skyscanner, comando/ferramentas do Claude) e uma lista de links com tags/filtros e "abrir marcados/por tag". |
 

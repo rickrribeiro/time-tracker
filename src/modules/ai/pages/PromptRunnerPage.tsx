@@ -67,8 +67,17 @@ function loadTabs(): RunnerTab[] {
   try {
     const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
     if (d) {
-      tabs = [makeTab({ agentId: d.agentId ?? null, skillIds: Array.isArray(d.skillIds) ? d.skillIds : [], userPrompt: d.userPrompt ?? '' }), ...tabs]
-      localStorage.removeItem(DRAFT_KEY)
+      tabs = [
+        makeTab({
+          agentId: d.agentId ?? null,
+          skillIds: Array.isArray(d.skillIds) ? d.skillIds : [],
+          userPrompt: d.userPrompt ?? '',
+          projectId: typeof d.projectId === 'number' ? d.projectId : null,
+          title: typeof d.title === 'string' ? d.title : ''
+        }),
+        ...tabs
+      ]
+      // removed after mount (see effect below): StrictMode runs this initializer twice
     }
   } catch {
     // ignore
@@ -84,6 +93,15 @@ export function PromptRunnerPage(): React.ReactElement {
 
   const [tabs, setTabs] = useState<RunnerTab[]>(loadTabs)
   const [activeId, setActiveId] = useState<string>(tabs[0].id)
+
+  // The draft hand-off was merged into the tabs above; consume it once mounted.
+  useEffect(() => {
+    try {
+      localStorage.removeItem(DRAFT_KEY)
+    } catch {
+      // ignore
+    }
+  }, [])
   const [search, setSearch] = useState('')
   const [showAllSkills, setShowAllSkills] = useState(false)
   const [model, setModel] = useState('')

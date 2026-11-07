@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useUIStore } from '../../../store/uiStore'
 import { DailyStandup } from '../components/DailyStandup'
+import { LostWorkCard } from '../../projects/components/LostWorkCard'
+import '../../projects/worktrees.css'
 import { useTaskStore } from '../../timetracker/store/taskStore'
 import { useTodoStore } from '../../todo/store/todoStore'
 import { useHabitStore } from '../../habits/store/habitStore'
@@ -148,6 +150,9 @@ export function HomePage(): React.ReactElement {
       <div style={{ marginTop: 12 }}>
         <UpcomingMeetings />
       </div>
+
+      {/* ── Branches com trabalho não entregue ── */}
+      <LostWorkCard />
 
       {/* ── Esta semana ── */}
       <h3 className="dash-heading">Esta semana</h3>

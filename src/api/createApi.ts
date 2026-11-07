@@ -229,6 +229,18 @@ export function createApi() {
       deleteIssue: (id: number) => invoke('github:deleteIssue', id),
       createOnGithub: (id: number) => invoke('github:createOnGithub', id)
     },
+    // Git: worktrees & branches of local repos (runs on the server machine)
+    git: {
+      scan: (opts?: { prs?: boolean; refreshPrs?: boolean }) => invoke('git:scan', opts),
+      summary: () => invoke('git:summary'),
+      details: (repoPath: string, branch: string | null, worktreePath: string | null) =>
+        invoke('git:details', repoPath, branch, worktreePath),
+      prune: (repoPath: string) => invoke('git:prune', repoPath),
+      fetch: (repoPath: string) => invoke('git:fetch', repoPath),
+      deleteBranch: (repoPath: string, branch: string) => invoke('git:deleteBranch', repoPath, branch),
+      createPr: (repoPath: string, branch: string) => invoke('git:createPr', repoPath, branch),
+      openPath: (target: string, app: 'vscode' | 'finder' | 'terminal') => invoke('git:openPath', target, app)
+    },
     // Calendar
     calendar: {
       upcoming: (fromISO: string, limit: number) => invoke('calendar:upcoming', fromISO, limit),

@@ -880,7 +880,7 @@ function getAll(db2, sql, params = []) {
   stmt.free();
   return rows;
 }
-function run(db2, sql, params = []) {
+function run$1(db2, sql, params = []) {
   const stmt = db2.prepare(sql);
   stmt.run(params);
   stmt.free();
@@ -899,7 +899,7 @@ async function getAllTags() {
 }
 async function createTag(name, color, isProductive) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO tags (name, color, isProductive) VALUES (?, ?, ?)", [
+  run$1(db2, "INSERT INTO tags (name, color, isProductive) VALUES (?, ?, ?)", [
     name,
     color,
     isProductive
@@ -909,7 +909,7 @@ async function createTag(name, color, isProductive) {
 }
 async function updateTag(id, name, color, isProductive) {
   const db2 = await getDb();
-  run(db2, "UPDATE tags SET name = ?, color = ?, isProductive = ? WHERE id = ?", [
+  run$1(db2, "UPDATE tags SET name = ?, color = ?, isProductive = ? WHERE id = ?", [
     name,
     color,
     isProductive,
@@ -919,8 +919,8 @@ async function updateTag(id, name, color, isProductive) {
 }
 async function deleteTag(id) {
   const db2 = await getDb();
-  run(db2, "UPDATE tasks SET tagId = 1 WHERE tagId = ?", [id]);
-  run(db2, "DELETE FROM tags WHERE id = ?", [id]);
+  run$1(db2, "UPDATE tasks SET tagId = 1 WHERE tagId = ?", [id]);
+  run$1(db2, "DELETE FROM tags WHERE id = ?", [id]);
 }
 const TASK_WITH_TAG_SQL = `
   SELECT t.id, t.title, t.tagId, t.secondaryTagId, t.startTime, t.endTime, t.studyNodeId,
@@ -962,7 +962,7 @@ async function getActiveTask() {
 }
 async function createTask(title, tagId, secondaryTagId, startTime, endTime = null, studyNodeId = null) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO tasks (title, tagId, secondaryTagId, startTime, endTime, studyNodeId) VALUES (?, ?, ?, ?, ?, ?)", [
+  run$1(db2, "INSERT INTO tasks (title, tagId, secondaryTagId, startTime, endTime, studyNodeId) VALUES (?, ?, ?, ?, ?, ?)", [
     title,
     tagId,
     secondaryTagId,
@@ -989,7 +989,7 @@ async function getStudyHoursByTopic() {
 }
 async function updateTask(id, title, tagId, secondaryTagId, startTime, endTime) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "UPDATE tasks SET title = ?, tagId = ?, secondaryTagId = ?, startTime = ?, endTime = ? WHERE id = ?",
     [title, tagId, secondaryTagId, startTime, endTime, id]
@@ -998,15 +998,15 @@ async function updateTask(id, title, tagId, secondaryTagId, startTime, endTime) 
 }
 async function stopTask(id, endTime) {
   const db2 = await getDb();
-  run(db2, "UPDATE tasks SET endTime = ? WHERE id = ?", [endTime, id]);
+  run$1(db2, "UPDATE tasks SET endTime = ? WHERE id = ?", [endTime, id]);
 }
 async function deleteTask(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM tasks WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM tasks WHERE id = ?", [id]);
 }
 async function stopAllActiveTasks(endTime) {
   const db2 = await getDb();
-  run(db2, "UPDATE tasks SET endTime = ? WHERE endTime IS NULL", [endTime]);
+  run$1(db2, "UPDATE tasks SET endTime = ? WHERE endTime IS NULL", [endTime]);
 }
 function localDateKey(date) {
   const y = date.getFullYear();
@@ -1092,7 +1092,7 @@ async function getTagStats(startDate, endDate) {
 }
 async function updateDayConfig(date, isWorkDay) {
   const db2 = await getDb();
-  run(db2, "INSERT OR REPLACE INTO day_configs (date, isWorkDay) VALUES (?, ?)", [date, isWorkDay]);
+  run$1(db2, "INSERT OR REPLACE INTO day_configs (date, isWorkDay) VALUES (?, ?)", [date, isWorkDay]);
 }
 async function getTodos(status) {
   const db2 = await getDb();
@@ -1108,7 +1108,7 @@ async function getTodos(status) {
 async function createTodo(title, notes, status, source, priority = 0, dueDate = null, projectId = null, aiGenerated = 0, recurrence = null, type = "projeto") {
   const db2 = await getDb();
   const createdAt = (/* @__PURE__ */ new Date()).toISOString();
-  run(
+  run$1(
     db2,
     "INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, type, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, type, createdAt]
@@ -1130,7 +1130,7 @@ async function updateTodo(id, title, notes, status, priority, dueDate, projectId
     params.push(type);
   }
   params.push(id);
-  run(db2, `UPDATE todos SET ${cols.join(", ")} WHERE id = ?`, params);
+  run$1(db2, `UPDATE todos SET ${cols.join(", ")} WHERE id = ?`, params);
   if (status === "done" && prev?.status !== "done") spawnRecurrenceIfNeeded(db2, id);
   return getOne(db2, "SELECT * FROM todos WHERE id = ?", [id]);
 }
@@ -1162,7 +1162,7 @@ function spawnRecurrenceIfNeeded(db2, id) {
   }
   if (!rec || !rec.type) return;
   const nextDue = nextDueDate(rec, t.dueDate);
-  run(
+  run$1(
     db2,
     "INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, type, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [t.title, t.notes, "todo", t.priority, nextDue, t.projectId, "recurring", 0, t.recurrence, t.type, (/* @__PURE__ */ new Date()).toISOString()]
@@ -1170,7 +1170,7 @@ function spawnRecurrenceIfNeeded(db2, id) {
 }
 async function deleteTodo(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM todos WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM todos WHERE id = ?", [id]);
 }
 async function getProjects() {
   const db2 = await getDb();
@@ -1178,7 +1178,7 @@ async function getProjects() {
 }
 async function createProject(name, description, githubRepoUrl, color, claudeCommand = null, localPath = null, stage = "ideia", businessModel = null, pricing = null, audience = null) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "INSERT INTO projects (name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience]
@@ -1188,7 +1188,7 @@ async function createProject(name, description, githubRepoUrl, color, claudeComm
 }
 async function updateProject(id, name, description, githubRepoUrl, color, archived, claudeCommand = null, localPath = null, stage = "ideia", businessModel = null, pricing = null, audience = null) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "UPDATE projects SET name = ?, description = ?, githubRepoUrl = ?, color = ?, archived = ?, claudeCommand = ?, localPath = ?, stage = ?, businessModel = ?, pricing = ?, audience = ? WHERE id = ?",
     [name, description, githubRepoUrl, color, archived, claudeCommand, localPath, stage, businessModel, pricing, audience, id]
@@ -1197,7 +1197,7 @@ async function updateProject(id, name, description, githubRepoUrl, color, archiv
 }
 async function setProjectStage(id, stage) {
   const db2 = await getDb();
-  run(db2, "UPDATE projects SET stage = ? WHERE id = ?", [stage, id]);
+  run$1(db2, "UPDATE projects SET stage = ? WHERE id = ?", [stage, id]);
 }
 async function getProjectMilestones() {
   const db2 = await getDb();
@@ -1205,20 +1205,20 @@ async function getProjectMilestones() {
 }
 async function createProjectMilestone(projectId, title, targetDate) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO project_milestones (projectId, title, targetDate, createdAt) VALUES (?, ?, ?, ?)", [projectId, title, targetDate, (/* @__PURE__ */ new Date()).toISOString()]);
+  run$1(db2, "INSERT INTO project_milestones (projectId, title, targetDate, createdAt) VALUES (?, ?, ?, ?)", [projectId, title, targetDate, (/* @__PURE__ */ new Date()).toISOString()]);
   return getOne(db2, "SELECT * FROM project_milestones WHERE id = ?", [lastInsertId(db2)]);
 }
 async function toggleProjectMilestone(id, done) {
   const db2 = await getDb();
-  run(db2, "UPDATE project_milestones SET doneAt = ? WHERE id = ?", [done ? (/* @__PURE__ */ new Date()).toISOString() : null, id]);
+  run$1(db2, "UPDATE project_milestones SET doneAt = ? WHERE id = ?", [done ? (/* @__PURE__ */ new Date()).toISOString() : null, id]);
 }
 async function deleteProjectMilestone(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM project_milestones WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM project_milestones WHERE id = ?", [id]);
 }
 async function deleteProject(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM projects WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM projects WHERE id = ?", [id]);
 }
 async function getHabits() {
   const db2 = await getDb();
@@ -1226,7 +1226,7 @@ async function getHabits() {
 }
 async function createHabit(name, frequency, target) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO habits (name, frequency, target) VALUES (?, ?, ?)", [
+  run$1(db2, "INSERT INTO habits (name, frequency, target) VALUES (?, ?, ?)", [
     name,
     frequency,
     target
@@ -1236,7 +1236,7 @@ async function createHabit(name, frequency, target) {
 }
 async function updateHabit(id, name, frequency, target, active) {
   const db2 = await getDb();
-  run(db2, "UPDATE habits SET name = ?, frequency = ?, target = ?, active = ? WHERE id = ?", [
+  run$1(db2, "UPDATE habits SET name = ?, frequency = ?, target = ?, active = ? WHERE id = ?", [
     name,
     frequency,
     target,
@@ -1247,7 +1247,7 @@ async function updateHabit(id, name, frequency, target, active) {
 }
 async function deleteHabit(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM habits WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM habits WHERE id = ?", [id]);
 }
 async function getHabitEntries(date) {
   const db2 = await getDb();
@@ -1264,7 +1264,7 @@ async function getHabitEntriesForRange(startDate, endDate) {
 async function toggleHabitEntry(habitId, date, completed) {
   const db2 = await getDb();
   const completedAt = completed ? (/* @__PURE__ */ new Date()).toISOString() : null;
-  run(
+  run$1(
     db2,
     `INSERT INTO habit_entries (habitId, date, completed, completedAt) VALUES (?, ?, ?, ?)
      ON CONFLICT(habitId, date) DO UPDATE SET completed = excluded.completed, completedAt = excluded.completedAt`,
@@ -1289,7 +1289,7 @@ async function getSetting(key) {
 }
 async function setSetting(key, value) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     `INSERT INTO settings (key, value) VALUES (?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
@@ -1311,7 +1311,7 @@ async function createLocalIssue(repo, title, body) {
   const db2 = await getDb();
   const minRow = getOne(db2, "SELECT MIN(id) as m FROM github_issues WHERE id < 0");
   const id = (minRow?.m ?? 0) - 1;
-  run(
+  run$1(
     db2,
     `INSERT INTO github_issues (id, number, title, state, repo, url, labels, milestone, updatedAt, local, body)
      VALUES (?, 0, ?, 'open', ?, NULL, '[]', NULL, ?, 1, ?)`,
@@ -1321,17 +1321,17 @@ async function createLocalIssue(repo, title, body) {
 }
 async function markIssueOnGithub(id, url, number) {
   const db2 = await getDb();
-  run(db2, "UPDATE github_issues SET url = ?, number = ? WHERE id = ?", [url, number, id]);
+  run$1(db2, "UPDATE github_issues SET url = ?, number = ? WHERE id = ?", [url, number, id]);
 }
 async function deleteGithubIssue(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM github_issues WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM github_issues WHERE id = ?", [id]);
 }
 async function replaceGithubIssues(issues) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM github_issues WHERE local = 0");
+  run$1(db2, "DELETE FROM github_issues WHERE local = 0");
   for (const i of issues) {
-    run(
+    run$1(
       db2,
       `INSERT INTO github_issues (id, number, title, state, repo, url, labels, milestone, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1342,7 +1342,7 @@ async function replaceGithubIssues(issues) {
 async function upsertGithubIssues(issues) {
   const db2 = await getDb();
   for (const i of issues) {
-    run(
+    run$1(
       db2,
       `INSERT OR REPLACE INTO github_issues (id, number, title, state, repo, url, labels, milestone, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1368,7 +1368,7 @@ async function getEventsForRange(startISO, endISO) {
 }
 async function createCalendarEvent(title, startTime, endTime, location) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "INSERT INTO calendar_events (title, startTime, endTime, location, source) VALUES (?, ?, ?, ?, 'manual')",
     [title, startTime, endTime, location]
@@ -1378,13 +1378,13 @@ async function createCalendarEvent(title, startTime, endTime, location) {
 }
 async function deleteCalendarEvent(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM calendar_events WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM calendar_events WHERE id = ?", [id]);
 }
 async function replaceGoogleEvents(events) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM calendar_events WHERE source = 'google'");
+  run$1(db2, "DELETE FROM calendar_events WHERE source = 'google'");
   for (const e of events) {
-    run(
+    run$1(
       db2,
       "INSERT INTO calendar_events (title, startTime, endTime, location, source) VALUES (?, ?, ?, ?, 'google')",
       [e.title, e.startTime, e.endTime, e.location]
@@ -1397,16 +1397,16 @@ async function getAccounts$1() {
 }
 async function createAccount(name, currency, balance) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO accounts (name, currency, balance) VALUES (?, ?, ?)", [name, currency, balance]);
+  run$1(db2, "INSERT INTO accounts (name, currency, balance) VALUES (?, ?, ?)", [name, currency, balance]);
   return getOne(db2, "SELECT * FROM accounts WHERE id = ?", [lastInsertId(db2)]);
 }
 async function updateAccount(id, name, currency, balance) {
   const db2 = await getDb();
-  run(db2, "UPDATE accounts SET name = ?, currency = ?, balance = ? WHERE id = ?", [name, currency, balance, id]);
+  run$1(db2, "UPDATE accounts SET name = ?, currency = ?, balance = ? WHERE id = ?", [name, currency, balance, id]);
 }
 async function deleteAccount(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM accounts WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM accounts WHERE id = ?", [id]);
 }
 async function getCategories() {
   const db2 = await getDb();
@@ -1414,12 +1414,12 @@ async function getCategories() {
 }
 async function createCategory(name, type, color) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO categories (name, type, color) VALUES (?, ?, ?)", [name, type, color]);
+  run$1(db2, "INSERT INTO categories (name, type, color) VALUES (?, ?, ?)", [name, type, color]);
   return getOne(db2, "SELECT * FROM categories WHERE id = ?", [lastInsertId(db2)]);
 }
 async function deleteCategory(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM categories WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM categories WHERE id = ?", [id]);
 }
 async function getTransactions(month) {
   const db2 = await getDb();
@@ -1434,7 +1434,7 @@ async function getTransactions(month) {
 }
 async function createTransaction(accountId, categoryId, amount, currency, type, description, date) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "INSERT INTO transactions (accountId, categoryId, amount, currency, type, description, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [accountId, categoryId, amount, currency, type, description, date]
@@ -1443,7 +1443,7 @@ async function createTransaction(accountId, categoryId, amount, currency, type, 
 }
 async function updateTransaction(id, accountId, categoryId, amount, currency, type, description, date) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "UPDATE transactions SET accountId = ?, categoryId = ?, amount = ?, currency = ?, type = ?, description = ?, date = ? WHERE id = ?",
     [accountId, categoryId, amount, currency, type, description, date, id]
@@ -1451,12 +1451,12 @@ async function updateTransaction(id, accountId, categoryId, amount, currency, ty
 }
 async function deleteTransaction(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM transactions WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM transactions WHERE id = ?", [id]);
 }
 async function bulkInsertTransactions(rows) {
   const db2 = await getDb();
   for (const r of rows) {
-    run(
+    run$1(
       db2,
       "INSERT INTO transactions (accountId, categoryId, amount, currency, type, description, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [r.accountId, r.categoryId, r.amount, r.currency, r.type, r.description, r.date]
@@ -1472,9 +1472,9 @@ async function setBudget(categoryId, month, amount) {
   const db2 = await getDb();
   const existing = getOne(db2, "SELECT * FROM budgets WHERE categoryId = ? AND month = ?", [categoryId, month]);
   if (existing) {
-    run(db2, "UPDATE budgets SET amount = ? WHERE id = ?", [amount, existing.id]);
+    run$1(db2, "UPDATE budgets SET amount = ? WHERE id = ?", [amount, existing.id]);
   } else {
-    run(db2, "INSERT INTO budgets (categoryId, month, amount) VALUES (?, ?, ?)", [categoryId, month, amount]);
+    run$1(db2, "INSERT INTO budgets (categoryId, month, amount) VALUES (?, ?, ?)", [categoryId, month, amount]);
   }
 }
 function currentMonthKey() {
@@ -1487,7 +1487,7 @@ function syncInvestmentLatest(db2, investmentId) {
     "SELECT * FROM investment_history WHERE investmentId = ? ORDER BY month DESC LIMIT 1",
     [investmentId]
   );
-  if (latest) run(db2, "UPDATE investments SET amount = ? WHERE id = ?", [latest.amount, investmentId]);
+  if (latest) run$1(db2, "UPDATE investments SET amount = ? WHERE id = ?", [latest.amount, investmentId]);
 }
 async function getInvestments() {
   const db2 = await getDb();
@@ -1499,9 +1499,9 @@ async function getInvestmentHistory() {
 }
 async function createInvestment(name, type, amount, currency) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO investments (name, type, amount, currency) VALUES (?, ?, ?, ?)", [name, type, amount, currency]);
+  run$1(db2, "INSERT INTO investments (name, type, amount, currency) VALUES (?, ?, ?, ?)", [name, type, amount, currency]);
   const id = lastInsertId(db2);
-  run(db2, "INSERT INTO investment_history (investmentId, month, amount) VALUES (?, ?, ?)", [id, currentMonthKey(), amount]);
+  run$1(db2, "INSERT INTO investment_history (investmentId, month, amount) VALUES (?, ?, ?)", [id, currentMonthKey(), amount]);
   return getOne(db2, "SELECT * FROM investments WHERE id = ?", [id]);
 }
 async function setInvestmentValue(investmentId, month, amount) {
@@ -1512,16 +1512,16 @@ async function setInvestmentValue(investmentId, month, amount) {
     [investmentId, month]
   );
   if (existing) {
-    run(db2, "UPDATE investment_history SET amount = ? WHERE id = ?", [amount, existing.id]);
+    run$1(db2, "UPDATE investment_history SET amount = ? WHERE id = ?", [amount, existing.id]);
   } else {
-    run(db2, "INSERT INTO investment_history (investmentId, month, amount) VALUES (?, ?, ?)", [investmentId, month, amount]);
+    run$1(db2, "INSERT INTO investment_history (investmentId, month, amount) VALUES (?, ?, ?)", [investmentId, month, amount]);
   }
   syncInvestmentLatest(db2, investmentId);
 }
 async function deleteInvestment(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM investment_history WHERE investmentId = ?", [id]);
-  run(db2, "DELETE FROM investments WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM investment_history WHERE investmentId = ?", [id]);
+  run$1(db2, "DELETE FROM investments WHERE id = ?", [id]);
 }
 async function getTrips() {
   const db2 = await getDb();
@@ -1529,7 +1529,7 @@ async function getTrips() {
 }
 async function createTrip(origin, destination, startDate, endDate, budget, currency, status) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "INSERT INTO trips (origin, destination, startDate, endDate, budget, currency, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [origin, destination, startDate, endDate, budget, currency, status]
@@ -1538,7 +1538,7 @@ async function createTrip(origin, destination, startDate, endDate, budget, curre
 }
 async function updateTrip(id, origin, destination, startDate, endDate, budget, currency, status) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "UPDATE trips SET origin = ?, destination = ?, startDate = ?, endDate = ?, budget = ?, currency = ?, status = ? WHERE id = ?",
     [origin, destination, startDate, endDate, budget, currency, status, id]
@@ -1546,7 +1546,7 @@ async function updateTrip(id, origin, destination, startDate, endDate, budget, c
 }
 async function deleteTrip(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM trips WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM trips WHERE id = ?", [id]);
 }
 async function getFlightWatches() {
   const db2 = await getDb();
@@ -1554,7 +1554,7 @@ async function getFlightWatches() {
 }
 async function createFlightWatch(tripId, origin, destination, price, currency, lastChecked) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "INSERT INTO flight_watches (tripId, origin, destination, price, currency, lastChecked) VALUES (?, ?, ?, ?, ?, ?)",
     [tripId, origin, destination, price, currency, lastChecked]
@@ -1563,11 +1563,11 @@ async function createFlightWatch(tripId, origin, destination, price, currency, l
 }
 async function deleteFlightWatch(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM flight_watches WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM flight_watches WHERE id = ?", [id]);
 }
 async function updateFlightWatchPrice(id, price, lastChecked) {
   const db2 = await getDb();
-  run(db2, "UPDATE flight_watches SET price = ?, lastChecked = ? WHERE id = ?", [price, lastChecked, id]);
+  run$1(db2, "UPDATE flight_watches SET price = ?, lastChecked = ? WHERE id = ?", [price, lastChecked, id]);
 }
 async function getTripDocuments(tripId) {
   const db2 = await getDb();
@@ -1575,7 +1575,7 @@ async function getTripDocuments(tripId) {
 }
 async function setTripDocument(tripId, item, checked) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     `INSERT INTO trip_documents (tripId, item, checked) VALUES (?, ?, ?)
      ON CONFLICT(tripId, item) DO UPDATE SET checked = excluded.checked`,
@@ -1590,7 +1590,7 @@ async function createSkill(name, description, category, tags, content) {
   const db2 = await getDb();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const id = crypto.randomUUID();
-  run(
+  run$1(
     db2,
     `INSERT INTO skills (id, name, description, category, tags, content, isFavorite, usageCount, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
@@ -1600,7 +1600,7 @@ async function createSkill(name, description, category, tags, content) {
 }
 async function updateSkill(id, name, description, category, tags, content) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "UPDATE skills SET name = ?, description = ?, category = ?, tags = ?, content = ?, updatedAt = ? WHERE id = ?",
     [name, description, category, tags, content, (/* @__PURE__ */ new Date()).toISOString(), id]
@@ -1609,18 +1609,18 @@ async function updateSkill(id, name, description, category, tags, content) {
 }
 async function deleteSkill(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM skills WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM skills WHERE id = ?", [id]);
 }
 async function toggleSkillFavorite(id) {
   const db2 = await getDb();
-  run(db2, "UPDATE skills SET isFavorite = 1 - isFavorite WHERE id = ?", [id]);
+  run$1(db2, "UPDATE skills SET isFavorite = 1 - isFavorite WHERE id = ?", [id]);
 }
 async function importSkill(s) {
   const db2 = await getDb();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const exists = s.id ? getOne(db2, "SELECT id FROM skills WHERE id = ?", [s.id]) : null;
   const id = exists || !s.id ? crypto.randomUUID() : s.id;
-  run(
+  run$1(
     db2,
     `INSERT INTO skills (id, name, description, category, tags, content, isFavorite, usageCount, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
@@ -1646,7 +1646,7 @@ async function createAgent(name, description, role, systemPrompt, defaultSkillId
   const db2 = await getDb();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const id = crypto.randomUUID();
-  run(
+  run$1(
     db2,
     `INSERT INTO agents (id, name, description, role, systemPrompt, defaultSkillIds, tags, isFavorite, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
@@ -1656,7 +1656,7 @@ async function createAgent(name, description, role, systemPrompt, defaultSkillId
 }
 async function updateAgent(id, name, description, role, systemPrompt, defaultSkillIds, tags) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "UPDATE agents SET name = ?, description = ?, role = ?, systemPrompt = ?, defaultSkillIds = ?, tags = ?, updatedAt = ? WHERE id = ?",
     [name, description, role, systemPrompt, defaultSkillIds, tags, (/* @__PURE__ */ new Date()).toISOString(), id]
@@ -1665,18 +1665,18 @@ async function updateAgent(id, name, description, role, systemPrompt, defaultSki
 }
 async function deleteAgent(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM agents WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM agents WHERE id = ?", [id]);
 }
 async function toggleAgentFavorite(id) {
   const db2 = await getDb();
-  run(db2, "UPDATE agents SET isFavorite = 1 - isFavorite WHERE id = ?", [id]);
+  run$1(db2, "UPDATE agents SET isFavorite = 1 - isFavorite WHERE id = ?", [id]);
 }
 async function importAgent(a) {
   const db2 = await getDb();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const exists = a.id ? getOne(db2, "SELECT id FROM agents WHERE id = ?", [a.id]) : null;
   const id = exists || !a.id ? crypto.randomUUID() : a.id;
-  run(
+  run$1(
     db2,
     `INSERT INTO agents (id, name, description, role, systemPrompt, defaultSkillIds, tags, isFavorite, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1702,7 +1702,7 @@ async function getExecutions() {
 async function createExecution(agentId, skillIds, userPrompt, finalPrompt, response) {
   const db2 = await getDb();
   const id = crypto.randomUUID();
-  run(
+  run$1(
     db2,
     `INSERT INTO prompt_executions (id, createdAt, agentId, skillIds, userPrompt, finalPrompt, response)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -1710,14 +1710,14 @@ async function createExecution(agentId, skillIds, userPrompt, finalPrompt, respo
   );
   try {
     const ids = JSON.parse(skillIds);
-    for (const sid of ids) run(db2, "UPDATE skills SET usageCount = usageCount + 1 WHERE id = ?", [sid]);
+    for (const sid of ids) run$1(db2, "UPDATE skills SET usageCount = usageCount + 1 WHERE id = ?", [sid]);
   } catch {
   }
   return getOne(db2, "SELECT * FROM prompt_executions WHERE id = ?", [id]);
 }
 async function deleteExecution(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM prompt_executions WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM prompt_executions WHERE id = ?", [id]);
 }
 async function getLinks() {
   const db2 = await getDb();
@@ -1725,7 +1725,7 @@ async function getLinks() {
 }
 async function createLink(title, url, tags = "[]") {
   const db2 = await getDb();
-  run(db2, "INSERT INTO links (title, url, checked, tags, createdAt) VALUES (?, ?, 0, ?, ?)", [
+  run$1(db2, "INSERT INTO links (title, url, checked, tags, createdAt) VALUES (?, ?, 0, ?, ?)", [
     title,
     url,
     tags,
@@ -1735,19 +1735,19 @@ async function createLink(title, url, tags = "[]") {
 }
 async function updateLink(id, title, url, tags = "[]") {
   const db2 = await getDb();
-  run(db2, "UPDATE links SET title = ?, url = ?, tags = ? WHERE id = ?", [title, url, tags, id]);
+  run$1(db2, "UPDATE links SET title = ?, url = ?, tags = ? WHERE id = ?", [title, url, tags, id]);
 }
 async function setLinkChecked(id, checked) {
   const db2 = await getDb();
-  run(db2, "UPDATE links SET checked = ? WHERE id = ?", [checked, id]);
+  run$1(db2, "UPDATE links SET checked = ? WHERE id = ?", [checked, id]);
 }
 async function setLinkOpened(id) {
   const db2 = await getDb();
-  run(db2, "UPDATE links SET lastOpenedAt = ? WHERE id = ?", [(/* @__PURE__ */ new Date()).toISOString(), id]);
+  run$1(db2, "UPDATE links SET lastOpenedAt = ? WHERE id = ?", [(/* @__PURE__ */ new Date()).toISOString(), id]);
 }
 async function deleteLink(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM links WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM links WHERE id = ?", [id]);
 }
 async function getStayFavorites() {
   const db2 = await getDb();
@@ -1755,7 +1755,7 @@ async function getStayFavorites() {
 }
 async function addStayFavorite(f) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "INSERT OR REPLACE INTO travel_stay_favorites (id, tripId, provider, listingUrl, title, pricePerNight, currency, data, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [f.id, f.tripId, f.provider, f.listingUrl, f.title, f.pricePerNight, f.currency, f.data, f.createdAt || (/* @__PURE__ */ new Date()).toISOString()]
@@ -1763,7 +1763,7 @@ async function addStayFavorite(f) {
 }
 async function removeStayFavorite(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM travel_stay_favorites WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM travel_stay_favorites WHERE id = ?", [id]);
 }
 async function getStayWatches() {
   const db2 = await getDb();
@@ -1771,7 +1771,7 @@ async function getStayWatches() {
 }
 async function addStayWatch(w) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "INSERT OR REPLACE INTO travel_stay_watches (id, city, filters, currentPrice, bestPrice, currency, lastCheckedAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     [w.id, w.city, w.filters, w.currentPrice, w.bestPrice, w.currency, w.lastCheckedAt, w.createdAt || (/* @__PURE__ */ new Date()).toISOString()]
@@ -1779,12 +1779,12 @@ async function addStayWatch(w) {
 }
 async function updateStayWatchPrice(id, currentPrice, bestPrice, checkedAt) {
   const db2 = await getDb();
-  run(db2, "UPDATE travel_stay_watches SET currentPrice = ?, bestPrice = ?, lastCheckedAt = ? WHERE id = ?", [currentPrice, bestPrice, checkedAt, id]);
+  run$1(db2, "UPDATE travel_stay_watches SET currentPrice = ?, bestPrice = ?, lastCheckedAt = ? WHERE id = ?", [currentPrice, bestPrice, checkedAt, id]);
 }
 async function removeStayWatch(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM travel_stay_watches WHERE id = ?", [id]);
-  run(db2, "DELETE FROM travel_stay_price_history WHERE watchId = ?", [id]);
+  run$1(db2, "DELETE FROM travel_stay_watches WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM travel_stay_price_history WHERE watchId = ?", [id]);
 }
 async function getStayPriceHistory(watchId) {
   const db2 = await getDb();
@@ -1792,7 +1792,7 @@ async function getStayPriceHistory(watchId) {
 }
 async function addStayPricePoint(p) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO travel_stay_price_history (id, watchId, checkedAt, price, currency) VALUES (?, ?, ?, ?, ?)", [p.id, p.watchId, p.checkedAt, p.price, p.currency]);
+  run$1(db2, "INSERT INTO travel_stay_price_history (id, watchId, checkedAt, price, currency) VALUES (?, ?, ?, ?, ?)", [p.id, p.watchId, p.checkedAt, p.price, p.currency]);
 }
 async function getStaySearchHistory() {
   const db2 = await getDb();
@@ -1800,8 +1800,8 @@ async function getStaySearchHistory() {
 }
 async function addStaySearchHistory(filters) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO travel_stay_search_history (filters, createdAt) VALUES (?, ?)", [filters, (/* @__PURE__ */ new Date()).toISOString()]);
-  run(db2, "DELETE FROM travel_stay_search_history WHERE id NOT IN (SELECT id FROM travel_stay_search_history ORDER BY id DESC LIMIT 20)");
+  run$1(db2, "INSERT INTO travel_stay_search_history (filters, createdAt) VALUES (?, ?)", [filters, (/* @__PURE__ */ new Date()).toISOString()]);
+  run$1(db2, "DELETE FROM travel_stay_search_history WHERE id NOT IN (SELECT id FROM travel_stay_search_history ORDER BY id DESC LIMIT 20)");
 }
 async function getContacts() {
   const db2 = await getDb();
@@ -1809,7 +1809,7 @@ async function getContacts() {
 }
 async function createContact(name, location, country, state, birthday, interests, context, nextFollowUp) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "INSERT INTO contacts (name, location, country, state, birthday, interests, context, nextFollowUp, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [name, location, country, state, birthday, interests, context, nextFollowUp, (/* @__PURE__ */ new Date()).toISOString()]
@@ -1818,7 +1818,7 @@ async function createContact(name, location, country, state, birthday, interests
 }
 async function updateContact(id, name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "UPDATE contacts SET name = ?, location = ?, country = ?, state = ?, birthday = ?, interests = ?, context = ?, lastContactAt = ?, nextFollowUp = ? WHERE id = ?",
     [name, location, country, state, birthday, interests, context, lastContactAt, nextFollowUp, id]
@@ -1827,12 +1827,12 @@ async function updateContact(id, name, location, country, state, birthday, inter
 }
 async function logContact(id) {
   const db2 = await getDb();
-  run(db2, "UPDATE contacts SET lastContactAt = ?, nextFollowUp = NULL WHERE id = ?", [(/* @__PURE__ */ new Date()).toISOString(), id]);
+  run$1(db2, "UPDATE contacts SET lastContactAt = ?, nextFollowUp = NULL WHERE id = ?", [(/* @__PURE__ */ new Date()).toISOString(), id]);
   return getOne(db2, "SELECT * FROM contacts WHERE id = ?", [id]);
 }
 async function deleteContact(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM contacts WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM contacts WHERE id = ?", [id]);
 }
 async function getRules() {
   const db2 = await getDb();
@@ -1840,20 +1840,20 @@ async function getRules() {
 }
 async function createRule(type, params) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO rules (type, enabled, params, createdAt) VALUES (?, 1, ?, ?)", [type, params, (/* @__PURE__ */ new Date()).toISOString()]);
+  run$1(db2, "INSERT INTO rules (type, enabled, params, createdAt) VALUES (?, 1, ?, ?)", [type, params, (/* @__PURE__ */ new Date()).toISOString()]);
   return getOne(db2, "SELECT * FROM rules WHERE id = ?", [lastInsertId(db2)]);
 }
 async function updateRule(id, enabled, params) {
   const db2 = await getDb();
-  run(db2, "UPDATE rules SET enabled = ?, params = ? WHERE id = ?", [enabled, params, id]);
+  run$1(db2, "UPDATE rules SET enabled = ?, params = ? WHERE id = ?", [enabled, params, id]);
 }
 async function setRuleFired(id, at) {
   const db2 = await getDb();
-  run(db2, "UPDATE rules SET lastFiredAt = ? WHERE id = ?", [at, id]);
+  run$1(db2, "UPDATE rules SET lastFiredAt = ? WHERE id = ?", [at, id]);
 }
 async function deleteRule(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM rules WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM rules WHERE id = ?", [id]);
 }
 async function getScheduledJobs() {
   const db2 = await getDb();
@@ -1861,20 +1861,20 @@ async function getScheduledJobs() {
 }
 async function createScheduledJob(name, prompt, hour) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO scheduled_jobs (name, prompt, hour, enabled, createdAt) VALUES (?, ?, ?, 1, ?)", [name, prompt, hour, (/* @__PURE__ */ new Date()).toISOString()]);
+  run$1(db2, "INSERT INTO scheduled_jobs (name, prompt, hour, enabled, createdAt) VALUES (?, ?, ?, 1, ?)", [name, prompt, hour, (/* @__PURE__ */ new Date()).toISOString()]);
   return getOne(db2, "SELECT * FROM scheduled_jobs WHERE id = ?", [lastInsertId(db2)]);
 }
 async function updateScheduledJob(id, name, prompt, hour, enabled) {
   const db2 = await getDb();
-  run(db2, "UPDATE scheduled_jobs SET name = ?, prompt = ?, hour = ?, enabled = ? WHERE id = ?", [name, prompt, hour, enabled, id]);
+  run$1(db2, "UPDATE scheduled_jobs SET name = ?, prompt = ?, hour = ?, enabled = ? WHERE id = ?", [name, prompt, hour, enabled, id]);
 }
 async function setJobRan(id, at) {
   const db2 = await getDb();
-  run(db2, "UPDATE scheduled_jobs SET lastRunAt = ? WHERE id = ?", [at, id]);
+  run$1(db2, "UPDATE scheduled_jobs SET lastRunAt = ? WHERE id = ?", [at, id]);
 }
 async function deleteScheduledJob(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM scheduled_jobs WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM scheduled_jobs WHERE id = ?", [id]);
 }
 async function getGoals(month) {
   const db2 = await getDb();
@@ -1882,7 +1882,7 @@ async function getGoals(month) {
 }
 async function createGoal(month, title, kind, refId, target, unit) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "INSERT INTO goals (month, title, kind, refId, target, current, unit, done, createdAt) VALUES (?, ?, ?, ?, ?, 0, ?, 0, ?)",
     [month, title, kind, refId, target, unit, (/* @__PURE__ */ new Date()).toISOString()]
@@ -1891,12 +1891,12 @@ async function createGoal(month, title, kind, refId, target, unit) {
 }
 async function updateGoal(id, title, target, current, unit, done) {
   const db2 = await getDb();
-  run(db2, "UPDATE goals SET title = ?, target = ?, current = ?, unit = ?, done = ? WHERE id = ?", [title, target, current, unit, done, id]);
+  run$1(db2, "UPDATE goals SET title = ?, target = ?, current = ?, unit = ?, done = ? WHERE id = ?", [title, target, current, unit, done, id]);
   return getOne(db2, "SELECT * FROM goals WHERE id = ?", [id]);
 }
 async function deleteGoal(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM goals WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM goals WHERE id = ?", [id]);
 }
 async function getStudyTopics() {
   const db2 = await getDb();
@@ -1904,7 +1904,7 @@ async function getStudyTopics() {
 }
 async function createStudyTopic(name, category, status, targetDate, priority, color) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "INSERT INTO study_topics (name, category, status, targetDate, priority, color, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [name, category, status, targetDate, priority, color, (/* @__PURE__ */ new Date()).toISOString()]
@@ -1913,7 +1913,7 @@ async function createStudyTopic(name, category, status, targetDate, priority, co
 }
 async function updateStudyTopic(id, name, category, status, targetDate, priority, color) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "UPDATE study_topics SET name = ?, category = ?, status = ?, targetDate = ?, priority = ?, color = ? WHERE id = ?",
     [name, category, status, targetDate, priority, color, id]
@@ -1922,7 +1922,7 @@ async function updateStudyTopic(id, name, category, status, targetDate, priority
 }
 async function deleteStudyTopic(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM study_topics WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM study_topics WHERE id = ?", [id]);
 }
 async function getStudyNodes(topicId) {
   const db2 = await getDb();
@@ -1944,7 +1944,7 @@ async function createStudyNode(topicId, parentId, title, description, estimatedH
     [topicId, parentId]
   );
   const orderIndex = siblings[0]?.n ?? 0;
-  run(
+  run$1(
     db2,
     "INSERT INTO study_nodes (topicId, parentId, title, description, status, orderIndex, estimatedHours, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     [topicId, parentId, title, description, "todo", orderIndex, estimatedHours, (/* @__PURE__ */ new Date()).toISOString()]
@@ -1954,7 +1954,7 @@ async function createStudyNode(topicId, parentId, title, description, estimatedH
 async function updateStudyNode(id, title, description, status, estimatedHours) {
   const db2 = await getDb();
   const completedAt = status === "done" ? (/* @__PURE__ */ new Date()).toISOString() : null;
-  run(
+  run$1(
     db2,
     "UPDATE study_nodes SET title = ?, description = ?, status = ?, estimatedHours = ?, completedAt = ? WHERE id = ?",
     [title, description, status, estimatedHours, completedAt, id]
@@ -1975,7 +1975,7 @@ async function deleteStudyNode(id) {
       }
     }
   }
-  for (const nid of toDelete) run(db2, "DELETE FROM study_nodes WHERE id = ?", [nid]);
+  for (const nid of toDelete) run$1(db2, "DELETE FROM study_nodes WHERE id = ?", [nid]);
 }
 async function reorderStudyNode(id, newParentId, newIndex) {
   const db2 = await getDb();
@@ -2003,8 +2003,8 @@ async function reorderStudyNode(id, newParentId, newIndex) {
   );
   const clamped = Math.max(0, Math.min(newIndex, siblings.length));
   siblings.splice(clamped, 0, n);
-  run(db2, "UPDATE study_nodes SET parentId = ? WHERE id = ?", [newParentId, id]);
-  siblings.forEach((s, i) => run(db2, "UPDATE study_nodes SET orderIndex = ? WHERE id = ?", [i, s.id]));
+  run$1(db2, "UPDATE study_nodes SET parentId = ? WHERE id = ?", [newParentId, id]);
+  siblings.forEach((s, i) => run$1(db2, "UPDATE study_nodes SET orderIndex = ? WHERE id = ?", [i, s.id]));
 }
 async function moveStudyNode(id, dir) {
   const db2 = await getDb();
@@ -2018,8 +2018,8 @@ async function moveStudyNode(id, dir) {
   const idx = siblings.findIndex((s) => s.id === id);
   const swapWith = dir === "up" ? siblings[idx - 1] : siblings[idx + 1];
   if (!swapWith) return;
-  run(db2, "UPDATE study_nodes SET orderIndex = ? WHERE id = ?", [swapWith.orderIndex, node.id]);
-  run(db2, "UPDATE study_nodes SET orderIndex = ? WHERE id = ?", [node.orderIndex, swapWith.id]);
+  run$1(db2, "UPDATE study_nodes SET orderIndex = ? WHERE id = ?", [swapWith.orderIndex, node.id]);
+  run$1(db2, "UPDATE study_nodes SET orderIndex = ? WHERE id = ?", [node.orderIndex, swapWith.id]);
 }
 async function getStudyNote(topicId, nodeId) {
   const db2 = await getDb();
@@ -2030,10 +2030,10 @@ async function saveStudyNote(topicId, nodeId, content) {
   const existing = await getStudyNote(topicId, nodeId);
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (existing) {
-    run(db2, "UPDATE study_notes SET content = ?, updatedAt = ? WHERE id = ?", [content, now, existing.id]);
+    run$1(db2, "UPDATE study_notes SET content = ?, updatedAt = ? WHERE id = ?", [content, now, existing.id]);
     return getOne(db2, "SELECT * FROM study_notes WHERE id = ?", [existing.id]);
   }
-  run(db2, "INSERT INTO study_notes (topicId, nodeId, content, updatedAt) VALUES (?, ?, ?, ?)", [topicId, nodeId, content, now]);
+  run$1(db2, "INSERT INTO study_notes (topicId, nodeId, content, updatedAt) VALUES (?, ?, ?, ?)", [topicId, nodeId, content, now]);
   return getOne(db2, "SELECT * FROM study_notes WHERE id = ?", [lastInsertId(db2)]);
 }
 async function getStudyFlashcards(topicId) {
@@ -2050,7 +2050,7 @@ async function getDueFlashcards(nowISO) {
 }
 async function createStudyFlashcard(topicId, nodeId, front, back) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "INSERT INTO study_flashcards (topicId, nodeId, front, back, createdAt) VALUES (?, ?, ?, ?, ?)",
     [topicId, nodeId, front, back, (/* @__PURE__ */ new Date()).toISOString()]
@@ -2059,22 +2059,22 @@ async function createStudyFlashcard(topicId, nodeId, front, back) {
 }
 async function updateStudyFlashcard(id, front, back) {
   const db2 = await getDb();
-  run(db2, "UPDATE study_flashcards SET front = ?, back = ? WHERE id = ?", [front, back, id]);
+  run$1(db2, "UPDATE study_flashcards SET front = ?, back = ? WHERE id = ?", [front, back, id]);
   return getOne(db2, "SELECT * FROM study_flashcards WHERE id = ?", [id]);
 }
 async function deleteStudyFlashcard(id) {
   const db2 = await getDb();
-  run(db2, "DELETE FROM study_flashcards WHERE id = ?", [id]);
+  run$1(db2, "DELETE FROM study_flashcards WHERE id = ?", [id]);
 }
 async function reviewStudyFlashcard(id, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, rating) {
   const db2 = await getDb();
-  run(
+  run$1(
     db2,
     "UPDATE study_flashcards SET easeFactor = ?, intervalDays = ?, repetitions = ?, nextReviewAt = ?, lastReviewedAt = ? WHERE id = ?",
     [easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, id]
   );
   const card = getOne(db2, "SELECT * FROM study_flashcards WHERE id = ?", [id]);
-  run(
+  run$1(
     db2,
     "INSERT INTO study_review_log (flashcardId, topicId, rating, reviewedAt) VALUES (?, ?, ?, ?)",
     [id, card.topicId, rating ?? null, lastReviewedAt]
@@ -2103,7 +2103,7 @@ async function getStudyQuizAttempts(topicId) {
 }
 async function createStudyQuizAttempt(topicId, score, total, durationMs) {
   const db2 = await getDb();
-  run(db2, "INSERT INTO study_quiz_attempts (topicId, score, total, durationMs, createdAt) VALUES (?, ?, ?, ?, ?)", [topicId, score, total, durationMs, (/* @__PURE__ */ new Date()).toISOString()]);
+  run$1(db2, "INSERT INTO study_quiz_attempts (topicId, score, total, durationMs, createdAt) VALUES (?, ?, ?, ?, ?)", [topicId, score, total, durationMs, (/* @__PURE__ */ new Date()).toISOString()]);
   return getOne(db2, "SELECT * FROM study_quiz_attempts WHERE id = ?", [lastInsertId(db2)]);
 }
 async function getStudyBundle(topicId) {
@@ -2121,7 +2121,7 @@ async function importStudyBundle(bundle) {
   const db2 = await getDb();
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const t = bundle.topic;
-  run(
+  run$1(
     db2,
     "INSERT INTO study_topics (name, category, status, targetDate, priority, color, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [t.name, t.category, t.status ?? "studying", t.targetDate, t.priority ?? 0, t.color ?? "#6366f1", now]
@@ -2138,7 +2138,7 @@ async function importStudyBundle(bundle) {
         i++;
         continue;
       }
-      run(
+      run$1(
         db2,
         "INSERT INTO study_nodes (topicId, parentId, title, description, status, orderIndex, estimatedHours, completedAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [newTopicId, n.parentId == null ? null : nodeIdMap.get(n.parentId) ?? null, n.title, n.description ?? null, n.status ?? "todo", n.orderIndex ?? 0, n.estimatedHours ?? null, n.completedAt ?? null, n.createdAt ?? now]
@@ -2149,11 +2149,11 @@ async function importStudyBundle(bundle) {
   }
   for (const note of bundle.notes ?? []) {
     const mappedNode = note.nodeId == null ? null : nodeIdMap.get(note.nodeId) ?? null;
-    run(db2, "INSERT INTO study_notes (topicId, nodeId, content, updatedAt) VALUES (?, ?, ?, ?)", [newTopicId, mappedNode, note.content ?? "", note.updatedAt ?? now]);
+    run$1(db2, "INSERT INTO study_notes (topicId, nodeId, content, updatedAt) VALUES (?, ?, ?, ?)", [newTopicId, mappedNode, note.content ?? "", note.updatedAt ?? now]);
   }
   for (const fc of bundle.flashcards ?? []) {
     const mappedNode = fc.nodeId == null ? null : nodeIdMap.get(fc.nodeId) ?? null;
-    run(
+    run$1(
       db2,
       "INSERT INTO study_flashcards (topicId, nodeId, front, back, easeFactor, intervalDays, repetitions, nextReviewAt, lastReviewedAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [newTopicId, mappedNode, fc.front, fc.back, fc.easeFactor ?? 2.5, fc.intervalDays ?? 0, fc.repetitions ?? 0, fc.nextReviewAt ?? null, fc.lastReviewedAt ?? null, fc.createdAt ?? now]
@@ -3095,6 +3095,417 @@ function broadcast(channel, payload) {
 function notify(title, body) {
   broadcast("notify", { title, body });
 }
+function toolPath() {
+  const home = os.homedir();
+  const extra = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", path.join(home, ".local", "bin")];
+  return [process.env.PATH || "", ...extra].join(path.delimiter);
+}
+function run(cmd, args, cwd, timeoutMs = 2e4) {
+  return new Promise((resolve, reject) => {
+    const child = child_process.spawn(cmd, args, {
+      cwd,
+      env: { ...process.env, PATH: toolPath(), GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", GH_PROMPT_DISABLED: "1", NO_COLOR: "1" }
+    });
+    let out = "";
+    let err = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error(`${cmd} ${args[0]} demorou demais`));
+    }, timeoutMs);
+    child.stdout.on("data", (d) => out += d.toString());
+    child.stderr.on("data", (d) => err += d.toString());
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      reject(e);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve(out);
+      else reject(new Error(err.trim() || `${cmd} saiu com código ${code}`));
+    });
+  });
+}
+const git = (cwd, args, timeoutMs) => run("git", args, cwd, timeoutMs);
+const gitOk = (cwd, args) => git(cwd, args).catch(() => null);
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) {
+      const idx = i++;
+      out[idx] = await fn(items[idx]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+function expandHome(p) {
+  return p.startsWith("~") ? path.join(os.homedir(), p.slice(1)) : p;
+}
+async function getScanRoots() {
+  const raw = await getSetting("git_scan_roots") || "";
+  return raw.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+}
+async function getStaleDays() {
+  const n = Number(await getSetting("git_stale_days"));
+  return Number.isFinite(n) && n > 0 ? n : 3;
+}
+async function mainRepoOf(dir) {
+  const common = await gitOk(dir, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  if (!common) return null;
+  const c = common.trim();
+  return path.basename(c) === ".git" ? path.dirname(c) : c;
+}
+function findReposUnder(root) {
+  const out = [];
+  const isRepo = (d) => {
+    try {
+      return fs.statSync(path.join(d, ".git")).isDirectory();
+    } catch {
+      return false;
+    }
+  };
+  const dir = expandHome(root);
+  if (!fs.existsSync(dir)) return out;
+  if (isRepo(dir)) out.push(dir);
+  let entries = [];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const e of entries) {
+    if (!e.isDirectory() || e.name.startsWith(".") || e.name === "node_modules") continue;
+    const sub = path.join(dir, e.name);
+    if (isRepo(sub)) {
+      out.push(sub);
+      continue;
+    }
+    try {
+      for (const e2 of fs.readdirSync(sub, { withFileTypes: true })) {
+        if (e2.isDirectory() && !e2.name.startsWith(".") && e2.name !== "node_modules" && isRepo(path.join(sub, e2.name))) {
+          out.push(path.join(sub, e2.name));
+        }
+      }
+    } catch {
+    }
+  }
+  return out;
+}
+async function discoverRepos() {
+  const byPath = /* @__PURE__ */ new Map();
+  const projects = await getProjects();
+  for (const p of projects) {
+    const lp = p.localPath?.trim();
+    if (!lp || !fs.existsSync(expandHome(lp))) continue;
+    const main = await mainRepoOf(expandHome(lp));
+    if (main && !byPath.has(main)) byPath.set(main, { path: main, projectId: p.id, projectName: p.name });
+  }
+  for (const root of await getScanRoots()) {
+    for (const dir of findReposUnder(root)) {
+      const main = await mainRepoOf(dir);
+      if (main && !byPath.has(main)) byPath.set(main, { path: main, projectId: null, projectName: null });
+    }
+  }
+  for (const c of byPath.values()) {
+    if (c.projectId != null) continue;
+    const url = (await gitOk(c.path, ["remote", "get-url", "origin"]))?.trim();
+    const slug = repoSlug(url ?? null);
+    const p = slug ? projects.find((x) => repoSlug(x.githubRepoUrl) === slug) : void 0;
+    if (p) {
+      c.projectId = p.id;
+      c.projectName = p.name;
+    }
+  }
+  return [...byPath.values()];
+}
+function repoSlug(url) {
+  if (!url) return null;
+  const m = url.trim().match(/github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/i);
+  return m ? m[1].toLowerCase() : null;
+}
+function parseWorktrees(porcelain) {
+  const list = [];
+  let cur = null;
+  const push = () => {
+    if (cur?.path) list.push({ path: cur.path, branch: cur.branch ?? null, head: cur.head ?? "", prunable: !!cur.prunable, isMain: list.length === 0 });
+  };
+  for (const line of porcelain.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      push();
+      cur = { path: line.slice(9) };
+    } else if (cur && line.startsWith("HEAD ")) cur.head = line.slice(5);
+    else if (cur && line.startsWith("branch ")) cur.branch = line.slice(7).replace(/^refs\/heads\//, "");
+    else if (cur && line.startsWith("prunable")) cur.prunable = true;
+  }
+  push();
+  return list.map((w) => ({ ...w, prunable: w.prunable || !w.isMain && !fs.existsSync(w.path) }));
+}
+async function resolveBase(repo) {
+  const sym = await gitOk(repo, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+  if (sym?.trim()) return { base: sym.trim(), baseBranch: sym.trim().replace(/^origin\//, "") };
+  for (const b of ["main", "master", "develop"]) {
+    if (await gitOk(repo, ["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${b}`])) return { base: `origin/${b}`, baseBranch: b };
+    if (await gitOk(repo, ["rev-parse", "--verify", "--quiet", `refs/heads/${b}`])) return { base: b, baseBranch: b };
+  }
+  const head = (await gitOk(repo, ["symbolic-ref", "--quiet", "--short", "HEAD"]))?.trim() || "HEAD";
+  return { base: head, baseBranch: head };
+}
+async function countStatus(dir) {
+  const out = await gitOk(dir, ["status", "--porcelain=v1", "--untracked-files=normal"]);
+  if (out == null) return null;
+  let dirty = 0;
+  let untracked = 0;
+  for (const l of out.split("\n")) {
+    if (!l.trim()) continue;
+    if (l.startsWith("??")) untracked++;
+    else dirty++;
+  }
+  return { dirty, untracked };
+}
+let ghChecked = null;
+async function ghAvailable() {
+  if (ghChecked != null) return ghChecked;
+  ghChecked = await run("gh", ["--version"], os.homedir(), 5e3).then(() => true, () => false);
+  return ghChecked;
+}
+const prCache = /* @__PURE__ */ new Map();
+async function pullRequestsFor(repo, force) {
+  const hit = prCache.get(repo);
+  if (!force && hit && Date.now() - hit.at < 5 * 60 * 1e3) return hit.prs;
+  const prs = /* @__PURE__ */ new Map();
+  try {
+    const out = await run("gh", ["pr", "list", "--state", "all", "--limit", "200", "--json", "number,state,headRefName,url,title,updatedAt"], repo, 2e4);
+    const rows = JSON.parse(out);
+    const rank = { OPEN: 3, MERGED: 2, CLOSED: 1 };
+    for (const r of rows) {
+      const cur = prs.get(r.headRefName);
+      if (!cur || rank[r.state] > rank[cur.state]) prs.set(r.headRefName, { number: r.number, state: r.state, url: r.url, title: r.title });
+    }
+  } catch {
+  }
+  prCache.set(repo, { at: Date.now(), prs });
+  return prs;
+}
+const AGENT_PATH = /\/\.claude\/worktrees\/|\/\.worktrees\/|\/worktrees\//;
+const AGENT_BRANCH = /^(claude|agent|ai|codex|cursor|worktree)[-/]/i;
+function classify(b, staleDays) {
+  if (b.worktreeMissing) return "orphan";
+  if ((b.dirty ?? 0) > 0 || (b.untracked ?? 0) > 0) return "risk";
+  if ((b.localOnly ?? 0) > 0) return "risk";
+  if (b.isBase) return "base";
+  if (b.pr?.state === "MERGED" || b.merged || b.ahead === 0) return "merged";
+  if (b.pr?.state === "OPEN") return "active";
+  if ((b.idleDays ?? 0) >= staleDays) return "forgotten";
+  return "active";
+}
+async function scanRepo(c, staleDays, withPrs, forcePrs) {
+  const name = path.basename(c.path);
+  const remoteUrl = (await gitOk(c.path, ["remote", "get-url", "origin"]))?.trim() || null;
+  const remotes = (await gitOk(c.path, ["remote"]))?.trim() || "";
+  const gh = withPrs && !!repoSlug(remoteUrl) && await ghAvailable();
+  const repo = {
+    path: c.path,
+    name,
+    projectId: c.projectId,
+    projectName: c.projectName,
+    base: "HEAD",
+    remoteUrl,
+    hasRemote: !!remotes,
+    ghAvailable: gh,
+    error: null
+  };
+  try {
+    const { base, baseBranch } = await resolveBase(c.path);
+    repo.base = base;
+    const [wtOut, refsOut, mergedOut, prs] = await Promise.all([
+      git(c.path, ["worktree", "list", "--porcelain"]),
+      git(c.path, [
+        "for-each-ref",
+        "refs/heads",
+        "--format=%(refname:short)%09%(upstream:short)%09%(upstream:track)%09%(committerdate:iso-strict)%09%(authorname)%09%(subject)"
+      ]),
+      gitOk(c.path, ["branch", "--merged", base, "--format=%(refname:short)"]),
+      gh ? pullRequestsFor(c.path, forcePrs) : Promise.resolve(/* @__PURE__ */ new Map())
+    ]);
+    const worktrees = parseWorktrees(wtOut);
+    const merged = new Set((mergedOut || "").split("\n").map((s) => s.trim()).filter(Boolean));
+    const wtByBranch = new Map(worktrees.filter((w) => w.branch).map((w) => [w.branch, w]));
+    const now = Date.now();
+    const refs = refsOut.split("\n").filter(Boolean).map((l) => {
+      const [branch, upstream, track, date, author, ...subject] = l.split("	");
+      return { branch, upstream, track, date, author, subject: subject.join("	") };
+    });
+    const branches = await mapLimit(refs, 6, async (r) => {
+      const wt = wtByBranch.get(r.branch) ?? null;
+      const isBase = r.branch === baseBranch;
+      const [lr, localOnlyOut, st] = await Promise.all([
+        gitOk(c.path, ["rev-list", "--left-right", "--count", `${base}...${r.branch}`]),
+        remotes ? gitOk(c.path, ["rev-list", "--count", r.branch, "--not", "--remotes"]) : Promise.resolve(null),
+        wt && !wt.prunable ? countStatus(wt.path) : Promise.resolve(null)
+      ]);
+      const [behind, ahead] = (lr || "0	0").trim().split(/\s+/).map((n) => Number(n) || 0);
+      const lastMs = r.date ? new Date(r.date).getTime() : NaN;
+      const info = {
+        id: `${c.path}::${r.branch}`,
+        repoPath: c.path,
+        repoName: name,
+        projectId: c.projectId,
+        projectName: c.projectName,
+        branch: r.branch,
+        isBase,
+        worktreePath: wt?.path ?? null,
+        worktreeMissing: !!wt?.prunable,
+        lastCommitAt: r.date || null,
+        lastCommitSubject: r.subject || null,
+        lastCommitAuthor: r.author || null,
+        ahead: isBase ? 0 : ahead,
+        behind,
+        upstream: r.upstream || null,
+        upstreamGone: r.track === "[gone]",
+        // no remote at all → everything ahead of the base exists only on this machine
+        localOnly: !remotes ? isBase ? 0 : ahead : localOnlyOut == null ? null : Number(localOnlyOut.trim()) || 0,
+        dirty: st?.dirty ?? null,
+        untracked: st?.untracked ?? null,
+        merged: !isBase && merged.has(r.branch),
+        agent: AGENT_BRANCH.test(r.branch) || !!wt && AGENT_PATH.test(wt.path),
+        pr: prs.get(r.branch) ?? null,
+        idleDays: Number.isFinite(lastMs) ? Math.floor((now - lastMs) / 864e5) : null
+      };
+      return { ...info, status: classify(info, staleDays) };
+    });
+    for (const w of worktrees) {
+      if (w.branch && refs.some((r) => r.branch === w.branch)) continue;
+      if (w.isMain && !w.branch) continue;
+      const st = w.prunable ? null : await countStatus(w.path);
+      const info = {
+        id: `${c.path}::wt:${w.path}`,
+        repoPath: c.path,
+        repoName: name,
+        projectId: c.projectId,
+        projectName: c.projectName,
+        branch: w.branch,
+        isBase: false,
+        worktreePath: w.path,
+        worktreeMissing: w.prunable,
+        lastCommitAt: null,
+        lastCommitSubject: w.head ? `HEAD destacado em ${w.head.slice(0, 8)}` : null,
+        lastCommitAuthor: null,
+        ahead: 0,
+        behind: 0,
+        upstream: null,
+        upstreamGone: false,
+        localOnly: null,
+        dirty: st?.dirty ?? null,
+        untracked: st?.untracked ?? null,
+        merged: false,
+        agent: AGENT_PATH.test(w.path),
+        pr: null,
+        idleDays: null
+      };
+      branches.push({ ...info, status: classify(info, staleDays) });
+    }
+    return { repo, branches };
+  } catch (e) {
+    repo.error = e instanceof Error ? e.message : String(e);
+    return { repo, branches: [] };
+  }
+}
+let lastScan = null;
+let scanning = null;
+async function scanGit(opts = {}) {
+  if (scanning) return scanning;
+  scanning = (async () => {
+    const staleDays = await getStaleDays();
+    const repos = await discoverRepos();
+    const results = await mapLimit(repos, 3, (c) => scanRepo(c, staleDays, opts.prs !== false, !!opts.refreshPrs));
+    const scan = {
+      scannedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      staleDays,
+      repos: results.map((r) => r.repo).sort((a, b) => a.name.localeCompare(b.name)),
+      branches: results.flatMap((r) => r.branches)
+    };
+    lastScan = scan;
+    return scan;
+  })().finally(() => {
+    scanning = null;
+  });
+  return scanning;
+}
+async function cachedScan(maxAgeMs) {
+  if (lastScan && Date.now() - new Date(lastScan.scannedAt).getTime() < maxAgeMs) return lastScan;
+  return scanGit();
+}
+async function assertKnownRepo(repoPath) {
+  const scan = lastScan ?? await scanGit({ prs: false });
+  if (!scan.repos.some((r) => r.path === repoPath)) throw new Error("Repositório desconhecido — atualize a lista.");
+}
+function knownBranch(repoPath, branch) {
+  return lastScan?.branches.find((b) => b.repoPath === repoPath && b.branch === branch);
+}
+async function branchDetails(repoPath, branch, worktreePath) {
+  await assertKnownRepo(repoPath);
+  const { base } = await resolveBase(repoPath);
+  const details = { commits: [], files: [], diffStat: "" };
+  if (branch) {
+    const log = await gitOk(repoPath, ["log", `${base}..${branch}`, "--max-count=50", "--format=%h%x09%an%x09%cI%x09%s"]);
+    details.commits = (log || "").split("\n").filter(Boolean).map((l) => {
+      const [hash, author, date, ...s] = l.split("	");
+      return { hash, author, date, subject: s.join("	") };
+    });
+    details.diffStat = (await gitOk(repoPath, ["diff", "--stat=100", `${base}...${branch}`]) || "").trim();
+  }
+  if (worktreePath && fs.existsSync(worktreePath)) {
+    const st = await gitOk(worktreePath, ["status", "--porcelain=v1"]);
+    details.files = (st || "").split("\n").filter((l) => l.trim()).map((l) => ({ status: l.slice(0, 2).trim() || "?", path: l.slice(3) }));
+  }
+  return details;
+}
+async function pruneWorktrees(repoPath) {
+  await assertKnownRepo(repoPath);
+  await git(repoPath, ["worktree", "prune", "--verbose"]);
+  return "Worktrees órfãs removidas.";
+}
+async function fetchRepo(repoPath) {
+  await assertKnownRepo(repoPath);
+  await git(repoPath, ["fetch", "--all", "--prune"], 12e4);
+  return "Remotos atualizados.";
+}
+async function deleteMergedBranch(repoPath, branch) {
+  await assertKnownRepo(repoPath);
+  const b = knownBranch(repoPath, branch);
+  if (!b) throw new Error("Branch não encontrada — atualize a lista.");
+  if (b.isBase) throw new Error("Não dá para apagar a branch principal.");
+  if (b.status !== "merged") throw new Error("Só branches já mergeadas podem ser apagadas por aqui.");
+  if (b.worktreePath) {
+    await git(repoPath, ["worktree", "remove", b.worktreePath]);
+  }
+  const squashMerged = b.pr?.state === "MERGED" && !b.merged && b.ahead > 0;
+  await git(repoPath, ["branch", squashMerged ? "-D" : "-d", branch]);
+  return `Branch ${branch} apagada${b.worktreePath ? " (e a worktree)" : ""}.`;
+}
+async function createPullRequest(repoPath, branch) {
+  await assertKnownRepo(repoPath);
+  const b = knownBranch(repoPath, branch);
+  if (!b || b.isBase) throw new Error("Branch inválida para PR.");
+  if (b.pr?.state === "OPEN") return { url: b.pr.url };
+  const { baseBranch } = await resolveBase(repoPath);
+  if (!b.upstream || b.upstreamGone || (b.localOnly ?? 0) > 0) {
+    await git(repoPath, ["push", "-u", "origin", branch], 12e4);
+  }
+  const out = await run("gh", ["pr", "create", "--fill", "--base", baseBranch, "--head", branch], repoPath, 6e4);
+  prCache.delete(repoPath);
+  const url = out.trim().split("\n").pop() || "";
+  return { url };
+}
+async function openPath(target, app) {
+  const scan = lastScan ?? await scanGit({ prs: false });
+  const allowed = scan.repos.some((r) => r.path === target) || scan.branches.some((b) => b.worktreePath === target);
+  if (!allowed || !fs.existsSync(target)) throw new Error("Pasta desconhecida ou inexistente.");
+  if (process.platform !== "darwin") throw new Error("Abrir pastas só é suportado no macOS.");
+  const args = app === "vscode" ? ["-a", "Visual Studio Code", target] : app === "terminal" ? ["-a", "Terminal", target] : [target];
+  await run("open", args, os.homedir(), 1e4);
+}
 const handlers = /* @__PURE__ */ new Map();
 const ipcMain = {
   handle(channel, fn) {
@@ -3299,6 +3710,21 @@ async function evaluateRules() {
             notifyNative("🔁 Revisões acumulando", `${due.length} flashcards vencidos — hora de revisar.`);
             await setRuleFired(r.id, (/* @__PURE__ */ new Date()).toISOString());
           }
+        } else if (r.type === "stale_branches") {
+          const days = params.days ?? 3;
+          if (now - last < 24 * 3600 * 1e3) continue;
+          const scan = await cachedScan(30 * 60 * 1e3);
+          const lost = scan.branches.filter(
+            (b) => (b.status === "risk" || b.status === "forgotten") && (b.idleDays ?? 0) >= days
+          );
+          if (lost.length) {
+            const repos = [...new Set(lost.map((b) => b.repoName))];
+            notifyNative(
+              "🌿 Trabalho esquecido em branches",
+              `${lost.length} branch(es) parada(s) há ${days}+ dias com código não entregue: ${repos.slice(0, 4).join(", ")}${repos.length > 4 ? "…" : ""}`
+            );
+            await setRuleFired(r.id, (/* @__PURE__ */ new Date()).toISOString());
+          }
         } else if (r.type === "budget_threshold") {
           const percent = params.percent ?? 80;
           if (now - last < 24 * 3600 * 1e3) continue;
@@ -3410,6 +3836,14 @@ ipcMain.handle(
 );
 ipcMain.handle("github:deleteIssue", (_, id) => deleteGithubIssue(id));
 ipcMain.handle("github:createOnGithub", (_, id) => createIssueViaClaude(id));
+ipcMain.handle("git:scan", (_, opts) => scanGit(opts ?? {}));
+ipcMain.handle("git:summary", () => cachedScan(10 * 60 * 1e3));
+ipcMain.handle("git:details", (_, repoPath, branch, worktreePath) => branchDetails(repoPath, branch, worktreePath));
+ipcMain.handle("git:prune", (_, repoPath) => pruneWorktrees(repoPath));
+ipcMain.handle("git:fetch", (_, repoPath) => fetchRepo(repoPath));
+ipcMain.handle("git:deleteBranch", (_, repoPath, branch) => deleteMergedBranch(repoPath, branch));
+ipcMain.handle("git:createPr", (_, repoPath, branch) => createPullRequest(repoPath, branch));
+ipcMain.handle("git:openPath", (_, target, app) => openPath(target, app));
 ipcMain.handle(
   "calendar:upcoming",
   (_, fromISO, limit) => getUpcomingEvents(fromISO, limit)

@@ -67,6 +67,25 @@ export interface Todo {
   createdAt: string
 }
 
+/** Uma execução do Claude CLI com o uso de tokens reportado pelo próprio CLI. */
+export interface AiUsage {
+  id: number
+  createdAt: string
+  source: string
+  projectId: number | null
+  projectName: string | null
+  projectColor: string | null
+  model: string | null
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheCreationTokens: number
+  costUsd: number
+  durationMs: number | null
+  numTurns: number | null
+  isError: number
+}
+
 export interface Project {
   id: number
   name: string
@@ -724,8 +743,9 @@ declare global {
         set: (tripId: number, item: string, checked: number) => Promise<void>
       }
       ai: {
-        run: (prompt: string, projectId?: number, model?: string) => Promise<string>
-        runStream: (prompt: string, projectId?: number, model?: string, runId?: string) => Promise<string>
+        run: (prompt: string, projectId?: number, model?: string, source?: string) => Promise<string>
+        runStream: (prompt: string, projectId?: number, model?: string, runId?: string, source?: string) => Promise<string>
+        usage: (from: string, to: string) => Promise<AiUsage[]>
         start: (params: {
           prompt: string
           projectId?: number | null
@@ -735,6 +755,8 @@ declare global {
           userPrompt?: string
           save?: boolean
           permission?: 'allowlist' | 'execute'
+          /** Módulo de origem (contabilidade de tokens). */
+          source?: string
         }) => Promise<string>
         getRun: (runId: string) => Promise<{ status: 'running' | 'done' | 'error' | 'cancelled'; output: string; error: string | null } | null>
         cancel: (runId: string) => Promise<boolean>

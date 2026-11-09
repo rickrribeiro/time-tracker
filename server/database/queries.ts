@@ -2168,3 +2168,71 @@ export async function importStudyBundle(bundle: StudyBundle): Promise<number> {
   }
   return newTopicId
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Uso de tokens da IA (Claude CLI)
+// ══════════════════════════════════════════════════════════════════════════════
+export interface AiUsageInput {
+  source: string
+  projectId?: number | null
+  model?: string | null
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheCreationTokens: number
+  costUsd: number
+  durationMs?: number | null
+  numTurns?: number | null
+  isError?: boolean
+}
+export interface DbAiUsage {
+  id: number
+  createdAt: string
+  source: string
+  projectId: number | null
+  projectName: string | null
+  projectColor: string | null
+  model: string | null
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheCreationTokens: number
+  costUsd: number
+  durationMs: number | null
+  numTurns: number | null
+  isError: number
+}
+export async function recordAiUsage(u: AiUsageInput): Promise<void> {
+  const db = await getDb()
+  run(
+    db,
+    `INSERT INTO ai_usage (createdAt, source, projectId, model, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, costUsd, durationMs, numTurns, isError)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      new Date().toISOString(),
+      u.source || 'outro',
+      u.projectId ?? null,
+      u.model ?? null,
+      Math.round(u.inputTokens || 0),
+      Math.round(u.outputTokens || 0),
+      Math.round(u.cacheReadTokens || 0),
+      Math.round(u.cacheCreationTokens || 0),
+      u.costUsd || 0,
+      u.durationMs ?? null,
+      u.numTurns ?? null,
+      u.isError ? 1 : 0
+    ]
+  )
+}
+/** Execuções no intervalo [from, to) (ISO), com o nome do projeto quando houver. */
+export async function getAiUsage(from: string, to: string): Promise<DbAiUsage[]> {
+  const db = await getDb()
+  return getAll<DbAiUsage>(
+    db,
+    `SELECT u.*, p.name AS projectName, p.color AS projectColor
+       FROM ai_usage u LEFT JOIN projects p ON p.id = u.projectId
+      WHERE u.createdAt >= ? AND u.createdAt < ?
+      ORDER BY u.createdAt DESC`,
+    [from, to]
+  )
+}

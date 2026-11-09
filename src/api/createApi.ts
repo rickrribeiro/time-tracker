@@ -426,9 +426,10 @@ export function createApi() {
     },
     // AI (Claude CLI)
     ai: {
-      run: (prompt: string, projectId?: number, model?: string) => invoke('ai:run', prompt, projectId, model),
-      runStream: (prompt: string, projectId?: number, model?: string, runId?: string) =>
-        invoke('ai:runStream', prompt, projectId, model, runId),
+      run: (prompt: string, projectId?: number, model?: string, source?: string) => invoke('ai:run', prompt, projectId, model, source),
+      runStream: (prompt: string, projectId?: number, model?: string, runId?: string, source?: string) =>
+        invoke('ai:runStream', prompt, projectId, model, runId, source),
+      usage: (from: string, to: string) => invoke('ai:usage', from, to),
       start: (params: {
         save?: boolean
         prompt: string
@@ -438,6 +439,7 @@ export function createApi() {
         skillIds?: string
         userPrompt?: string
         permission?: 'allowlist' | 'execute'
+        source?: string
       }) => invoke('ai:start', params),
       getRun: (runId: string) => invoke('ai:getRun', runId),
       cancel: (runId: string) => invoke('ai:cancel', runId),

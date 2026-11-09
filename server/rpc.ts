@@ -154,7 +154,8 @@ import {
   createScheduledJob,
   updateScheduledJob,
   setJobRan,
-  deleteScheduledJob
+  deleteScheduledJob,
+  getAiUsage
 } from './database/queries'
 import type { DbTransaction, DbSkill, DbAgent, StudyBundle, DbStayFavorite, DbStayWatch, DbStayPricePoint } from './database/queries'
 import { syncGithubIssues, createIssueViaClaude } from './services/github'
@@ -408,7 +409,7 @@ async function runScheduledJobs(): Promise<void> {
       await setJobRan(job.id, todayStr) // mark first to avoid double-run if it takes long
       try {
         const command = await resolveClaudeCommand()
-        const out = await runClaude(job.prompt, command, { model: await resolveModel(), timeoutMs: 0 })
+        const out = await runClaude(job.prompt, command, { model: await resolveModel(), timeoutMs: 0, usage: { source: 'agendador' } })
         const text = (out || '').trim()
         if (text) {
           await createTodo(`🤖 ${job.name}`, text.slice(0, 4000), 'inbox', 'agent', 1, null, null, 1)
@@ -537,7 +538,8 @@ Regras:
     const out = await runClaude(prompt, command, {
       model: await resolveModel(),
       extraArgs: ['--allowedTools', 'Read'],
-      timeoutMs: 180000
+      timeoutMs: 180000,
+      usage: { source: 'inbox' }
     })
     return { ok: true, output: out }
   } catch (e) {
@@ -995,9 +997,15 @@ async function buildProjectContext(projectId?: number | null): Promise<string> {
   return lines.join('\n') + '\n\n'
 }
 
-ipcMain.handle('ai:run', async (_, prompt: string, projectId?: number, model?: string) => {
-  return runClaude(prompt, await resolveClaudeCommand(projectId), { model: await resolveModel(model) })
+ipcMain.handle('ai:run', async (_, prompt: string, projectId?: number, model?: string, source?: string) => {
+  return runClaude(prompt, await resolveClaudeCommand(projectId), {
+    model: await resolveModel(model),
+    usage: { source: source || 'outro', projectId: projectId ?? null }
+  })
 })
+
+// Uso de tokens do Claude CLI no intervalo [from, to) (ISO).
+ipcMain.handle('ai:usage', (_, from: string, to: string) => getAiUsage(from, to))
 
 // ── Background AI runs (owned by main; survive renderer navigation) ────────────
 interface AiRun {
@@ -1019,6 +1027,7 @@ interface AiStartParams {
   userPrompt?: string
   save?: boolean // persist an execution in the AI history (default true)
   permission?: 'allowlist' | 'execute' // 'execute' = agentic (roda ferramentas)
+  source?: string // módulo de origem, para a contabilidade de tokens
 }
 
 // Start a run in the background: returns runId immediately. Output accumulates in main,
@@ -1042,6 +1051,7 @@ ipcMain.handle('ai:start', async (_, params: AiStartParams) => {
     timeoutMs: 0, // sem timeout: tarefas podem demorar
     streamJson: !agentic, // texto/pensamento ao vivo (modo seguro)
     agentic, // 'executar': roda ferramentas de verdade (bidirecional)
+    usage: { source: params.source || 'outro', projectId: params.projectId ?? null },
     onChunk: (text) => {
       run.output += text
       broadcast('ai:chunk', { runId, text })
@@ -1082,7 +1092,7 @@ ipcMain.handle('ai:getRun', (_, runId: string) => {
 })
 
 // One-shot streaming (used by the Assistente page).
-ipcMain.handle('ai:runStream', async (_, prompt: string, projectId?: number, model?: string, runId?: string) => {
+ipcMain.handle('ai:runStream', async (_, prompt: string, projectId?: number, model?: string, runId?: string, source?: string) => {
   const command = await resolveClaudeCommand(projectId)
   const context = await buildProjectContext(projectId)
   const extraArgs = await resolveAllowedToolsArgs()
@@ -1091,6 +1101,8 @@ ipcMain.handle('ai:runStream', async (_, prompt: string, projectId?: number, mod
     model: await resolveModel(model),
     extraArgs,
     cwd,
+    streamJson: true, // stream-json carries the token usage at the end
+    usage: { source: source || 'assistente', projectId: projectId ?? null },
     onChunk: (text) => {
       broadcast('ai:chunk', { runId, text })
     }

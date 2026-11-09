@@ -59,7 +59,7 @@ Estruture o resumo em Markdown:
 3. **O que ficou pendente** e uma sugestão de foco.
 Seja factual — use apenas o que o gh retornar. Se um repositório não existir ou o gh falhar, apenas mencione e siga.`
     try {
-      runId.current = await window.api.ai.start({ prompt, model, save: false })
+      runId.current = await window.api.ai.start({ prompt, model, save: false, source: 'projetos', projectId: projects.length === 1 ? projects[0].id : null })
     } catch (e) {
       setRunning(false)
       setError(e instanceof Error ? e.message : String(e))

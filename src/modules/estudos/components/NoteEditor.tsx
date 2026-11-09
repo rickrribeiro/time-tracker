@@ -56,7 +56,7 @@ export function NoteEditor(): React.ReactElement {
     setTutorRunning(true)
     const prompt = `${instruction}\n\nConteúdo (Markdown):\n"""\n${content}\n"""`
     try {
-      const rid = await window.api.ai.start({ prompt, model, save: false })
+      const rid = await window.api.ai.start({ prompt, model, save: false, source: 'estudos' })
       tutorRunId.current = rid
     } catch (e) {
       setTutorRunning(false)

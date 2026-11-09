@@ -211,7 +211,7 @@ export function AIPage(): React.ReactElement {
     try {
       // main owns the run → it keeps going (and streams) even if we leave the page.
       // save:false → don't clutter the Prompt Runner history with assistant runs.
-      const rid = await window.api.ai.start({ prompt: text, model, save: false, permission })
+      const rid = await window.api.ai.start({ prompt: text, model, save: false, permission, source: 'assistente' })
       runIdRef.current = rid
       setRunId(rid)
     } catch (e) {

@@ -146,7 +146,7 @@ export function WeeklyReviewPage(): React.ReactElement {
     setDraft('')
     const { prompt } = await step.build()
     const model = (await window.api.settings.get('claude_model')) ?? ''
-    runId.current = await window.api.ai.start({ prompt, model, save: false })
+    runId.current = await window.api.ai.start({ prompt, model, save: false, source: 'revisao' })
   }
 
   return (

@@ -210,6 +210,7 @@ export async function createIssueViaClaude(id: number): Promise<DbGithubIssue> {
   if (issue.url) throw new Error('Essa issue já está no GitHub.')
 
   const command = await claudeCommandForRepo(issue.repo)
+  const project = (await getProjects()).find((p) => repoFromUrl(p.githubRepoUrl)?.toLowerCase() === issue.repo.toLowerCase())
   const body = (issue.body ?? '').replace(/`/g, "'")
   const prompt =
     `Crie uma issue no GitHub no repositório ${issue.repo} usando o gh CLI ` +
@@ -217,7 +218,10 @@ export async function createIssueViaClaude(id: number): Promise<DbGithubIssue> {
     `Título: "${issue.title}". Corpo: "${body || issue.title}". ` +
     `Ao final, imprima APENAS a URL da issue criada (ex.: https://github.com/${issue.repo}/issues/N).`
 
-  const out = await runClaude(prompt, command, { extraArgs: ['--allowedTools', 'Bash(gh:*)'] })
+  const out = await runClaude(prompt, command, {
+    extraArgs: ['--allowedTools', 'Bash(gh:*)'],
+    usage: { source: 'github', projectId: project?.id ?? null }
+  })
   const m = out.match(/https?:\/\/github\.com\/[^\s"')]+\/issues\/(\d+)/)
   if (!m) {
     throw new Error(`Não consegui confirmar a criação (sem URL na resposta). Saída: ${out.slice(0, 200)}`)

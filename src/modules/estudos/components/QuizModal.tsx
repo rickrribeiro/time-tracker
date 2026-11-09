@@ -94,7 +94,7 @@ Material:
 ${material.slice(0, 12000)}
 """`
     try {
-      const rid = await window.api.ai.start({ prompt, model, save: false })
+      const rid = await window.api.ai.start({ prompt, model, save: false, source: 'estudos' })
       runId.current = rid
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

@@ -91,7 +91,7 @@ Seja direto e realista. Não invente compromissos que não estão no contexto.
 
 Contexto:
 ${ctx}`
-      runId.current = await window.api.ai.start({ prompt, model, save: false })
+      runId.current = await window.api.ai.start({ prompt, model, save: false, source: 'home' })
     } catch (e) {
       setRunning(false)
       setError(e instanceof Error ? e.message : String(e))

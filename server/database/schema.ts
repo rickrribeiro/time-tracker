@@ -395,4 +395,22 @@ export const SCHEMA = `
     done INTEGER NOT NULL DEFAULT 0,
     createdAt TEXT NOT NULL
   );
+
+  -- Uso de tokens das execuções do Claude CLI (por módulo/projeto)
+  CREATE TABLE IF NOT EXISTS ai_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    createdAt TEXT NOT NULL,
+    source TEXT NOT NULL,          -- módulo de origem (assistente, estudos, agendador…)
+    projectId INTEGER,
+    model TEXT,
+    inputTokens INTEGER NOT NULL DEFAULT 0,
+    outputTokens INTEGER NOT NULL DEFAULT 0,
+    cacheReadTokens INTEGER NOT NULL DEFAULT 0,
+    cacheCreationTokens INTEGER NOT NULL DEFAULT 0,
+    costUsd REAL NOT NULL DEFAULT 0,
+    durationMs INTEGER,
+    numTurns INTEGER,
+    isError INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_ai_usage_createdAt ON ai_usage(createdAt);
 `;

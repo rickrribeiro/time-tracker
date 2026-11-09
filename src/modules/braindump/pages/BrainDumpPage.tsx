@@ -203,7 +203,7 @@ export function BrainDumpPage(): React.ReactElement {
     setPlan(null)
     setRunning(true)
     try {
-      const rid = await window.api.ai.start({ prompt: buildPrompt(text), model, save: false })
+      const rid = await window.api.ai.start({ prompt: buildPrompt(text), model, save: false, source: 'braindump' })
       runIdRef.current = rid
       // persist immediately so a reload can reconnect
       localStorage.setItem(STATE_KEY, JSON.stringify({ text, output: '', plan: null, runId: rid }))

@@ -76,7 +76,7 @@ Regras: 3 a 8 itens; títulos curtos e acionáveis; não repita itens que já es
 Roadmap atual:
 ${outline(nodes)}`
       try {
-        runId.current = await window.api.ai.start({ prompt, model: m, save: false })
+        runId.current = await window.api.ai.start({ prompt, model: m, save: false, source: 'estudos' })
       } catch (e) {
         setBusy(false)
         setError(e instanceof Error ? e.message : String(e))

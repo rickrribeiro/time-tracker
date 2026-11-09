@@ -2,6 +2,7 @@ import { spawn } from 'child_process'
 import os from 'os'
 import path from 'path'
 import fs from 'fs'
+import { recordAiUsage } from '../database/queries'
 
 const TIMEOUT_MS = 120_000
 
@@ -42,6 +43,66 @@ export interface RunOptions {
    * tool_use / tool_result progress. Prompt is sent as a JSON message on stdin.
    */
   agentic?: boolean
+  /**
+   * Token accounting: when set, the run's usage (tokens/custo reported by the CLI in its
+   * `result` event) is saved to `ai_usage`, tagged with the source module/project.
+   */
+  usage?: { source: string; projectId?: number | null }
+  /** Internal: receives the usage parsed from the CLI's `result` event. */
+  onUsage?: (u: CliUsage) => void
+}
+
+/** Usage numbers from the CLI's final `result` event (stream-json or json output). */
+export interface CliUsage {
+  model: string | null
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheCreationTokens: number
+  costUsd: number
+  durationMs: number | null
+  numTurns: number | null
+  isError: boolean
+}
+
+interface ResultEvent {
+  type?: string
+  result?: unknown
+  is_error?: boolean
+  total_cost_usd?: number
+  duration_ms?: number
+  num_turns?: number
+  usage?: {
+    input_tokens?: number
+    output_tokens?: number
+    cache_read_input_tokens?: number
+    cache_creation_input_tokens?: number
+  }
+  modelUsage?: Record<
+    string,
+    { inputTokens?: number; outputTokens?: number; cacheReadInputTokens?: number; cacheCreationInputTokens?: number }
+  >
+}
+
+function usageFromResult(evt: ResultEvent): CliUsage | null {
+  if (!evt.usage && evt.total_cost_usd == null) return null
+  const entries = Object.entries(evt.modelUsage ?? {}).sort((a, b) => (b[1]?.outputTokens ?? 0) - (a[1]?.outputTokens ?? 0))
+  // modelUsage is the session-wide total per model (all turns + helper models); prefer it.
+  const sum = (k: 'inputTokens' | 'outputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens'): number =>
+    entries.reduce((t, [, m]) => t + (m?.[k] ?? 0), 0)
+  const u = evt.usage ?? {}
+  const byModel = entries.length > 0
+  return {
+    model: byModel ? entries.map(([m]) => m).join(', ') : null,
+    inputTokens: byModel ? sum('inputTokens') : u.input_tokens ?? 0,
+    outputTokens: byModel ? sum('outputTokens') : u.output_tokens ?? 0,
+    cacheReadTokens: byModel ? sum('cacheReadInputTokens') : u.cache_read_input_tokens ?? 0,
+    cacheCreationTokens: byModel ? sum('cacheCreationInputTokens') : u.cache_creation_input_tokens ?? 0,
+    costUsd: evt.total_cost_usd ?? 0,
+    durationMs: evt.duration_ms ?? null,
+    numTurns: evt.num_turns ?? null,
+    isError: !!evt.is_error
+  }
 }
 
 /** Single-quote a token for safe inclusion in the interactive-shell command string. */
@@ -65,11 +126,26 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
     const agentic = !!opts.agentic
     const streamJson = !!opts.streamJson
     const useStreamParse = streamJson || agentic
+    // plain one-shot runs (no live streaming) use `--output-format json`, which carries the
+    // final text plus token usage; runs streaming plain text keep the raw output.
+    const oneShotJson = !useStreamParse && !opts.onChunk
     // agentic: bidirectional stream-json (stdin open, prompt via JSON message, tools execute)
     const agenticArgs = ['--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'default']
     const agenticShell = ' --input-format stream-json --output-format stream-json --verbose --permission-mode default'
-    const jsonArgs = agentic ? agenticArgs : streamJson ? ['--output-format', 'stream-json', '--verbose', '--include-partial-messages'] : []
-    const jsonShell = agentic ? agenticShell : streamJson ? ' --output-format stream-json --verbose --include-partial-messages' : ''
+    const jsonArgs = agentic
+      ? agenticArgs
+      : streamJson
+        ? ['--output-format', 'stream-json', '--verbose', '--include-partial-messages']
+        : oneShotJson
+          ? ['--output-format', 'json']
+          : []
+    const jsonShell = agentic
+      ? agenticShell
+      : streamJson
+        ? ' --output-format stream-json --verbose --include-partial-messages'
+        : oneShotJson
+          ? ' --output-format json'
+          : ''
     // stdin: agentic keeps it OPEN (to send the user message); otherwise 'ignore' so
     // `claude -p` doesn't hang waiting for stdin.
     const stdio: ['ignore' | 'pipe', 'pipe', 'pipe'] = [agentic ? 'pipe' : 'ignore', 'pipe', 'pipe']
@@ -118,6 +194,18 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
     let lineBuf = ''
     let assistantText = ''
     let finalText: string | null = null
+    let usageReported = false
+    const reportUsage = (evt: ResultEvent): void => {
+      if (usageReported || !opts.onUsage) return
+      const u = usageFromResult(evt)
+      if (!u) return
+      usageReported = true
+      try {
+        opts.onUsage(u)
+      } catch {
+        // accounting is best-effort
+      }
+    }
 
     // stream-json: parse each JSON line into live text / thinking / tool-use progress
     const processLine = (line: string): void => {
@@ -134,6 +222,7 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
       } catch {
         return
       }
+      if (evt.type === 'result') reportUsage(evt as ResultEvent)
       // agentic: full assistant/user messages (tool_use + tool_result) instead of partial deltas
       if (agentic && evt.type === 'assistant' && evt.message?.content) {
         for (const c of evt.message.content) {
@@ -171,8 +260,8 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
             opts.onChunk?.(ev.delta.thinking)
           }
         }
-      } else if (evt.type === 'result' && typeof evt.result === 'string') {
-        finalText = evt.result
+      } else if (evt.type === 'result') {
+        if (typeof evt.result === 'string') finalText = evt.result
       }
     }
 
@@ -222,10 +311,24 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
       settled = true
       clear()
       if (useStreamParse && lineBuf.trim()) processLine(lineBuf)
+      if (oneShotJson) {
+        // `--output-format json`: a single result object (fall back to raw text if not JSON)
+        let parsed: ResultEvent | null = null
+        try {
+          parsed = JSON.parse(stdout.trim()) as ResultEvent
+        } catch {
+          parsed = null
+        }
+        if (parsed && parsed.type === 'result') {
+          reportUsage(parsed)
+          if (typeof parsed.result === 'string') finalText = parsed.result
+        }
+      }
+      const parsedMode = useStreamParse || oneShotJson
       if (code === 0) {
-        resolve(useStreamParse ? finalText ?? (assistantText.trim() || stdout.trim()) : stdout.trim())
+        resolve(parsedMode ? finalText ?? (assistantText.trim() || stdout.trim()) : stdout.trim())
       } else {
-        reject(new Error(stderr.trim() || (useStreamParse ? finalText ?? '' : '') || `Claude CLI saiu com código ${code}.`))
+        reject(new Error(stderr.trim() || (parsedMode ? finalText ?? '' : '') || `Claude CLI saiu com código ${code}.`))
       }
     })
   })
@@ -244,6 +347,18 @@ export async function runClaude(prompt: string, command = 'claude', opts: RunOpt
     throw new Error(`Comando inválido: "${bin}". Use apenas letras, números, ., _, - ou /.`)
   }
   if (!prompt.trim()) throw new Error('Prompt vazio.')
+
+  if (opts.usage && !opts.onUsage) {
+    const meta = opts.usage
+    opts = {
+      ...opts,
+      onUsage: (u) => {
+        recordAiUsage({ ...u, source: meta.source, projectId: meta.projectId ?? null, model: u.model || opts.model || null }).catch(() => {
+          // accounting is best-effort
+        })
+      }
+    }
+  }
 
   try {
     return await attempt(bin, prompt, false, opts)

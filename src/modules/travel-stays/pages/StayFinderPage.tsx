@@ -159,7 +159,7 @@ export function StayFinderPage(): React.ReactElement {
     const top = results.slice(0, 8).map((r, i) => `${i + 1}. ${r.title} — ${formatMoney(r.pricePerNight, r.currency)}/noite, ${r.neighborhood ?? '—'}, ⭐${r.rating ?? '?'}, ${r.roomType}, score ${r.score}`).join('\n')
     const model = (await window.api.settings.get('claude_model')) ?? ''
     const prompt = `Meu perfil de viagem:\n${profile}\n\nResultados de hospedagem em ${input.city}:\n${top}\n\nAnalise e explique em português quais são as 3 MELHORES opções para o meu perfil e por quê. Seja direto.`
-    aiRun.current = await window.api.ai.start({ prompt, model, save: false })
+    aiRun.current = await window.api.ai.start({ prompt, model, save: false, source: 'viagens' })
   }
 
   async function refreshWatch(w: StayWatch): Promise<void> {

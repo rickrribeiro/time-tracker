@@ -40,7 +40,7 @@ Local: ${[contact.location, contact.state, contact.country].filter(Boolean).join
 Interesses: ${contact.interests ?? '—'}
 Última conversa: ${contact.lastContactAt ? new Date(contact.lastContactAt).toLocaleDateString('pt-BR') : '—'}
 Contexto: ${contact.context ?? '—'}`
-      runId.current = await window.api.ai.start({ prompt, model, save: false })
+      runId.current = await window.api.ai.start({ prompt, model, save: false, source: 'crm' })
     })()
     return () => {
       offChunk()

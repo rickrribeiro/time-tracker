@@ -6,6 +6,7 @@ import { useFinanceStore } from '../../finance/store/financeStore'
 import { PluggyConnect } from 'react-pluggy-connect'
 import { SnapshotsSection } from '../components/SnapshotsSection'
 import { AppearanceSection } from '../components/AppearanceSection'
+import { AiUsageModal } from '../components/AiUsageModal'
 
 const FX_CURRENCIES = ['BRL', 'USD', 'JPY', 'EUR']
 
@@ -48,6 +49,8 @@ export function SettingsPage(): React.ReactElement {
     setAuthMode(m)
     await set('github_auth_mode', m)
   }
+
+  const [showAiUsage, setShowAiUsage] = useState(false)
 
   // IA (Claude CLI)
   const [claudeCmd, setClaudeCmd] = useState('claude')
@@ -569,6 +572,16 @@ export function SettingsPage(): React.ReactElement {
       </div>
 
       <SnapshotsSection />
+
+      <div className="chart-section" style={{ maxWidth: 560, marginTop: 16 }}>
+        <div className="chart-title">📊 Uso de tokens da IA</div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 12px' }}>
+          Quanto cada módulo e projeto gastou de tokens nas execuções do Claude CLI.
+        </p>
+        <button className="btn btn-secondary btn-sm" onClick={() => setShowAiUsage(true)}>Ver consumo de tokens</button>
+      </div>
+
+      {showAiUsage && <AiUsageModal onClose={() => setShowAiUsage(false)} />}
     </div>
   )
 }

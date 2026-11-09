@@ -260,7 +260,8 @@ export function PromptRunnerPage(): React.ReactElement {
       agentId: tab.agentId,
       skillIds: JSON.stringify(tab.skillIds),
       userPrompt: tab.userPrompt,
-      permission: tab.permission
+      permission: tab.permission,
+      source: 'prompt-runner'
     })
     patchTab(tab.id, { running: true, runId, output: '', error: '' })
   }

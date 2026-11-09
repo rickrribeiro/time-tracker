@@ -111,7 +111,7 @@ Anotação:
 ${content}
 """`
     try {
-      const rid = await window.api.ai.start({ prompt, model, save: false })
+      const rid = await window.api.ai.start({ prompt, model, save: false, source: 'estudos' })
       runIdRef.current = rid
     } catch (e) {
       setGenerating(false)

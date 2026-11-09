@@ -455,6 +455,24 @@ const SCHEMA = `
     done INTEGER NOT NULL DEFAULT 0,
     createdAt TEXT NOT NULL
   );
+
+  -- Uso de tokens das execuções do Claude CLI (por módulo/projeto)
+  CREATE TABLE IF NOT EXISTS ai_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    createdAt TEXT NOT NULL,
+    source TEXT NOT NULL,          -- módulo de origem (assistente, estudos, agendador…)
+    projectId INTEGER,
+    model TEXT,
+    inputTokens INTEGER NOT NULL DEFAULT 0,
+    outputTokens INTEGER NOT NULL DEFAULT 0,
+    cacheReadTokens INTEGER NOT NULL DEFAULT 0,
+    cacheCreationTokens INTEGER NOT NULL DEFAULT 0,
+    costUsd REAL NOT NULL DEFAULT 0,
+    durationMs INTEGER,
+    numTurns INTEGER,
+    isError INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_ai_usage_createdAt ON ai_usage(createdAt);
 `;
 const SKILLS = [
   {
@@ -2161,6 +2179,39 @@ async function importStudyBundle(bundle) {
   }
   return newTopicId;
 }
+async function recordAiUsage(u) {
+  const db2 = await getDb();
+  run$1(
+    db2,
+    `INSERT INTO ai_usage (createdAt, source, projectId, model, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, costUsd, durationMs, numTurns, isError)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      (/* @__PURE__ */ new Date()).toISOString(),
+      u.source || "outro",
+      u.projectId ?? null,
+      u.model ?? null,
+      Math.round(u.inputTokens || 0),
+      Math.round(u.outputTokens || 0),
+      Math.round(u.cacheReadTokens || 0),
+      Math.round(u.cacheCreationTokens || 0),
+      u.costUsd || 0,
+      u.durationMs ?? null,
+      u.numTurns ?? null,
+      u.isError ? 1 : 0
+    ]
+  );
+}
+async function getAiUsage(from, to) {
+  const db2 = await getDb();
+  return getAll(
+    db2,
+    `SELECT u.*, p.name AS projectName, p.color AS projectColor
+       FROM ai_usage u LEFT JOIN projects p ON p.id = u.projectId
+      WHERE u.createdAt >= ? AND u.createdAt < ?
+      ORDER BY u.createdAt DESC`,
+    [from, to]
+  );
+}
 const SENSITIVE_KEYS = /* @__PURE__ */ new Set([
   "github_token",
   "google_client_secret",
@@ -2228,6 +2279,24 @@ function buildPath() {
   ];
   return [process.env.PATH || "", ...extra].join(path.delimiter);
 }
+function usageFromResult(evt) {
+  if (!evt.usage && evt.total_cost_usd == null) return null;
+  const entries = Object.entries(evt.modelUsage ?? {}).sort((a, b) => (b[1]?.outputTokens ?? 0) - (a[1]?.outputTokens ?? 0));
+  const sum = (k) => entries.reduce((t, [, m]) => t + (m?.[k] ?? 0), 0);
+  const u = evt.usage ?? {};
+  const byModel = entries.length > 0;
+  return {
+    model: byModel ? entries.map(([m]) => m).join(", ") : null,
+    inputTokens: byModel ? sum("inputTokens") : u.input_tokens ?? 0,
+    outputTokens: byModel ? sum("outputTokens") : u.output_tokens ?? 0,
+    cacheReadTokens: byModel ? sum("cacheReadInputTokens") : u.cache_read_input_tokens ?? 0,
+    cacheCreationTokens: byModel ? sum("cacheCreationInputTokens") : u.cache_creation_input_tokens ?? 0,
+    costUsd: evt.total_cost_usd ?? 0,
+    durationMs: evt.duration_ms ?? null,
+    numTurns: evt.num_turns ?? null,
+    isError: !!evt.is_error
+  };
+}
 function shquote(s) {
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
@@ -2239,10 +2308,11 @@ function attempt(bin, prompt, viaShell, opts = {}) {
     const agentic = !!opts.agentic;
     const streamJson = !!opts.streamJson;
     const useStreamParse = streamJson || agentic;
+    const oneShotJson = !useStreamParse && !opts.onChunk;
     const agenticArgs = ["--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--permission-mode", "default"];
     const agenticShell = " --input-format stream-json --output-format stream-json --verbose --permission-mode default";
-    const jsonArgs = agentic ? agenticArgs : streamJson ? ["--output-format", "stream-json", "--verbose", "--include-partial-messages"] : [];
-    const jsonShell = agentic ? agenticShell : streamJson ? " --output-format stream-json --verbose --include-partial-messages" : "";
+    const jsonArgs = agentic ? agenticArgs : streamJson ? ["--output-format", "stream-json", "--verbose", "--include-partial-messages"] : oneShotJson ? ["--output-format", "json"] : [];
+    const jsonShell = agentic ? agenticShell : streamJson ? " --output-format stream-json --verbose --include-partial-messages" : oneShotJson ? " --output-format json" : "";
     const stdio = [agentic ? "pipe" : "ignore", "pipe", "pipe"];
     const cwd = opts.cwd && fs.existsSync(opts.cwd) ? opts.cwd : void 0;
     let child;
@@ -2279,6 +2349,17 @@ function attempt(bin, prompt, viaShell, opts = {}) {
     let lineBuf = "";
     let assistantText = "";
     let finalText = null;
+    let usageReported = false;
+    const reportUsage = (evt) => {
+      if (usageReported || !opts.onUsage) return;
+      const u = usageFromResult(evt);
+      if (!u) return;
+      usageReported = true;
+      try {
+        opts.onUsage(u);
+      } catch {
+      }
+    };
     const processLine = (line) => {
       const trimmed = line.trim();
       if (!trimmed) return;
@@ -2288,6 +2369,7 @@ function attempt(bin, prompt, viaShell, opts = {}) {
       } catch {
         return;
       }
+      if (evt.type === "result") reportUsage(evt);
       if (agentic && evt.type === "assistant" && evt.message?.content) {
         for (const c of evt.message.content) {
           if (c.type === "text" && c.text) {
@@ -2326,8 +2408,8 @@ function attempt(bin, prompt, viaShell, opts = {}) {
             opts.onChunk?.(ev.delta.thinking);
           }
         }
-      } else if (evt.type === "result" && typeof evt.result === "string") {
-        finalText = evt.result;
+      } else if (evt.type === "result") {
+        if (typeof evt.result === "string") finalText = evt.result;
       }
     };
     const timeoutMs = opts.timeoutMs ?? TIMEOUT_MS;
@@ -2370,10 +2452,23 @@ function attempt(bin, prompt, viaShell, opts = {}) {
       settled = true;
       clear();
       if (useStreamParse && lineBuf.trim()) processLine(lineBuf);
+      if (oneShotJson) {
+        let parsed = null;
+        try {
+          parsed = JSON.parse(stdout.trim());
+        } catch {
+          parsed = null;
+        }
+        if (parsed && parsed.type === "result") {
+          reportUsage(parsed);
+          if (typeof parsed.result === "string") finalText = parsed.result;
+        }
+      }
+      const parsedMode = useStreamParse || oneShotJson;
       if (code === 0) {
-        resolve(useStreamParse ? finalText ?? (assistantText.trim() || stdout.trim()) : stdout.trim());
+        resolve(parsedMode ? finalText ?? (assistantText.trim() || stdout.trim()) : stdout.trim());
       } else {
-        reject(new Error(stderr.trim() || (useStreamParse ? finalText ?? "" : "") || `Claude CLI saiu com código ${code}.`));
+        reject(new Error(stderr.trim() || (parsedMode ? finalText ?? "" : "") || `Claude CLI saiu com código ${code}.`));
       }
     });
   });
@@ -2384,6 +2479,16 @@ async function runClaude(prompt, command = "claude", opts = {}) {
     throw new Error(`Comando inválido: "${bin}". Use apenas letras, números, ., _, - ou /.`);
   }
   if (!prompt.trim()) throw new Error("Prompt vazio.");
+  if (opts.usage && !opts.onUsage) {
+    const meta = opts.usage;
+    opts = {
+      ...opts,
+      onUsage: (u) => {
+        recordAiUsage({ ...u, source: meta.source, projectId: meta.projectId ?? null, model: u.model || opts.model || null }).catch(() => {
+        });
+      }
+    };
+  }
   try {
     return await attempt(bin, prompt, false, opts);
   } catch (err) {
@@ -2535,9 +2640,13 @@ async function createIssueViaClaude(id) {
   if (!issue) throw new Error("Issue não encontrada.");
   if (issue.url) throw new Error("Essa issue já está no GitHub.");
   const command = await claudeCommandForRepo(issue.repo);
+  const project = (await getProjects()).find((p) => repoFromUrl(p.githubRepoUrl)?.toLowerCase() === issue.repo.toLowerCase());
   const body = (issue.body ?? "").replace(/`/g, "'");
   const prompt = `Crie uma issue no GitHub no repositório ${issue.repo} usando o gh CLI (gh issue create --repo ${issue.repo} --title <título> --body <corpo>). Título: "${issue.title}". Corpo: "${body || issue.title}". Ao final, imprima APENAS a URL da issue criada (ex.: https://github.com/${issue.repo}/issues/N).`;
-  const out = await runClaude(prompt, command, { extraArgs: ["--allowedTools", "Bash(gh:*)"] });
+  const out = await runClaude(prompt, command, {
+    extraArgs: ["--allowedTools", "Bash(gh:*)"],
+    usage: { source: "github", projectId: project?.id ?? null }
+  });
   const m = out.match(/https?:\/\/github\.com\/[^\s"')]+\/issues\/(\d+)/);
   if (!m) {
     throw new Error(`Não consegui confirmar a criação (sem URL na resposta). Saída: ${out.slice(0, 200)}`);
@@ -3651,7 +3760,7 @@ async function runScheduledJobs() {
       await setJobRan(job.id, todayStr);
       try {
         const command = await resolveClaudeCommand();
-        const out = await runClaude(job.prompt, command, { model: await resolveModel(), timeoutMs: 0 });
+        const out = await runClaude(job.prompt, command, { model: await resolveModel(), timeoutMs: 0, usage: { source: "agendador" } });
         const text = (out || "").trim();
         if (text) {
           await createTodo(`🤖 ${job.name}`, text.slice(0, 4e3), "inbox", "agent", 1, null, null, 1);
@@ -3773,7 +3882,8 @@ Regras:
     const out = await runClaude(prompt, command, {
       model: await resolveModel(),
       extraArgs: ["--allowedTools", "Read"],
-      timeoutMs: 18e4
+      timeoutMs: 18e4,
+      usage: { source: "inbox" }
     });
     return { ok: true, output: out };
   } catch (e) {
@@ -4112,9 +4222,13 @@ async function buildProjectContext(projectId) {
   }
   return lines.join("\n") + "\n\n";
 }
-ipcMain.handle("ai:run", async (_, prompt, projectId, model) => {
-  return runClaude(prompt, await resolveClaudeCommand(projectId), { model: await resolveModel(model) });
+ipcMain.handle("ai:run", async (_, prompt, projectId, model, source) => {
+  return runClaude(prompt, await resolveClaudeCommand(projectId), {
+    model: await resolveModel(model),
+    usage: { source: source || "outro", projectId: projectId ?? null }
+  });
 });
+ipcMain.handle("ai:usage", (_, from, to) => getAiUsage(from, to));
 const aiRuns = /* @__PURE__ */ new Map();
 ipcMain.handle("ai:start", async (_, params) => {
   const runId = crypto.randomUUID();
@@ -4138,6 +4252,7 @@ ipcMain.handle("ai:start", async (_, params) => {
     // texto/pensamento ao vivo (modo seguro)
     agentic,
     // 'executar': roda ferramentas de verdade (bidirecional)
+    usage: { source: params.source || "outro", projectId: params.projectId ?? null },
     onChunk: (text) => {
       run2.output += text;
       broadcast("ai:chunk", { runId, text });
@@ -4169,7 +4284,7 @@ ipcMain.handle("ai:getRun", (_, runId) => {
   const r = aiRuns.get(runId);
   return r ? { status: r.status, output: r.output, error: r.error } : null;
 });
-ipcMain.handle("ai:runStream", async (_, prompt, projectId, model, runId) => {
+ipcMain.handle("ai:runStream", async (_, prompt, projectId, model, runId, source) => {
   const command = await resolveClaudeCommand(projectId);
   const context = await buildProjectContext(projectId);
   const extraArgs = await resolveAllowedToolsArgs();
@@ -4178,6 +4293,9 @@ ipcMain.handle("ai:runStream", async (_, prompt, projectId, model, runId) => {
     model: await resolveModel(model),
     extraArgs,
     cwd,
+    streamJson: true,
+    // stream-json carries the token usage at the end
+    usage: { source: source || "assistente", projectId: projectId ?? null },
     onChunk: (text) => {
       broadcast("ai:chunk", { runId, text });
     }

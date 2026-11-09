@@ -114,6 +114,62 @@ const SCHEMA = `
     createdAt TEXT NOT NULL
   );
 
+  -- Central de Projetos: ciclos/versões, histórico de decisões e base de conhecimento
+  CREATE TABLE IF NOT EXISTS project_cycles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,                     -- ex: v1.3, Ciclo de novembro
+    goal TEXT,                              -- o que este ciclo entrega
+    startDate TEXT NOT NULL,                -- YYYY-MM-DD
+    dueDate TEXT,                           -- prazo atual (YYYY-MM-DD)
+    originalDueDate TEXT,                   -- prazo antes das extensões
+    extensions INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ativo',   -- ativo | concluido | cancelado
+    closedAt TEXT,
+    retrospective TEXT,
+    createdAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS project_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,                     -- status | decisao | proxima_acao | onde_parei | bloqueio | ciclo | marco | revisao | nota
+    fromStatus TEXT,
+    toStatus TEXT,
+    text TEXT,
+    createdAt TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_project_events_project ON project_events(projectId, createdAt);
+
+  CREATE TABLE IF NOT EXISTS project_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL DEFAULT 'nota',      -- nota | link | decisao
+    title TEXT NOT NULL,
+    body TEXT,
+    url TEXT,
+    pinned INTEGER NOT NULL DEFAULT 0,
+    createdAt TEXT NOT NULL
+  );
+
+  -- Próximas ações delegadas ao Claude (rodam num worktree isolado, voltam para revisão)
+  CREATE TABLE IF NOT EXISTS project_delegations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    action TEXT NOT NULL,
+    instructions TEXT,
+    repoPath TEXT NOT NULL,
+    branch TEXT NOT NULL,
+    worktreePath TEXT NOT NULL,
+    baseRef TEXT,
+    status TEXT NOT NULL DEFAULT 'rodando', -- rodando | pronta | erro | cancelada | aceita | descartada
+    output TEXT,
+    error TEXT,
+    prUrl TEXT,
+    createdAt TEXT NOT NULL,
+    finishedAt TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS todos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -790,6 +846,103 @@ const MIGRATIONS = [
       } catch {
       }
     }
+  },
+  {
+    version: 16,
+    label: "Central de Projetos: situação, área, foco, ciclos, vínculos com timer/todos",
+    run: (db2) => {
+      const cols = [
+        ["status", "TEXT NOT NULL DEFAULT 'incubadora'"],
+        // incubadora|fila|foco|pausado|concluido|encerrado
+        ["area", "TEXT NOT NULL DEFAULT 'pessoal'"],
+        // pessoal | profissional
+        ["priority", "INTEGER NOT NULL DEFAULT 0"],
+        ["finishLine", "TEXT"],
+        ["scope", "TEXT"],
+        ["futureIdeas", "TEXT"],
+        ["nextAction", "TEXT"],
+        ["nextActionAt", "TEXT"],
+        ["whereLeftOff", "TEXT"],
+        ["whereLeftOffAt", "TEXT"],
+        ["blocker", "TEXT"],
+        ["blockerNeed", "TEXT"],
+        ["pauseReason", "TEXT"],
+        ["resumeAt", "TEXT"],
+        ["resumeCondition", "TEXT"],
+        ["closeReason", "TEXT"],
+        ["retrospective", "TEXT"],
+        ["closedAt", "TEXT"],
+        ["statusChangedAt", "TEXT"],
+        ["continuous", "INTEGER NOT NULL DEFAULT 0"],
+        ["triagedAt", "TEXT"],
+        ["lastReviewedAt", "TEXT"],
+        ["createdAt", "TEXT"]
+      ];
+      for (const [c, def] of cols) {
+        try {
+          db2.run(`ALTER TABLE projects ADD COLUMN ${c} ${def};`);
+        } catch {
+        }
+      }
+      try {
+        db2.run("ALTER TABLE project_milestones ADD COLUMN cycleId INTEGER;");
+      } catch {
+      }
+      try {
+        db2.run("ALTER TABLE project_milestones ADD COLUMN description TEXT;");
+      } catch {
+      }
+      try {
+        db2.run("ALTER TABLE tasks ADD COLUMN projectId INTEGER;");
+      } catch {
+      }
+      try {
+        db2.run("ALTER TABLE tags ADD COLUMN projectId INTEGER;");
+      } catch {
+      }
+      try {
+        db2.run("ALTER TABLE todos ADD COLUMN milestoneId INTEGER;");
+      } catch {
+      }
+      try {
+        db2.run("ALTER TABLE todos ADD COLUMN doneAt TEXT;");
+      } catch {
+      }
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      try {
+        db2.run("UPDATE projects SET status = 'encerrado', closedAt = COALESCE(closedAt, ?) WHERE archived = 1 OR stage = 'morto'", [now]);
+        db2.run("UPDATE projects SET stage = '' WHERE stage IN ('trabalho', 'morto')");
+        db2.run("UPDATE projects SET createdAt = ? WHERE createdAt IS NULL", [now]);
+        db2.run("UPDATE projects SET statusChangedAt = ? WHERE statusChangedAt IS NULL", [now]);
+        db2.run("UPDATE todos SET doneAt = createdAt WHERE status = 'done' AND doneAt IS NULL");
+      } catch {
+      }
+    }
+  },
+  {
+    version: 17,
+    label: "Projetos: tamanho da próxima ação, dias da semana, changelog de ciclo",
+    run: (db2) => {
+      const cols = [
+        ["projects", "nextActionSize", "TEXT"],
+        // rapida (⚡ 15 min) | longa (🧠 2 h)
+        ["projects", "workDays", "TEXT"],
+        // JSON: [2,4] (0=dom … 6=sáb)
+        ["projects", "workStart", "TEXT"],
+        // HH:MM do bloco
+        ["projects", "workMinutes", "INTEGER"],
+        ["projects", "calendarEventId", "TEXT"],
+        // evento recorrente no Google
+        ["projects", "calendarAccount", "TEXT"],
+        ["project_cycles", "changelog", "TEXT"]
+      ];
+      for (const [t, c, def] of cols) {
+        try {
+          db2.run(`ALTER TABLE ${t} ADD COLUMN ${c} ${def};`);
+        } catch {
+        }
+      }
+    }
   }
 ];
 function getUserVersion(database) {
@@ -910,18 +1063,23 @@ function getAll(db2, sql, params = []) {
   stmt.free();
   return rows;
 }
-function run$1(db2, sql, params = []) {
-  const stmt = db2.prepare(sql);
-  stmt.run(params);
-  stmt.free();
-  saveDb();
-}
-function lastInsertId(db2) {
+let lastRowId = 0;
+function readLastRowId(db2) {
   const stmt = db2.prepare("SELECT last_insert_rowid() as id");
   stmt.step();
   const id = stmt.getAsObject().id;
   stmt.free();
   return id;
+}
+function run$1(db2, sql, params = []) {
+  const stmt = db2.prepare(sql);
+  stmt.run(params);
+  stmt.free();
+  if (/^\s*(INSERT|REPLACE)\b/i.test(sql)) lastRowId = readLastRowId(db2);
+  saveDb();
+}
+function lastInsertId(db2) {
+  return readLastRowId(db2) || lastRowId;
 }
 async function getAllTags() {
   const db2 = await getDb();
@@ -954,6 +1112,7 @@ async function deleteTag(id) {
 }
 const TASK_WITH_TAG_SQL = `
   SELECT t.id, t.title, t.tagId, t.secondaryTagId, t.startTime, t.endTime, t.studyNodeId,
+         COALESCE(t.projectId, tg.projectId) as projectId, pj.name as projectName, pj.color as projectColor,
          tg.name as tagName, tg.color as tagColor, tg.isProductive as tagIsProductive,
          stg.name as secondaryTagName, stg.color as secondaryTagColor,
          sn.title as studyNodeTitle, st.id as studyTopicId, st.name as studyTopicName, st.color as studyTopicColor
@@ -962,6 +1121,7 @@ const TASK_WITH_TAG_SQL = `
   LEFT JOIN tags stg ON t.secondaryTagId = stg.id
   LEFT JOIN study_nodes sn ON t.studyNodeId = sn.id
   LEFT JOIN study_topics st ON sn.topicId = st.id
+  LEFT JOIN projects pj ON pj.id = COALESCE(t.projectId, tg.projectId)
 `;
 async function getTasksForRange(startDate, endDate) {
   const db2 = await getDb();
@@ -990,18 +1150,19 @@ async function getActiveTask() {
      LIMIT 1`
   );
 }
-async function createTask(title, tagId, secondaryTagId, startTime, endTime = null, studyNodeId = null) {
+async function createTask(title, tagId, secondaryTagId, startTime, endTime = null, studyNodeId = null, projectId = null) {
   const db2 = await getDb();
-  run$1(db2, "INSERT INTO tasks (title, tagId, secondaryTagId, startTime, endTime, studyNodeId) VALUES (?, ?, ?, ?, ?, ?)", [
+  run$1(db2, "INSERT INTO tasks (title, tagId, secondaryTagId, startTime, endTime, studyNodeId, projectId) VALUES (?, ?, ?, ?, ?, ?, ?)", [
     title,
     tagId,
     secondaryTagId,
     startTime,
     endTime,
-    studyNodeId
+    studyNodeId,
+    projectId
   ]);
   const id = lastInsertId(db2);
-  return { id, title, tagId, secondaryTagId, startTime, endTime, studyNodeId };
+  return { id, title, tagId, secondaryTagId, startTime, endTime, studyNodeId, projectId };
 }
 async function getStudyHoursByTopic() {
   const db2 = await getDb();
@@ -1138,6 +1299,13 @@ async function getTodos(status) {
 async function createTodo(title, notes, status, source, priority = 0, dueDate = null, projectId = null, aiGenerated = 0, recurrence = null, type = "projeto") {
   const db2 = await getDb();
   const createdAt = (/* @__PURE__ */ new Date()).toISOString();
+  if (projectId == null) {
+    const hit = detectProjectMention(db2, title);
+    if (hit) {
+      projectId = hit.projectId;
+      title = hit.title;
+    }
+  }
   run$1(
     db2,
     "INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, type, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -1158,6 +1326,12 @@ async function updateTodo(id, title, notes, status, priority, dueDate, projectId
   if (type !== void 0) {
     cols.push("type = ?");
     params.push(type);
+  }
+  if (status === "done" && prev?.status !== "done") {
+    cols.push("doneAt = ?");
+    params.push((/* @__PURE__ */ new Date()).toISOString());
+  } else if (status !== "done" && prev?.status === "done") {
+    cols.push("doneAt = NULL");
   }
   params.push(id);
   run$1(db2, `UPDATE todos SET ${cols.join(", ")} WHERE id = ?`, params);
@@ -1210,8 +1384,8 @@ async function createProject(name, description, githubRepoUrl, color, claudeComm
   const db2 = await getDb();
   run$1(
     db2,
-    "INSERT INTO projects (name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience]
+    "INSERT INTO projects (name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience, status, createdAt, statusChangedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience, "incubadora", (/* @__PURE__ */ new Date()).toISOString(), (/* @__PURE__ */ new Date()).toISOString()]
   );
   const id = lastInsertId(db2);
   return getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
@@ -2264,6 +2438,388 @@ async function clearNotifications(onlyRead = false) {
   const db2 = await getDb();
   run$1(db2, onlyRead ? "DELETE FROM notifications WHERE readAt IS NOT NULL" : "DELETE FROM notifications");
 }
+const PROJECT_STATUSES = ["incubadora", "fila", "baixa", "foco", "pausado", "concluido", "encerrado"];
+function normName(s) {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+function detectProjectMention(db2, title) {
+  const projects = getAll(db2, "SELECT id, name FROM projects");
+  if (!projects.length) return null;
+  const find = (raw) => {
+    const k = normName(raw);
+    if (!k) return null;
+    const exact = projects.find((p) => normName(p.name) === k);
+    return exact ? exact.id : null;
+  };
+  const bracket = title.match(/^\s*\[([^\]]+)\]\s*/);
+  if (bracket) {
+    const id = find(bracket[1]);
+    if (id) return { projectId: id, title: title.slice(bracket[0].length).trim() || title };
+  }
+  const hashRe = /(^|\s)#([\p{L}\p{N}_\-/.]+)/gu;
+  let m;
+  while (m = hashRe.exec(title)) {
+    const id = find(m[2]);
+    if (id) {
+      const clean = (title.slice(0, m.index) + m[1] + title.slice(m.index + m[0].length)).replace(/\s{2,}/g, " ").trim();
+      return { projectId: id, title: clean || title };
+    }
+  }
+  return null;
+}
+async function getProject(id) {
+  const db2 = await getDb();
+  return getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
+}
+async function addProjectEvent(projectId, kind, text, fromStatus = null, toStatus = null) {
+  const db2 = await getDb();
+  run$1(db2, "INSERT INTO project_events (projectId, kind, fromStatus, toStatus, text, createdAt) VALUES (?, ?, ?, ?, ?, ?)", [
+    projectId,
+    kind,
+    fromStatus,
+    toStatus,
+    text,
+    (/* @__PURE__ */ new Date()).toISOString()
+  ]);
+}
+async function getProjectEvents(projectId, limit = 200) {
+  const db2 = await getDb();
+  if (projectId != null) {
+    return getAll(db2, "SELECT * FROM project_events WHERE projectId = ? ORDER BY createdAt DESC LIMIT ?", [projectId, limit]);
+  }
+  return getAll(db2, "SELECT * FROM project_events ORDER BY createdAt DESC LIMIT ?", [limit]);
+}
+const PROJECT_PATCHABLE = /* @__PURE__ */ new Set([
+  "name",
+  "description",
+  "githubRepoUrl",
+  "color",
+  "claudeCommand",
+  "localPath",
+  "stage",
+  "businessModel",
+  "pricing",
+  "audience",
+  "area",
+  "priority",
+  "finishLine",
+  "scope",
+  "futureIdeas",
+  "nextAction",
+  "whereLeftOff",
+  "blocker",
+  "blockerNeed",
+  "pauseReason",
+  "resumeAt",
+  "resumeCondition",
+  "closeReason",
+  "retrospective",
+  "continuous",
+  "triagedAt",
+  "lastReviewedAt",
+  "nextActionSize",
+  "workDays",
+  "workStart",
+  "workMinutes",
+  "calendarEventId",
+  "calendarAccount"
+]);
+async function patchProject(id, fields) {
+  const db2 = await getDb();
+  const prev = getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
+  if (!prev) throw new Error("Projeto não encontrado");
+  const cols = [];
+  const params = [];
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  for (const [k, v] of Object.entries(fields)) {
+    if (!PROJECT_PATCHABLE.has(k)) continue;
+    cols.push(`${k} = ?`);
+    params.push(typeof v === "string" ? v.trim() === "" ? null : v.trim() : v);
+  }
+  if ("nextAction" in fields) cols.push(`nextActionAt = '${now}'`);
+  if ("whereLeftOff" in fields) cols.push(`whereLeftOffAt = '${now}'`);
+  if (!cols.length) return prev;
+  params.push(id);
+  run$1(db2, `UPDATE projects SET ${cols.join(", ")} WHERE id = ?`, params);
+  const next = getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
+  const log = (kind, text) => run$1(db2, "INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)", [id, kind, text, now]);
+  if ("nextAction" in fields && next.nextAction !== prev.nextAction && next.nextAction) log("proxima_acao", next.nextAction);
+  if ("whereLeftOff" in fields && next.whereLeftOff !== prev.whereLeftOff && next.whereLeftOff) log("onde_parei", next.whereLeftOff);
+  if ("blocker" in fields && next.blocker !== prev.blocker) log("bloqueio", next.blocker ? `Bloqueado: ${next.blocker}${next.blockerNeed ? ` — precisa: ${next.blockerNeed}` : ""}` : "Bloqueio resolvido");
+  if ("finishLine" in fields && next.finishLine !== prev.finishLine && next.finishLine) log("decisao", `Linha de chegada: ${next.finishLine}`);
+  return next;
+}
+async function setProjectStatus(id, status, payload = {}) {
+  if (!PROJECT_STATUSES.includes(status)) throw new Error(`Situação inválida: ${status}`);
+  const db2 = await getDb();
+  const prev = getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
+  if (!prev) throw new Error("Projeto não encontrado");
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const closed = status === "concluido" || status === "encerrado";
+  const sets = ["status = ?", "statusChangedAt = ?", "archived = ?", "triagedAt = COALESCE(triagedAt, ?)"];
+  const params = [status, now, closed ? 1 : 0, now];
+  if (status === "pausado") {
+    sets.push("pauseReason = ?", "resumeAt = ?", "resumeCondition = ?");
+    params.push(payload.reason ?? null, payload.resumeAt ?? null, payload.resumeCondition ?? null);
+  } else {
+    sets.push("pauseReason = NULL", "resumeAt = NULL", "resumeCondition = NULL");
+  }
+  if (closed) {
+    sets.push("closedAt = ?", "closeReason = ?");
+    params.push(now, payload.reason ?? null);
+    if (payload.retrospective !== void 0) {
+      sets.push("retrospective = ?");
+      params.push(payload.retrospective);
+    }
+  } else {
+    sets.push("closedAt = NULL");
+  }
+  if (payload.nextAction) {
+    sets.push("nextAction = ?", "nextActionAt = ?");
+    params.push(payload.nextAction, now);
+  }
+  params.push(id);
+  run$1(db2, `UPDATE projects SET ${sets.join(", ")} WHERE id = ?`, params);
+  const parts = [payload.reason, payload.resumeAt ? `retomar em ${payload.resumeAt}` : null, payload.resumeCondition ? `retomar quando: ${payload.resumeCondition}` : null, payload.note].filter(Boolean).join(" · ");
+  run$1(db2, "INSERT INTO project_events (projectId, kind, fromStatus, toStatus, text, createdAt) VALUES (?, ?, ?, ?, ?, ?)", [
+    id,
+    "status",
+    prev.status,
+    status,
+    parts || null,
+    now
+  ]);
+  if (payload.nextAction && payload.nextAction !== prev.nextAction) {
+    run$1(db2, "INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)", [id, "proxima_acao", payload.nextAction, now]);
+  }
+  return getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
+}
+async function completeNextAction(id, next, size = null) {
+  const db2 = await getDb();
+  const prev = getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
+  if (!prev) throw new Error("Projeto não encontrado");
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  if (prev.nextAction) {
+    run$1(db2, "INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)", [id, "acao_concluida", prev.nextAction, now]);
+  }
+  const n = next && next.trim() ? next.trim() : null;
+  run$1(db2, "UPDATE projects SET nextAction = ?, nextActionAt = ?, nextActionSize = ? WHERE id = ?", [n, now, n ? size : null, id]);
+  if (n) run$1(db2, "INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)", [id, "proxima_acao", n, now]);
+  return getOne(db2, "SELECT * FROM projects WHERE id = ?", [id]);
+}
+async function updateProjectMilestone(id, title, targetDate, cycleId, description) {
+  const db2 = await getDb();
+  run$1(db2, "UPDATE project_milestones SET title = ?, targetDate = ?, cycleId = ?, description = ? WHERE id = ?", [title, targetDate, cycleId, description, id]);
+}
+async function setCycleChangelog(id, changelog) {
+  const db2 = await getDb();
+  run$1(db2, "UPDATE project_cycles SET changelog = ? WHERE id = ?", [changelog, id]);
+}
+async function getProjectCycle(id) {
+  const db2 = await getDb();
+  return getOne(db2, "SELECT * FROM project_cycles WHERE id = ?", [id]);
+}
+async function getProjectCycles(projectId) {
+  const db2 = await getDb();
+  if (projectId != null) return getAll(db2, "SELECT * FROM project_cycles WHERE projectId = ? ORDER BY startDate DESC, id DESC", [projectId]);
+  return getAll(db2, "SELECT * FROM project_cycles ORDER BY startDate DESC, id DESC");
+}
+async function createProjectCycle(projectId, name, goal, startDate, dueDate) {
+  const db2 = await getDb();
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  run$1(db2, "INSERT INTO project_cycles (projectId, name, goal, startDate, dueDate, originalDueDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)", [
+    projectId,
+    name,
+    goal,
+    startDate,
+    dueDate,
+    dueDate,
+    now
+  ]);
+  const id = lastInsertId(db2);
+  run$1(db2, "UPDATE projects SET continuous = 1 WHERE id = ?", [projectId]);
+  run$1(db2, "INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)", [projectId, "ciclo", `Ciclo "${name}" iniciado${dueDate ? ` (prazo ${dueDate})` : ""}`, now]);
+  return getOne(db2, "SELECT * FROM project_cycles WHERE id = ?", [id]);
+}
+async function updateProjectCycle(id, name, goal, dueDate) {
+  const db2 = await getDb();
+  run$1(db2, "UPDATE project_cycles SET name = ?, goal = ?, dueDate = ?, originalDueDate = COALESCE(originalDueDate, ?) WHERE id = ?", [name, goal, dueDate, dueDate, id]);
+}
+async function extendProjectCycle(id, newDueDate, reason) {
+  const db2 = await getDb();
+  const c = getOne(db2, "SELECT * FROM project_cycles WHERE id = ?", [id]);
+  if (!c) return;
+  run$1(db2, "UPDATE project_cycles SET dueDate = ?, extensions = extensions + 1, originalDueDate = COALESCE(originalDueDate, ?) WHERE id = ?", [newDueDate, c.dueDate, id]);
+  run$1(db2, "INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)", [
+    c.projectId,
+    "ciclo",
+    `Prazo de "${c.name}" estendido ${c.dueDate ?? "—"} → ${newDueDate} (extensão nº ${c.extensions + 1})${reason ? `: ${reason}` : ""}`,
+    (/* @__PURE__ */ new Date()).toISOString()
+  ]);
+}
+async function closeProjectCycle(id, status, retrospective) {
+  const db2 = await getDb();
+  const c = getOne(db2, "SELECT * FROM project_cycles WHERE id = ?", [id]);
+  if (!c) return;
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  run$1(db2, "UPDATE project_cycles SET status = ?, closedAt = ?, retrospective = ? WHERE id = ?", [status, now, retrospective, id]);
+  run$1(db2, "INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)", [
+    c.projectId,
+    "ciclo",
+    `Ciclo "${c.name}" ${status === "concluido" ? "concluído 🎉" : "cancelado"}`,
+    now
+  ]);
+}
+async function deleteProjectCycle(id) {
+  const db2 = await getDb();
+  run$1(db2, "UPDATE project_milestones SET cycleId = NULL WHERE cycleId = ?", [id]);
+  run$1(db2, "DELETE FROM project_cycles WHERE id = ?", [id]);
+}
+async function getProjectNotes(projectId) {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM project_notes WHERE projectId = ? ORDER BY pinned DESC, createdAt DESC", [projectId]);
+}
+async function saveProjectNote(note) {
+  const db2 = await getDb();
+  if (note.id) {
+    run$1(db2, "UPDATE project_notes SET kind = ?, title = ?, body = ?, url = ?, pinned = ? WHERE id = ?", [note.kind, note.title, note.body, note.url, note.pinned ?? 0, note.id]);
+    return getOne(db2, "SELECT * FROM project_notes WHERE id = ?", [note.id]);
+  }
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  run$1(db2, "INSERT INTO project_notes (projectId, kind, title, body, url, pinned, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)", [
+    note.projectId,
+    note.kind,
+    note.title,
+    note.body,
+    note.url,
+    note.pinned ?? 0,
+    now
+  ]);
+  if (note.kind === "decisao") {
+    run$1(db2, "INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)", [note.projectId, "decisao", note.title, now]);
+  }
+  return getOne(db2, "SELECT * FROM project_notes WHERE id = ?", [lastInsertId(db2)]);
+}
+async function deleteProjectNote(id) {
+  const db2 = await getDb();
+  run$1(db2, "DELETE FROM project_notes WHERE id = ?", [id]);
+}
+async function linkTodosToProject(todoIds, projectId, milestoneId = null) {
+  const db2 = await getDb();
+  for (const id of todoIds) {
+    run$1(db2, "UPDATE todos SET projectId = ?, milestoneId = ? WHERE id = ?", [projectId, milestoneId, id]);
+  }
+}
+async function setTodoMilestone(todoId, milestoneId) {
+  const db2 = await getDb();
+  run$1(db2, "UPDATE todos SET milestoneId = ? WHERE id = ?", [milestoneId, todoId]);
+}
+async function setTagProject(tagId, projectId) {
+  const db2 = await getDb();
+  run$1(db2, "UPDATE tags SET projectId = ? WHERE id = ?", [projectId, tagId]);
+}
+async function setTaskProject(taskId, projectId) {
+  const db2 = await getDb();
+  run$1(db2, "UPDATE tasks SET projectId = ? WHERE id = ?", [projectId, taskId]);
+}
+const TASK_MINUTES = "(julianday(COALESCE(t.endTime, strftime('%Y-%m-%dT%H:%M:%fZ','now'))) - julianday(t.startTime)) * 24 * 60";
+async function getProjectNumbers() {
+  const db2 = await getDb();
+  const since7 = new Date(Date.now() - 7 * 864e5).toISOString();
+  const since30 = new Date(Date.now() - 30 * 864e5).toISOString();
+  const hours = getAll(
+    db2,
+    `SELECT COALESCE(t.projectId, tg.projectId) as projectId,
+            SUM(${TASK_MINUTES}) as total,
+            SUM(CASE WHEN t.startTime >= ? THEN ${TASK_MINUTES} ELSE 0 END) as m7,
+            SUM(CASE WHEN t.startTime >= ? THEN ${TASK_MINUTES} ELSE 0 END) as m30,
+            MAX(COALESCE(t.endTime, t.startTime)) as lastAt
+       FROM tasks t LEFT JOIN tags tg ON tg.id = t.tagId
+      WHERE COALESCE(t.projectId, tg.projectId) IS NOT NULL
+      GROUP BY COALESCE(t.projectId, tg.projectId)`,
+    [since7, since30]
+  );
+  const todos = getAll(
+    db2,
+    `SELECT projectId, SUM(status <> 'done') as open, SUM(status = 'done') as done,
+            MAX(COALESCE(doneAt, createdAt)) as lastAt
+       FROM todos WHERE projectId IS NOT NULL GROUP BY projectId`
+  );
+  const events = getAll(db2, "SELECT projectId, MAX(createdAt) as lastAt FROM project_events GROUP BY projectId");
+  const ids = /* @__PURE__ */ new Set([...hours.map((h) => h.projectId), ...todos.map((t) => t.projectId), ...events.map((e) => e.projectId)]);
+  return [...ids].map((id) => {
+    const h = hours.find((x) => x.projectId === id);
+    const t = todos.find((x) => x.projectId === id);
+    const e = events.find((x) => x.projectId === id);
+    return {
+      projectId: id,
+      minutesTotal: Math.round(h?.total ?? 0),
+      minutes7d: Math.round(h?.m7 ?? 0),
+      minutes30d: Math.round(h?.m30 ?? 0),
+      lastTaskAt: h?.lastAt ?? null,
+      openTodos: t?.open ?? 0,
+      doneTodos: t?.done ?? 0,
+      lastTodoAt: t?.lastAt ?? null,
+      lastEventAt: e?.lastAt ?? null
+    };
+  });
+}
+async function getProjectTasks(projectId, limit = 100) {
+  const db2 = await getDb();
+  return getAll(db2, `${TASK_WITH_TAG_SQL} WHERE COALESCE(t.projectId, tg.projectId) = ? ORDER BY t.startTime DESC LIMIT ?`, [projectId, limit]);
+}
+async function getProjectHours(from, to) {
+  const db2 = await getDb();
+  return getAll(
+    db2,
+    `SELECT COALESCE(t.projectId, tg.projectId) as projectId, CAST(ROUND(SUM(${TASK_MINUTES})) AS INTEGER) as minutes
+       FROM tasks t LEFT JOIN tags tg ON tg.id = t.tagId
+      WHERE t.startTime >= ? AND t.startTime < ? AND COALESCE(t.projectId, tg.projectId) IS NOT NULL
+      GROUP BY COALESCE(t.projectId, tg.projectId) ORDER BY minutes DESC`,
+    [from, to]
+  );
+}
+async function getUnlinkedTagHours() {
+  const db2 = await getDb();
+  const since = new Date(Date.now() - 90 * 864e5).toISOString();
+  return getAll(
+    db2,
+    `SELECT tg.id as tagId, tg.name as tagName, tg.color as tagColor, CAST(ROUND(SUM(${TASK_MINUTES})) AS INTEGER) as minutes
+       FROM tasks t JOIN tags tg ON tg.id = t.tagId
+      WHERE tg.projectId IS NULL AND t.projectId IS NULL AND t.startTime >= ? AND tg.id NOT IN (1, 3)
+      GROUP BY tg.id ORDER BY minutes DESC`,
+    [since]
+  );
+}
+async function createDelegation(d) {
+  const db2 = await getDb();
+  run$1(db2, "INSERT INTO project_delegations (projectId, action, instructions, repoPath, branch, worktreePath, baseRef, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [
+    d.projectId,
+    d.action,
+    d.instructions,
+    d.repoPath,
+    d.branch,
+    d.worktreePath,
+    d.baseRef,
+    (/* @__PURE__ */ new Date()).toISOString()
+  ]);
+  return getOne(db2, "SELECT * FROM project_delegations WHERE id = ?", [lastInsertId(db2)]);
+}
+async function updateDelegation(id, fields) {
+  const db2 = await getDb();
+  const keys = Object.keys(fields);
+  if (!keys.length) return;
+  run$1(db2, `UPDATE project_delegations SET ${keys.map((k) => `${k} = ?`).join(", ")} WHERE id = ?`, [...keys.map((k) => fields[k] ?? null), id]);
+}
+async function getDelegation(id) {
+  const db2 = await getDb();
+  return getOne(db2, "SELECT * FROM project_delegations WHERE id = ?", [id]);
+}
+async function getDelegations(projectId) {
+  const db2 = await getDb();
+  if (projectId != null) return getAll(db2, "SELECT * FROM project_delegations WHERE projectId = ? ORDER BY createdAt DESC", [projectId]);
+  return getAll(db2, "SELECT * FROM project_delegations ORDER BY createdAt DESC LIMIT 100");
+}
 const SENSITIVE_KEYS = /* @__PURE__ */ new Set([
   "github_token",
   "google_client_secret",
@@ -2354,15 +2910,16 @@ function shquote(s) {
 }
 function attempt(bin, prompt, viaShell, opts = {}) {
   return new Promise((resolve, reject) => {
-    const env = { ...process.env, PATH: buildPath() };
+    const env = { ...process.env, PATH: buildPath(), RICKOS_CLAUDE_RUN: "1" };
     const model = opts.model?.trim();
     const extra = opts.extraArgs ?? [];
     const agentic = !!opts.agentic;
     const streamJson = !!opts.streamJson;
     const useStreamParse = streamJson || agentic;
     const oneShotJson = !useStreamParse && !opts.onChunk;
-    const agenticArgs = ["--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--permission-mode", "default"];
-    const agenticShell = " --input-format stream-json --output-format stream-json --verbose --permission-mode default";
+    const permissionMode = opts.permissionMode ?? "default";
+    const agenticArgs = ["--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--permission-mode", permissionMode];
+    const agenticShell = ` --input-format stream-json --output-format stream-json --verbose --permission-mode ${permissionMode}`;
     const jsonArgs = agentic ? agenticArgs : streamJson ? ["--output-format", "stream-json", "--verbose", "--include-partial-messages"] : oneShotJson ? ["--output-format", "json"] : [];
     const jsonShell = agentic ? agenticShell : streamJson ? " --output-format stream-json --verbose --include-partial-messages" : oneShotJson ? " --output-format json" : "";
     const stdio = [agentic ? "pipe" : "ignore", "pipe", "pipe"];
@@ -2462,6 +3019,12 @@ function attempt(bin, prompt, viaShell, opts = {}) {
         }
       } else if (evt.type === "result") {
         if (typeof evt.result === "string") finalText = evt.result;
+        if (agentic) {
+          try {
+            child.stdin?.end();
+          } catch {
+          }
+        }
       }
     };
     const timeoutMs = opts.timeoutMs ?? TIMEOUT_MS;
@@ -2676,14 +3239,14 @@ async function syncGithubIssues(forceFull = false) {
   await setSetting("github_last_sync", (/* @__PURE__ */ new Date()).toISOString());
   return issues.length;
 }
-function repoFromUrl(url) {
+function repoFromUrl$1(url) {
   if (!url) return null;
   const m = url.match(/github\.com[/:]([^/]+\/[^/#?]+?)(?:\.git)?\/?$/i);
   return m ? m[1] : null;
 }
 async function claudeCommandForRepo(repo) {
   const projects = await getProjects();
-  const match = projects.find((p) => repoFromUrl(p.githubRepoUrl)?.toLowerCase() === repo.toLowerCase());
+  const match = projects.find((p) => repoFromUrl$1(p.githubRepoUrl)?.toLowerCase() === repo.toLowerCase());
   if (match?.claudeCommand && match.claudeCommand.trim()) return match.claudeCommand.trim();
   return await getSetting("claude_command") || "claude";
 }
@@ -2692,7 +3255,7 @@ async function createIssueViaClaude(id) {
   if (!issue) throw new Error("Issue não encontrada.");
   if (issue.url) throw new Error("Essa issue já está no GitHub.");
   const command = await claudeCommandForRepo(issue.repo);
-  const project = (await getProjects()).find((p) => repoFromUrl(p.githubRepoUrl)?.toLowerCase() === issue.repo.toLowerCase());
+  const project = (await getProjects()).find((p) => repoFromUrl$1(p.githubRepoUrl)?.toLowerCase() === issue.repo.toLowerCase());
   const body = (issue.body ?? "").replace(/`/g, "'");
   const prompt = `Crie uma issue no GitHub no repositório ${issue.repo} usando o gh CLI (gh issue create --repo ${issue.repo} --title <título> --body <corpo>). Título: "${issue.title}". Corpo: "${body || issue.title}". Ao final, imprima APENAS a URL da issue criada (ex.: https://github.com/${issue.repo}/issues/N).`;
   const out = await runClaude(prompt, command, {
@@ -2709,7 +3272,7 @@ async function createIssueViaClaude(id) {
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
-const SCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.file";
+const SCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file";
 function base64url(buf) {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -3006,6 +3569,58 @@ async function syncGoogleCalendar() {
   await replaceGoogleEvents(all);
   return all.length;
 }
+const BYDAY = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+function scopeError(status, t) {
+  if (status === 403 || /insufficient|scope/i.test(t)) {
+    return new Error("Esta conta Google só tem permissão de leitura. Reconecte-a em Configurações para permitir criar eventos.");
+  }
+  return null;
+}
+async function upsertRecurringBlock(opts) {
+  const accounts = await getAccounts();
+  if (!accounts.length) throw new Error("Nenhuma conta Google conectada (Configurações).");
+  const acc = opts.email && accounts.find((a) => a.email === opts.email) || accounts[0];
+  const token = await accessTokenFor(acc.refreshToken);
+  const days = [...new Set(opts.days)].filter((d) => d >= 0 && d <= 6).sort();
+  if (!days.length) throw new Error("Escolha ao menos um dia da semana.");
+  const [hh, mm] = opts.start.split(":").map(Number);
+  const first = /* @__PURE__ */ new Date();
+  first.setHours(hh || 0, mm || 0, 0, 0);
+  for (let i = 0; i < 7 && !days.includes(first.getDay()); i++) first.setDate(first.getDate() + 1);
+  const end = new Date(first.getTime() + Math.max(15, opts.minutes) * 6e4);
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const local = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:00`;
+  const body = {
+    summary: opts.summary,
+    description: opts.description,
+    start: { dateTime: local(first), timeZone: tz },
+    end: { dateTime: local(end), timeZone: tz },
+    recurrence: [`RRULE:FREQ=WEEKLY;BYDAY=${days.map((d) => BYDAY[d]).join(",")}`],
+    reminders: { useDefault: true }
+  };
+  const base = `${CALENDAR_API}/calendars/primary/events`;
+  let res = opts.eventId ? await fetch(`${base}/${encodeURIComponent(opts.eventId)}`, { method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) }) : null;
+  if (!res || res.status === 404 || res.status === 410) {
+    res = await fetch(base, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  }
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw scopeError(res.status, t) ?? new Error(`Google Calendar recusou (${res.status}). ${t.slice(0, 160)}`);
+  }
+  const j = await res.json();
+  return { eventId: j.id, account: acc.email, link: j.htmlLink ?? null };
+}
+async function deleteRecurringBlock(eventId, email) {
+  const accounts = await getAccounts();
+  const acc = email && accounts.find((a) => a.email === email) || accounts[0];
+  if (!acc) return;
+  const token = await accessTokenFor(acc.refreshToken);
+  const res = await fetch(`${CALENDAR_API}/calendars/primary/events/${encodeURIComponent(eventId)}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok && res.status !== 404 && res.status !== 410) {
+    const t = await res.text().catch(() => "");
+    throw scopeError(res.status, t) ?? new Error(`Falha ao remover o evento (${res.status}).`);
+  }
+}
 const PLUGGY_API = "https://api.pluggy.ai";
 const OUTROS_CATEGORY_ID = 6;
 async function loadFx() {
@@ -3135,8 +3750,8 @@ async function syncPluggy() {
     }
   }
   const existing = await getTransactions();
-  const seen = new Set(existing.map((t) => `${t.date}|${t.amount}|${t.description ?? ""}`));
-  const fresh = incoming.filter((t) => !seen.has(`${t.date}|${t.amount}|${t.description ?? ""}`));
+  const seen2 = new Set(existing.map((t) => `${t.date}|${t.amount}|${t.description ?? ""}`));
+  const fresh = incoming.filter((t) => !seen2.has(`${t.date}|${t.amount}|${t.description ?? ""}`));
   if (fresh.length) await bulkInsertTransactions(fresh);
   return { imported: fresh.length, skipped: incoming.length - fresh.length };
 }
@@ -3293,7 +3908,7 @@ const MARKERS = [
   "index.html",
   "CLAUDE.md"
 ];
-function expandHome$1(p) {
+function expandHome$4(p) {
   return p.startsWith("~") ? path.join(os.homedir(), p.slice(1)) : p;
 }
 function tildify(p) {
@@ -3475,11 +4090,11 @@ async function restoreProjectSuggestions() {
 }
 async function suggestProjects() {
   const rootSetting = await getProjectsRoot();
-  const root = expandHome$1(rootSetting);
+  const root = expandHome$4(rootSetting);
   const rootExists = fs.existsSync(root);
   if (!rootExists) return { root: rootSetting, rootExists, items: [], ignoredCount: 0 };
   const projects = await getProjects();
-  const registeredPaths = projects.map((p) => p.localPath?.trim()).filter((p) => !!p).map((p) => realpath(expandHome$1(p)));
+  const registeredPaths = projects.map((p) => p.localPath?.trim()).filter((p) => !!p).map((p) => realpath(expandHome$4(p)));
   const registeredRepos = new Set(projects.map((p) => repoKey(p.githubRepoUrl)).filter((k) => !!k));
   const isRegistered = (dir, repo) => {
     const real = realpath(dir);
@@ -3561,6 +4176,7 @@ function run(cmd, args, cwd, timeoutMs = 2e4) {
 }
 const git = (cwd, args, timeoutMs) => run("git", args, cwd, timeoutMs);
 const gitOk = (cwd, args) => git(cwd, args).catch(() => null);
+const gitQuiet = gitOk;
 async function mapLimit(items, limit, fn) {
   const out = new Array(items.length);
   let i = 0;
@@ -3573,7 +4189,7 @@ async function mapLimit(items, limit, fn) {
   await Promise.all(workers);
   return out;
 }
-function expandHome(p) {
+function expandHome$3(p) {
   return p.startsWith("~") ? path.join(os.homedir(), p.slice(1)) : p;
 }
 async function getScanRoots() {
@@ -3599,7 +4215,7 @@ function findReposUnder(root) {
       return false;
     }
   };
-  const dir = expandHome(root);
+  const dir = expandHome$3(root);
   if (!fs.existsSync(dir)) return out;
   if (isRepo(dir)) out.push(dir);
   let entries = [];
@@ -3631,8 +4247,8 @@ async function discoverRepos() {
   const projects = await getProjects();
   for (const p of projects) {
     const lp = p.localPath?.trim();
-    if (!lp || !fs.existsSync(expandHome(lp))) continue;
-    const main = await mainRepoOf(expandHome(lp));
+    if (!lp || !fs.existsSync(expandHome$3(lp))) continue;
+    const main = await mainRepoOf(expandHome$3(lp));
     if (main && !byPath.has(main)) byPath.set(main, { path: main, projectId: p.id, projectName: p.name });
   }
   for (const root of await getScanRoots()) {
@@ -3940,6 +4556,663 @@ async function openPath(target, app) {
   const args = app === "vscode" ? ["-a", "Visual Studio Code", target] : app === "terminal" ? ["-a", "Terminal", target] : [target];
   await run("open", args, os.homedir(), 1e4);
 }
+const DAY = 864e5;
+const ROADMAP_FILE = "ROADMAP_RICKOS.md";
+function expandHome$2(p) {
+  return p.startsWith("~") ? path.join(os.homedir(), p.slice(1)) : p;
+}
+function repoFromUrl(url) {
+  if (!url) return null;
+  const m = url.match(/github\.com[/:]([^/]+\/[^/#?]+?)(?:\.git)?\/?$/i);
+  return m ? m[1] : null;
+}
+function todayStr() {
+  const d = /* @__PURE__ */ new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+const gitCache = /* @__PURE__ */ new Map();
+async function gitPulse(localPath) {
+  if (!localPath) return { lastCommitAt: null, commits7d: 0 };
+  const dir = expandHome$2(localPath);
+  const hit = gitCache.get(dir);
+  if (hit && Date.now() - hit.at < 10 * 60 * 1e3) return hit;
+  if (!fs.existsSync(path.join(dir, ".git")) && !fs.existsSync(dir)) return { lastCommitAt: null, commits7d: 0 };
+  const [last, count2] = await Promise.all([
+    gitQuiet(dir, ["log", "--all", "-1", "--format=%aI"]),
+    gitQuiet(dir, ["rev-list", "--all", "--count", "--since=7.days"])
+  ]);
+  const v = { at: Date.now(), lastCommitAt: last?.trim() || null, commits7d: Number(count2?.trim() || 0) || 0 };
+  gitCache.set(dir, v);
+  return v;
+}
+async function projectCommits(projectId, limit = 30) {
+  const p = await getProject(projectId);
+  if (!p?.localPath) return [];
+  const out = await gitQuiet(expandHome$2(p.localPath), ["log", "--all", `-${limit}`, "--format=%h%x1f%s%x1f%an%x1f%aI%x1f%D"]);
+  if (!out) return [];
+  return out.split("\n").filter(Boolean).map((line) => {
+    const [hash, subject, author, date, refs] = line.split("");
+    return { hash, subject, author, date, refs: refs ?? "" };
+  });
+}
+function roadmapPath(p) {
+  if (!p.localPath) return null;
+  return path.join(expandHome$2(p.localPath), ROADMAP_FILE);
+}
+async function readRoadmap(projectId) {
+  const p = await getProject(projectId);
+  const file = p ? roadmapPath(p) : null;
+  if (!file || !fs.existsSync(file)) return { path: file, exists: false, content: "" };
+  return { path: file, exists: true, content: fs.readFileSync(file, "utf8") };
+}
+async function setRoadmapItem(projectId, line, expected, mark) {
+  const p = await getProject(projectId);
+  const file = p ? roadmapPath(p) : null;
+  if (!file || !fs.existsSync(file)) throw new Error("ROADMAP_RICKOS.md não encontrado");
+  const lines = fs.readFileSync(file, "utf8").split("\n");
+  const cur = lines[line];
+  if (cur == null || !cur.includes(expected)) throw new Error("O arquivo mudou — recarregue o roadmap");
+  lines[line] = cur.replace(/\[( |x|X|~|-)\]/, `[${mark}]`);
+  const content = lines.join("\n");
+  fs.writeFileSync(file, content, "utf8");
+  return { content };
+}
+async function createRoadmapTemplate(projectId) {
+  const p = await getProject(projectId);
+  const file = p ? roadmapPath(p) : null;
+  if (!p || !file) throw new Error("Defina o caminho local do projeto primeiro");
+  if (fs.existsSync(file)) return { content: fs.readFileSync(file, "utf8") };
+  const content = `# Roadmap — ${p.name}
+
+> Padrão RickOS. \`##\` = área/épico · \`###\` = funcionalidade · \`- [ ]\` = tarefa.
+> Marcadores: \`[ ]\` a fazer · \`[~]\` em andamento · \`[x]\` feito · \`[-]\` descartado.
+> Opcional no fim do item: \`@v1.2\` (versão/ciclo) · \`!alta\` / \`!media\` / \`!baixa\` (prioridade).
+
+## Agora (entrega atual)
+
+### Funcionalidade principal
+- [ ] Primeira tarefa @v1 !alta
+- [ ] Segunda tarefa @v1
+
+## Próximo
+
+- [ ] Melhoria planejada @v2
+
+## Futuro / ideias
+
+- [ ] Ideia para depois
+`;
+  fs.writeFileSync(file, content, "utf8");
+  return { content };
+}
+function pulseOf(idleDays) {
+  if (idleDays == null) return "parado";
+  if (idleDays <= 3) return "vivo";
+  if (idleDays <= 14) return "morno";
+  if (idleDays <= 30) return "frio";
+  return "parado";
+}
+async function projectsOverview() {
+  const [projects, numbers, milestones, cycles, issues, todos] = await Promise.all([
+    getProjects(),
+    getProjectNumbers(),
+    getProjectMilestones(),
+    getProjectCycles(null),
+    getGithubIssues(),
+    getTodos()
+  ]);
+  const today = todayStr();
+  const focusLimit = Number(await getSetting("projects_focus_limit") || 3) || 3;
+  const inFocus = projects.filter((p) => p.status === "foco").length;
+  const gits = await Promise.all(projects.map((p) => p.status === "concluido" || p.status === "encerrado" ? Promise.resolve({ lastCommitAt: null, commits7d: 0 }) : gitPulse(p.localPath)));
+  return projects.map((p, i) => {
+    const n = numbers.find((x) => x.projectId === p.id);
+    const ms = milestones.filter((m) => m.projectId === p.id);
+    const repo = repoFromUrl(p.githubRepoUrl);
+    const projIssues = repo ? issues.filter((x) => x.repo.toLowerCase() === repo.toLowerCase()) : [];
+    const openIssues = projIssues.filter((x) => x.state === "open").length;
+    const lastIssueAt = projIssues.reduce((max, x) => x.updatedAt && (!max || x.updatedAt > max) ? x.updatedAt : max, null);
+    const g = gits[i];
+    let progress = 0;
+    if (ms.length) {
+      const parts = ms.map((m) => {
+        if (m.doneAt) return 1;
+        const linked = todos.filter((t) => t.milestoneId === m.id);
+        return linked.length ? linked.filter((t) => t.status === "done").length / linked.length : 0;
+      });
+      progress = Math.round(parts.reduce((a, b) => a + b, 0) / ms.length * 100);
+    } else if (n && n.openTodos + n.doneTodos > 0) {
+      progress = Math.round(n.doneTodos / (n.openTodos + n.doneTodos) * 100);
+    }
+    if (p.status === "concluido") progress = 100;
+    const sources = [
+      ["commit", g.lastCommitAt],
+      ["timer", n?.lastTaskAt ?? null],
+      ["tarefa", n?.lastTodoAt ?? null],
+      ["registro", n?.lastEventAt ?? null],
+      ["issue", lastIssueAt]
+    ];
+    let lastActivityAt = null;
+    let lastActivitySource = null;
+    for (const [src, at] of sources) {
+      if (at && (!lastActivityAt || new Date(at).getTime() > new Date(lastActivityAt).getTime())) {
+        lastActivityAt = at;
+        lastActivitySource = src;
+      }
+    }
+    const idleDays = lastActivityAt ? Math.floor((Date.now() - new Date(lastActivityAt).getTime()) / DAY) : null;
+    const activeCycle = cycles.find((c) => c.projectId === p.id && c.status === "ativo") ?? null;
+    const alerts = [];
+    const open = p.status !== "concluido" && p.status !== "encerrado";
+    if (p.status === "foco" && !p.nextAction) alerts.push({ kind: "sem_proxima_acao", severity: "alta", text: "Em foco sem próxima ação" });
+    if (open && p.blocker) alerts.push({ kind: "travado", severity: "alta", text: `Travado: ${p.blocker}` });
+    if (p.status === "pausado" && p.resumeAt && p.resumeAt <= today) alerts.push({ kind: "pausa_vencida", severity: "alta", text: `Pausa venceu em ${p.resumeAt} — retomar ou decidir` });
+    if (p.status === "foco" && (idleDays == null || idleDays >= 7)) alerts.push({ kind: "parado", severity: "media", text: idleDays == null ? "Em foco sem nenhuma atividade" : `Em foco, mas parado há ${idleDays} dias` });
+    if ((p.status === "fila" || p.status === "incubadora") && idleDays != null && idleDays >= 45)
+      alerts.push({ kind: "esquecido", severity: "baixa", text: `Esquecido há ${idleDays} dias` });
+    else if (p.status === "baixa" && idleDays != null && idleDays >= 90)
+      alerts.push({ kind: "esquecido", severity: "baixa", text: `Esquecido há ${idleDays} dias` });
+    if (activeCycle?.dueDate) {
+      if (activeCycle.dueDate < today) alerts.push({ kind: "ciclo_vencido", severity: "alta", text: `Ciclo "${activeCycle.name}" venceu em ${activeCycle.dueDate}` });
+      else if ((/* @__PURE__ */ new Date(`${activeCycle.dueDate}T12:00:00`)).getTime() - Date.now() <= 3 * DAY)
+        alerts.push({ kind: "ciclo_vence", severity: "media", text: `Ciclo "${activeCycle.name}" vence em ${activeCycle.dueDate}` });
+    }
+    const lateMs = ms.filter((m) => !m.doneAt && m.targetDate && m.targetDate < today);
+    if (open && lateMs.length) alerts.push({ kind: "marco_vencido", severity: "media", text: `${lateMs.length} marco(s) atrasado(s): ${lateMs[0].title}` });
+    if (p.status === "foco" && !p.finishLine) alerts.push({ kind: "sem_linha_chegada", severity: "baixa", text: 'Sem linha de chegada ("pronto quando…")' });
+    if (p.status === "foco" && inFocus > focusLimit) alerts.push({ kind: "foco_excedido", severity: "baixa", text: `${inFocus} projetos em foco (limite ${focusLimit})` });
+    if (!p.triagedAt && open) alerts.push({ kind: "sem_triagem", severity: "baixa", text: "Ainda não passou pela triagem" });
+    const file = p.localPath ? path.join(expandHome$2(p.localPath), ROADMAP_FILE) : null;
+    return {
+      projectId: p.id,
+      minutesTotal: n?.minutesTotal ?? 0,
+      minutes7d: n?.minutes7d ?? 0,
+      minutes30d: n?.minutes30d ?? 0,
+      openTodos: n?.openTodos ?? 0,
+      doneTodos: n?.doneTodos ?? 0,
+      openIssues,
+      milestonesTotal: ms.length,
+      milestonesDone: ms.filter((m) => m.doneAt).length,
+      progress,
+      lastCommitAt: g.lastCommitAt,
+      commits7d: g.commits7d,
+      lastActivityAt,
+      lastActivitySource,
+      idleDays,
+      pulse: open ? pulseOf(idleDays) : "parado",
+      activeCycle,
+      hasRoadmap: !!file && fs.existsSync(file),
+      alerts
+    };
+  });
+}
+async function checkProjectRadar(force = false) {
+  const today = todayStr();
+  if (!force && await getSetting("projects_radar_last") === today) return 0;
+  await setSetting("projects_radar_last", today);
+  const [projects, overview] = await Promise.all([getProjects(), projectsOverview()]);
+  const name = (id) => projects.find((p) => p.id === id)?.name ?? `#${id}`;
+  const important = overview.flatMap(
+    (o) => o.alerts.filter((a) => a.severity !== "baixa").map((a) => `• ${name(o.projectId)}: ${a.text}`)
+  );
+  let sent = 0;
+  if (important.length) {
+    await notify({
+      title: `🗂 ${important.length} alerta(s) nos projetos`,
+      body: important.slice(0, 6).join("\n") + (important.length > 6 ? `
+… e mais ${important.length - 6}` : ""),
+      source: "projetos",
+      page: "projects"
+    });
+    sent++;
+  }
+  const dow = (/* @__PURE__ */ new Date()).getDay();
+  const lastReview = await getSetting("projects_last_review");
+  if ((dow === 0 || dow === 1) && (!lastReview || Date.now() - new Date(lastReview).getTime() > 7 * DAY)) {
+    await notify({ title: "🗓️ Revisão semanal dos projetos", body: "Decida: continuar, pausar, retomar ou encerrar.", source: "projetos", page: "weekly-review" });
+    sent++;
+  }
+  return sent;
+}
+const GROUPS = [
+  { key: "feat", title: "✨ Novidades", re: /^feat(\(.+?\))?!?:/i },
+  { key: "fix", title: "🐛 Correções", re: /^fix(\(.+?\))?!?:/i },
+  { key: "perf", title: "⚡ Melhorias", re: /^(perf|refactor|style|ux)(\(.+?\))?!?:/i },
+  { key: "docs", title: "📝 Documentação", re: /^docs(\(.+?\))?!?:/i },
+  { key: "chore", title: "🔧 Manutenção", re: /^(chore|build|ci|test)(\(.+?\))?!?:/i }
+];
+async function cycleCommits(cycleId) {
+  const c = await getProjectCycle(cycleId);
+  if (!c) throw new Error("Ciclo não encontrado");
+  const p = await getProject(c.projectId);
+  if (!p?.localPath) return [];
+  const until = c.closedAt ?? (/* @__PURE__ */ new Date()).toISOString();
+  const out = await gitQuiet(expandHome$2(p.localPath), ["log", "--no-merges", `--since=${c.startDate}T00:00:00`, `--until=${until}`, "--format=%h%x1f%s%x1f%aI"]);
+  return (out ?? "").split("\n").filter(Boolean).map((l) => {
+    const [hash, subject, date] = l.split("");
+    return { hash, subject, date };
+  });
+}
+function groupedChangelog(name, commits) {
+  if (!commits.length) return `## ${name}
+
+_Nenhum commit no período do ciclo._`;
+  const buckets = /* @__PURE__ */ new Map();
+  for (const c of commits) {
+    const g = GROUPS.find((x) => x.re.test(c.subject));
+    const title = g?.title ?? "📦 Outros";
+    const text = g ? c.subject.replace(g.re, "").trim() : c.subject;
+    if (!buckets.has(title)) buckets.set(title, []);
+    buckets.get(title).push(`- ${text.charAt(0).toUpperCase()}${text.slice(1)} (${c.hash})`);
+  }
+  const order = [...GROUPS.map((g) => g.title), "📦 Outros"];
+  return [`## ${name}`, "", ...order.filter((t) => buckets.has(t)).flatMap((t) => [`### ${t}`, ...buckets.get(t), ""])].join("\n").trim();
+}
+async function generateCycleChangelog(cycleId, useAi) {
+  const c = await getProjectCycle(cycleId);
+  if (!c) throw new Error("Ciclo não encontrado");
+  const p = await getProject(c.projectId);
+  const commits = await cycleCommits(cycleId);
+  let md = groupedChangelog(c.name, commits);
+  if (useAi && commits.length) {
+    try {
+      const command = p?.claudeCommand?.trim() || await getSetting("claude_command") || "claude";
+      const out = await runClaude(
+        `[rickos:changelog] Escreva o CHANGELOG da versão/ciclo "${c.name}" do projeto "${p?.name ?? ""}"${c.goal ? ` (objetivo: ${c.goal})` : ""} a partir dos commits abaixo.
+Markdown, em português, voltado a quem USA o produto: comece com "## ${c.name}" e 1 frase de destaque; depois seções curtas (✨ Novidades, ⚡ Melhorias, 🐛 Correções) com bullets claros. Junte commits repetidos, ignore ruído (merges, builds, "wip", atualizações de dist). Não invente nada. Responda só o Markdown.
+
+Commits (${commits.length}):
+${commits.map((x) => `- ${x.date.slice(0, 10)} ${x.subject}`).join("\n")}`,
+        command,
+        { model: (await getSetting("claude_model") || "").trim(), timeoutMs: 18e4, usage: { source: "changelog", projectId: c.projectId } }
+      );
+      if (out.trim()) md = out.trim();
+    } catch {
+    }
+  }
+  await setCycleChangelog(cycleId, md);
+  return md;
+}
+async function setProjectSchedule(projectId, days, start, minutes, syncCalendar) {
+  const p = await getProject(projectId);
+  if (!p) throw new Error("Projeto não encontrado");
+  const clean = [...new Set(days)].filter((d) => d >= 0 && d <= 6).sort();
+  await patchProject(projectId, { workDays: clean.length ? JSON.stringify(clean) : null, workStart: start, workMinutes: minutes });
+  let eventLink = null;
+  if (syncCalendar) {
+    if (clean.length && start && minutes) {
+      const ev = await upsertRecurringBlock({
+        summary: `🗂 ${p.name}`,
+        description: `Bloco do projeto ${p.name} (rickOS).${p.nextAction ? `
+Próxima ação: ${p.nextAction}` : ""}${p.finishLine ? `
+Pronto quando: ${p.finishLine}` : ""}`,
+        days: clean,
+        start,
+        minutes,
+        eventId: p.calendarEventId,
+        email: p.calendarAccount
+      });
+      await patchProject(projectId, { calendarEventId: ev.eventId, calendarAccount: ev.account });
+      eventLink = ev.link;
+      const names = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+      await addProjectEvent(projectId, "decisao", `Dias do projeto: ${clean.map((d) => names[d]).join(", ")} às ${start} (${minutes} min) — bloco no Google Calendar`);
+    } else if (p.calendarEventId) {
+      await deleteRecurringBlock(p.calendarEventId, p.calendarAccount);
+      await patchProject(projectId, { calendarEventId: null, calendarAccount: null });
+    }
+  }
+  return { eventLink };
+}
+const HOOK_FILE = "rickos-claude-hook.mjs";
+const MARK = "rickos-claude-hook";
+const SETTINGS_FILE = path.join(os.homedir(), ".claude", "settings.json");
+const AUTO_WHERE_KEY = "projects_auto_where";
+const HOOK_MODEL_KEY = "projects_hook_model";
+const HOOK_LAST_KEY = "projects_hook_last";
+function hookScriptPath() {
+  return path.join(dataDir(), "hooks", HOOK_FILE);
+}
+function serverUrl$1() {
+  const cfg2 = getConfig();
+  const host = cfg2.host === "0.0.0.0" || cfg2.host === "::" ? "127.0.0.1" : cfg2.host;
+  return `http://${host}:${cfg2.port}`;
+}
+function hookScript() {
+  const cfg2 = getConfig();
+  return `#!/usr/bin/env node
+// Gerado pelo rickOS — hook SessionEnd do Claude Code: avisa o rickOS que a sessão terminou
+// para ele preencher o "onde parei" do projeto. Nunca bloqueia o Claude (sai sempre com 0).
+if (process.env.RICKOS_CLAUDE_RUN) process.exit(0)
+const URL = ${JSON.stringify(serverUrl$1())}
+const TOKEN = ${JSON.stringify(cfg2.token || "")}
+let raw = ''
+process.stdin.on('data', (d) => (raw += d))
+process.stdin.on('end', async () => {
+  try {
+    const input = JSON.parse(raw || '{}')
+    const ctrl = new AbortController()
+    setTimeout(() => ctrl.abort(), 4000)
+    await fetch(URL + '/api/rpc/projects:claudeSession', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(TOKEN ? { authorization: 'Bearer ' + TOKEN } : {}) },
+      body: JSON.stringify({ args: [{ cwd: input.cwd, transcriptPath: input.transcript_path, sessionId: input.session_id, reason: input.reason || input.hook_event_name || null }] }),
+      signal: ctrl.signal
+    })
+  } catch {}
+  process.exit(0)
+})
+`;
+}
+function readSettings() {
+  if (!fs.existsSync(SETTINGS_FILE)) return {};
+  const raw = fs.readFileSync(SETTINGS_FILE, "utf8").trim();
+  if (!raw) return {};
+  return JSON.parse(raw);
+}
+const isOurs = (e) => !!e.hooks?.some((h) => h.command.includes(MARK));
+async function claudeHookStatus() {
+  let installed = false;
+  try {
+    installed = !!readSettings().hooks?.SessionEnd?.some(isOurs) && fs.existsSync(hookScriptPath());
+  } catch {
+    installed = false;
+  }
+  let last = null;
+  try {
+    last = JSON.parse(await getSetting(HOOK_LAST_KEY) || "null");
+  } catch {
+    last = null;
+  }
+  return {
+    installed,
+    enabled: await getSetting(AUTO_WHERE_KEY) !== "0",
+    settingsPath: SETTINGS_FILE,
+    scriptPath: hookScriptPath(),
+    model: await getSetting(HOOK_MODEL_KEY) || "haiku",
+    last
+  };
+}
+async function installClaudeHook() {
+  const script = hookScriptPath();
+  fs.mkdirSync(path.dirname(script), { recursive: true });
+  fs.writeFileSync(script, hookScript(), { mode: 493 });
+  const settings = readSettings();
+  const hooks = settings.hooks ?? {};
+  const list = (hooks.SessionEnd ?? []).filter((e) => !isOurs(e));
+  list.push({ hooks: [{ type: "command", command: `node ${JSON.stringify(script)}`, timeout: 10 }] });
+  settings.hooks = { ...hooks, SessionEnd: list };
+  fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
+  if (fs.existsSync(SETTINGS_FILE)) fs.copyFileSync(SETTINGS_FILE, `${SETTINGS_FILE}.rickos-backup`);
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2) + "\n");
+  await setSetting(AUTO_WHERE_KEY, "1");
+  return claudeHookStatus();
+}
+async function uninstallClaudeHook() {
+  const settings = readSettings();
+  if (settings.hooks?.SessionEnd) {
+    const list = settings.hooks.SessionEnd.filter((e) => !isOurs(e));
+    if (list.length) settings.hooks.SessionEnd = list;
+    else delete settings.hooks.SessionEnd;
+    if (!Object.keys(settings.hooks).length) delete settings.hooks;
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2) + "\n");
+  }
+  try {
+    fs.unlinkSync(hookScriptPath());
+  } catch {
+  }
+  return claudeHookStatus();
+}
+function expandHome$1(p) {
+  return p.startsWith("~") ? path.join(os.homedir(), p.slice(1)) : p;
+}
+const norm = (p) => path.resolve(expandHome$1(p)).replace(/\/+$/, "");
+async function projectForDir(cwd) {
+  const projects = (await getProjects()).filter((p) => p.localPath);
+  const dir = norm(cwd);
+  const byPath = (d) => projects.filter((p) => d === norm(p.localPath) || d.startsWith(norm(p.localPath) + "/")).sort((a, b) => norm(b.localPath).length - norm(a.localPath).length)[0] ?? null;
+  const direct = byPath(dir);
+  if (direct) return direct;
+  const common = await gitQuiet(dir, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  if (common?.trim()) return byPath(norm(path.dirname(common.trim())));
+  return null;
+}
+function textOf(content) {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content.filter((b) => b && typeof b === "object" && b.type === "text").map((b) => b.text ?? "").join("\n");
+  }
+  return "";
+}
+function readTranscript(file) {
+  const t = { prompts: [], replies: [], startedAt: null, branch: null };
+  if (!file || !fs.existsSync(file)) return t;
+  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    let row;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (row.timestamp && !t.startedAt) t.startedAt = row.timestamp;
+    if (row.gitBranch) t.branch = row.gitBranch;
+    if (row.isMeta) continue;
+    if (row.type === "user") {
+      const txt = textOf(row.message?.content).trim();
+      if (!txt || /^<(command-|local-command|system-reminder)|^Caveat:/.test(txt)) continue;
+      t.prompts.push(txt);
+    } else if (row.type === "assistant") {
+      const txt = textOf(row.message?.content).trim();
+      if (txt) t.replies.push(txt);
+    }
+  }
+  return t;
+}
+const clip = (s, n) => s.length > n ? s.slice(0, n) + "…" : s;
+const seen = /* @__PURE__ */ new Map();
+async function handleClaudeSession(payload) {
+  if (!payload?.cwd) return { accepted: false, project: null, reason: "sem cwd" };
+  if (await getSetting(AUTO_WHERE_KEY) === "0") return { accepted: false, project: null, reason: "desligado" };
+  const project = await projectForDir(payload.cwd);
+  if (!project) return { accepted: false, project: null, reason: "pasta não pertence a nenhum projeto" };
+  const key = payload.sessionId || payload.transcriptPath || "";
+  if (key && seen.has(key) && Date.now() - seen.get(key) < 10 * 60 * 1e3) return { accepted: false, project: project.name, reason: "repetido" };
+  if (key) seen.set(key, Date.now());
+  void summarize(project.id, payload).catch(async (e) => {
+    await setSetting(HOOK_LAST_KEY, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), project: project.name, status: `erro: ${e instanceof Error ? e.message : String(e)}` }));
+  });
+  return { accepted: true, project: project.name };
+}
+async function summarize(projectId, payload) {
+  const project = await getProject(projectId);
+  if (!project) return;
+  const tr = readTranscript(payload.transcriptPath ?? "");
+  const markLast = (status2) => setSetting(HOOK_LAST_KEY, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), project: project.name, status: status2 }));
+  if (!tr.prompts.length || tr.prompts[0].includes("[rickos:")) return void await markLast("ignorada (sessão vazia ou interna)");
+  const since = tr.startedAt ?? new Date(Date.now() - 3 * 3600 * 1e3).toISOString();
+  const commits = (await gitQuiet(payload.cwd, ["log", `--since=${since}`, "--format=%h %s", "-20"]) ?? "").trim();
+  const status = (await gitQuiet(payload.cwd, ["status", "--short"]) ?? "").trim().split("\n").filter(Boolean);
+  const prompt = `[rickos:onde-parei] Resuma esta sessão de programação com o Claude Code no projeto "${project.name}" para eu retomar depois.
+Responda APENAS com JSON: {"whereLeftOff": "2-4 frases em primeira pessoa: o que foi feito, o estado atual, o detalhe que eu esqueceria", "nextStep": "a próxima ação concreta, curta (ou null)"}
+
+Branch: ${tr.branch ?? "?"}
+Pedidos que fiz (em ordem):
+${tr.prompts.slice(-10).map((p, i) => `${i + 1}. ${clip(p.replace(/\s+/g, " "), 400)}`).join("\n")}
+
+Últimas respostas do Claude:
+${tr.replies.slice(-4).map((r) => `- ${clip(r.replace(/\s+/g, " "), 600)}`).join("\n")}
+
+Commits durante a sessão:
+${commits || "(nenhum)"}
+Arquivos não commitados: ${status.length ? status.slice(0, 15).join(", ") : "(nenhum)"}`;
+  const command = project.claudeCommand?.trim() || await getSetting("claude_command") || "claude";
+  const model = await getSetting(HOOK_MODEL_KEY) || "haiku";
+  let where = "";
+  let next = null;
+  try {
+    const out = await runClaude(prompt, command, { model, timeoutMs: 12e4, usage: { source: "onde-parei", projectId } });
+    const m = out.match(/\{[\s\S]*\}/);
+    const j = m ? JSON.parse(m[0]) : null;
+    where = (j?.whereLeftOff ?? "").trim();
+    next = j?.nextStep?.trim() || null;
+  } catch {
+    where = `Última sessão (${tr.branch ?? "branch ?"}): ${clip(tr.prompts[tr.prompts.length - 1].replace(/\s+/g, " "), 220)}${commits ? ` · commits: ${commits.split("\n").slice(0, 3).join("; ")}` : ""}${status.length ? ` · ${status.length} arquivo(s) sem commit` : ""}`;
+  }
+  if (!where) return void await markLast("resumo vazio");
+  const fields = { whereLeftOff: where };
+  if (!project.nextAction && next) fields.nextAction = next;
+  await patchProject(projectId, fields);
+  await addProjectEvent(projectId, "sessao_claude", `Sessão do Claude Code (${tr.prompts.length} pedido(s)${tr.branch ? `, ${tr.branch}` : ""})${next && project.nextAction ? ` · sugestão de próximo passo: ${next}` : ""}`);
+  await markLast("ok");
+  broadcast("projects:updated", { id: projectId });
+}
+const kills = /* @__PURE__ */ new Map();
+function expandHome(p) {
+  return p.startsWith("~") ? path.join(os.homedir(), p.slice(1)) : p;
+}
+function slugify(s) {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "tarefa";
+}
+function stamp() {
+  const d = /* @__PURE__ */ new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
+const changed = (projectId) => {
+  broadcast("projects:updated", { id: projectId });
+  broadcast("delegations:updated", { projectId });
+};
+async function recoverDelegations() {
+  for (const d of await getDelegations(null)) {
+    if (d.status === "rodando") await updateDelegation(d.id, { status: "erro", error: "O servidor reiniciou durante a execução.", finishedAt: (/* @__PURE__ */ new Date()).toISOString() });
+  }
+}
+async function delegateNextAction(projectId, action, instructions) {
+  const p = await getProject(projectId);
+  if (!p) throw new Error("Projeto não encontrado");
+  const task = (action ?? p.nextAction ?? "").trim();
+  if (!task) throw new Error("Defina a próxima ação antes de delegar.");
+  if (!p.localPath) throw new Error("Defina o caminho local do projeto (repositório git).");
+  const repo = path.resolve(expandHome(p.localPath));
+  const top = (await gitQuiet(repo, ["rev-parse", "--show-toplevel"]))?.trim();
+  if (!top) throw new Error("O caminho local não é um repositório git.");
+  const base = (await gitQuiet(top, ["rev-parse", "--abbrev-ref", "HEAD"]))?.trim() || "HEAD";
+  const name = `rickos-${slugify(task)}-${stamp()}`;
+  const branch = `claude/${name}`;
+  const wtDir = path.join(path.dirname(top), ".worktrees", `${path.basename(top)}-${name}`);
+  fs.mkdirSync(path.dirname(wtDir), { recursive: true });
+  const added = await gitQuiet(top, ["worktree", "add", "-b", branch, wtDir, "HEAD"]);
+  if (added == null || !fs.existsSync(wtDir)) throw new Error("Não consegui criar o worktree (git worktree add falhou).");
+  const d = await createDelegation({ projectId, action: task, instructions: instructions?.trim() || null, repoPath: top, branch, worktreePath: wtDir, baseRef: base });
+  await addProjectEvent(projectId, "delegacao", `🤖 Delegada ao Claude: ${task} (${branch})`);
+  changed(projectId);
+  const prompt = `[rickos:delegacao] Você é um engenheiro trabalhando sozinho no projeto "${p.name}".
+Você está num git worktree ISOLADO, na branch "${branch}" (criada a partir de "${base}"). Pode editar à vontade aqui.
+
+TAREFA (a próxima ação do projeto):
+${task}
+${instructions?.trim() ? `
+Instruções adicionais:
+${instructions.trim()}
+` : ""}
+Contexto do projeto:
+${p.description ? `- Descrição: ${p.description}
+` : ""}${p.finishLine ? `- Linha de chegada: ${p.finishLine}
+` : ""}${p.scope ? `- Escopo atual: ${p.scope}
+` : ""}${p.whereLeftOff ? `- Onde parei: ${p.whereLeftOff}
+` : ""}
+Regras:
+- Leia o CLAUDE.md / README do repositório antes de mudar algo e siga as convenções.
+- Faça a menor mudança que conclua a tarefa. Rode o typecheck/testes se existirem.
+- Faça commits pequenos com mensagens claras NESTA branch. NÃO faça push, NÃO abra PR, NÃO mexa fora deste diretório.
+- Se a tarefa for ambígua ou grande demais, faça a parte segura e explique o resto.
+
+No final, escreva um resumo em Markdown com: **O que fiz**, **Como testar**, **O que falta / dúvidas**.`;
+  const command = p.claudeCommand?.trim() || await getSetting("claude_command") || "claude";
+  const model = (await getSetting("claude_model") || "").trim();
+  const allowed = ["Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)", "Bash(git commit:*)", "Bash(npm run:*)", "Bash(npx tsc:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(grep:*)", "Bash(rg:*)", "Bash(find:*)"];
+  runClaude(prompt, command, {
+    model,
+    cwd: wtDir,
+    agentic: true,
+    permissionMode: "acceptEdits",
+    extraArgs: ["--allowedTools", allowed.join(",")],
+    timeoutMs: 0,
+    usage: { source: "delegacao", projectId },
+    registerChild: (kill) => kills.set(d.id, kill)
+  }).then(async (out) => {
+    kills.delete(d.id);
+    const cur = await getDelegation(d.id);
+    if (cur?.status === "cancelada") return;
+    await updateDelegation(d.id, { status: "pronta", output: out, finishedAt: (/* @__PURE__ */ new Date()).toISOString() });
+    await addProjectEvent(projectId, "delegacao", `🤖 Delegação pronta para revisão: ${task}`);
+    void notify({ title: `🤖 ${p.name}: delegação pronta`, body: task, source: "ia", page: "projects" });
+    changed(projectId);
+  }).catch(async (e) => {
+    kills.delete(d.id);
+    const cur = await getDelegation(d.id);
+    if (cur?.status === "cancelada") return;
+    await updateDelegation(d.id, { status: "erro", error: e instanceof Error ? e.message : String(e), finishedAt: (/* @__PURE__ */ new Date()).toISOString() });
+    void notify({ title: `⚠️ ${p.name}: delegação falhou`, body: task, source: "ia", page: "projects" });
+    changed(projectId);
+  });
+  return d;
+}
+async function cancelDelegation(id) {
+  const d = await getDelegation(id);
+  if (!d) return;
+  await updateDelegation(id, { status: "cancelada", finishedAt: (/* @__PURE__ */ new Date()).toISOString() });
+  kills.get(id)?.();
+  kills.delete(id);
+  changed(d.projectId);
+}
+async function reviewDelegation(id) {
+  const d = await getDelegation(id);
+  if (!d) throw new Error("Delegação não encontrada");
+  const exists = fs.existsSync(d.worktreePath);
+  const base = d.baseRef && d.baseRef !== "HEAD" ? d.baseRef : null;
+  const range = base ? `${base}..${d.branch}` : `${d.branch}~20..${d.branch}`;
+  const log = await gitQuiet(d.repoPath, ["log", "--format=%h%x1f%s", range]) ?? "";
+  const stat = base ? await gitQuiet(d.repoPath, ["diff", "--stat", `${base}...${d.branch}`]) ?? "" : "";
+  const st = exists ? await gitQuiet(d.worktreePath, ["status", "--short"]) ?? "" : "";
+  return {
+    commits: log.split("\n").filter(Boolean).map((l) => {
+      const [hash, subject] = l.split("");
+      return { hash, subject };
+    }),
+    diffStat: stat.trim(),
+    uncommitted: st.split("\n").filter(Boolean),
+    worktreeExists: exists
+  };
+}
+async function discardDelegation(id) {
+  const d = await getDelegation(id);
+  if (!d) return;
+  if (d.status === "rodando") throw new Error("Cancele a execução antes de descartar.");
+  if (fs.existsSync(d.worktreePath)) await gitQuiet(d.repoPath, ["worktree", "remove", "--force", d.worktreePath]);
+  await gitQuiet(d.repoPath, ["worktree", "prune"]);
+  await gitQuiet(d.repoPath, ["branch", "-D", d.branch]);
+  await updateDelegation(id, { status: "descartada" });
+  await addProjectEvent(d.projectId, "delegacao", `🗑 Delegação descartada: ${d.action}`);
+  changed(d.projectId);
+}
+async function acceptDelegation(id) {
+  const d = await getDelegation(id);
+  if (!d) return;
+  await updateDelegation(id, { status: "aceita" });
+  await addProjectEvent(d.projectId, "delegacao", `✅ Delegação aceita: ${d.action}`);
+  changed(d.projectId);
+}
+async function prDelegation(id) {
+  const d = await getDelegation(id);
+  if (!d) throw new Error("Delegação não encontrada");
+  await scanGit({});
+  const r = await createPullRequest(d.repoPath, d.branch);
+  await updateDelegation(id, { prUrl: r.url });
+  await addProjectEvent(d.projectId, "delegacao", `🔀 PR aberto: ${r.url}`);
+  changed(d.projectId);
+  return r;
+}
 const handlers = /* @__PURE__ */ new Map();
 const ipcMain = {
   handle(channel, fn) {
@@ -3973,6 +5246,9 @@ function startScheduler() {
   setInterval(() => void runScheduledJobs(), 5 * 60 * 1e3);
   setTimeout(() => void maybeAutoSyncGoogle(), 8e3);
   setInterval(() => void maybeAutoSyncGoogle(), 6 * 60 * 60 * 1e3);
+  setTimeout(() => void checkProjectRadar().catch(() => void 0), 6e4);
+  void recoverDelegations().catch(() => void 0);
+  setInterval(() => void checkProjectRadar().catch(() => void 0), 60 * 60 * 1e3);
 }
 ipcMain.handle("tags:getAll", () => getAllTags());
 ipcMain.handle(
@@ -3990,11 +5266,12 @@ ipcMain.handle(
   (_, startDate, endDate) => getTasksForRange(startDate, endDate)
 );
 ipcMain.handle("tasks:getActive", () => getActiveTask());
-ipcMain.handle("tasks:start", async (_, title, tagId, secondaryTagId, startTime, studyNodeId) => {
+ipcMain.handle("tasks:start", async (_, title, tagId, secondaryTagId, startTime, studyNodeId, projectId) => {
   const now = startTime || (/* @__PURE__ */ new Date()).toISOString();
   await stopAllActiveTasks(now);
-  return createTask(title, tagId, secondaryTagId, now, null, studyNodeId ?? null);
+  return createTask(title, tagId, secondaryTagId, now, null, studyNodeId ?? null, projectId ?? null);
 });
+ipcMain.handle("tasks:setProject", (_, taskId, projectId) => setTaskProject(taskId, projectId));
 ipcMain.handle("tasks:stop", async (_, id, endTime) => {
   const now = endTime || (/* @__PURE__ */ new Date()).toISOString();
   await stopTask(id, now);
@@ -4096,12 +5373,12 @@ async function runScheduledJobs() {
   try {
     const jobs = (await getScheduledJobs()).filter((j) => j.enabled);
     const now = /* @__PURE__ */ new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const todayStr2 = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     for (const job of jobs) {
       if (now.getHours() < job.hour) continue;
       const ranDay = job.lastRunAt ? job.lastRunAt.slice(0, 10) : "";
-      if (ranDay === todayStr) continue;
-      await setJobRan(job.id, todayStr);
+      if (ranDay === todayStr2) continue;
+      await setJobRan(job.id, todayStr2);
       try {
         const command = await resolveClaudeCommand();
         const out = await runClaude(job.prompt, command, { model: await resolveModel(), timeoutMs: 0, usage: { source: "agendador" } });
@@ -4259,6 +5536,80 @@ ipcMain.handle("milestones:getAll", () => getProjectMilestones());
 ipcMain.handle("milestones:create", (_, projectId, title, targetDate) => createProjectMilestone(projectId, title, targetDate));
 ipcMain.handle("milestones:toggle", (_, id, done) => toggleProjectMilestone(id, done));
 ipcMain.handle("milestones:delete", (_, id) => deleteProjectMilestone(id));
+ipcMain.handle(
+  "milestones:update",
+  (_, id, title, targetDate, cycleId, description) => updateProjectMilestone(id, title, targetDate, cycleId, description)
+);
+const projectsChanged = (id) => broadcast("projects:updated", { id: id ?? null });
+ipcMain.handle("projects:get", (_, id) => getProject(id));
+ipcMain.handle("projects:patch", async (_, id, fields) => {
+  const p = await patchProject(id, fields);
+  projectsChanged(id);
+  return p;
+});
+ipcMain.handle("projects:setStatus", async (_, id, status, payload) => {
+  const p = await setProjectStatus(id, status, payload ?? {});
+  projectsChanged(id);
+  return p;
+});
+ipcMain.handle("projects:completeNextAction", async (_, id, next, size) => {
+  const p = await completeNextAction(id, next, size ?? null);
+  projectsChanged(id);
+  return p;
+});
+ipcMain.handle("projects:overview", () => projectsOverview());
+ipcMain.handle("projects:events", (_, projectId, limit) => getProjectEvents(projectId ?? null, limit ?? 200));
+ipcMain.handle("projects:addEvent", async (_, projectId, kind, text) => {
+  await addProjectEvent(projectId, kind, text);
+  projectsChanged(projectId);
+});
+ipcMain.handle("projects:commits", (_, projectId, limit) => projectCommits(projectId, limit ?? 30));
+ipcMain.handle("projects:tasks", (_, projectId, limit) => getProjectTasks(projectId, limit ?? 100));
+ipcMain.handle("projects:hours", (_, from, to) => getProjectHours(from, to));
+ipcMain.handle("projects:unlinkedTags", () => getUnlinkedTagHours());
+ipcMain.handle("projects:linkTodos", (_, todoIds, projectId, milestoneId) => linkTodosToProject(todoIds, projectId, milestoneId ?? null));
+ipcMain.handle("projects:setTodoMilestone", (_, todoId, milestoneId) => setTodoMilestone(todoId, milestoneId));
+ipcMain.handle("projects:linkTag", (_, tagId, projectId) => setTagProject(tagId, projectId));
+ipcMain.handle("projects:roadmap", (_, projectId) => readRoadmap(projectId));
+ipcMain.handle("projects:roadmapSet", (_, projectId, line, expected, mark) => setRoadmapItem(projectId, line, expected, mark));
+ipcMain.handle("projects:roadmapCreate", (_, projectId) => createRoadmapTemplate(projectId));
+ipcMain.handle("projects:radarCheck", () => checkProjectRadar(true));
+ipcMain.handle("cycles:getAll", (_, projectId) => getProjectCycles(projectId ?? null));
+ipcMain.handle("cycles:create", (_, projectId, name, goal, startDate, dueDate) => createProjectCycle(projectId, name, goal, startDate, dueDate));
+ipcMain.handle("cycles:update", (_, id, name, goal, dueDate) => updateProjectCycle(id, name, goal, dueDate));
+ipcMain.handle("cycles:extend", (_, id, newDueDate, reason) => extendProjectCycle(id, newDueDate, reason));
+ipcMain.handle("cycles:close", async (_, id, status, retrospective) => {
+  await closeProjectCycle(id, status, retrospective);
+  const c = await getProjectCycle(id);
+  if (status === "concluido" && c && !c.changelog) await generateCycleChangelog(id, false).catch(() => void 0);
+});
+ipcMain.handle("cycles:changelog", (_, id, useAi) => generateCycleChangelog(id, !!useAi));
+ipcMain.handle("cycles:commits", (_, id) => cycleCommits(id));
+ipcMain.handle("projects:setSchedule", async (_, projectId, days, start, minutes, syncCalendar) => {
+  const r = await setProjectSchedule(projectId, days, start, minutes, !!syncCalendar);
+  projectsChanged(projectId);
+  return r;
+});
+ipcMain.handle("projects:claudeSession", (_, payload) => handleClaudeSession(payload));
+ipcMain.handle("projects:hookStatus", () => claudeHookStatus());
+ipcMain.handle("projects:hookInstall", () => installClaudeHook());
+ipcMain.handle("projects:hookUninstall", () => uninstallClaudeHook());
+ipcMain.handle("projects:hookConfig", async (_, enabled, model) => {
+  await setSetting(AUTO_WHERE_KEY, enabled ? "1" : "0");
+  if (model != null) await setSetting(HOOK_MODEL_KEY, model.trim());
+  return claudeHookStatus();
+});
+ipcMain.handle("delegations:getAll", (_, projectId) => getDelegations(projectId ?? null));
+ipcMain.handle("delegations:start", (_, projectId, action, instructions) => delegateNextAction(projectId, action, instructions));
+ipcMain.handle("delegations:cancel", (_, id) => cancelDelegation(id));
+ipcMain.handle("delegations:review", (_, id) => reviewDelegation(id));
+ipcMain.handle("delegations:discard", (_, id) => discardDelegation(id));
+ipcMain.handle("delegations:accept", (_, id) => acceptDelegation(id));
+ipcMain.handle("delegations:pr", (_, id) => prDelegation(id));
+ipcMain.handle("cycles:delete", (_, id) => deleteProjectCycle(id));
+ipcMain.handle("projectNotes:getAll", (_, projectId) => getProjectNotes(projectId));
+ipcMain.handle("projectNotes:save", (_, note) => saveProjectNote(note));
+ipcMain.handle("projectNotes:delete", (_, id) => deleteProjectNote(id));
 ipcMain.handle("habits:getAll", () => getHabits());
 ipcMain.handle(
   "habits:create",
@@ -4673,8 +6024,8 @@ ipcMain.handle("app:exportDbToDrive", async (_, email) => {
     saveDb();
     const now = /* @__PURE__ */ new Date();
     const pad = (n) => String(n).padStart(2, "0");
-    const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
-    const fileName = `timetracker_snapshot_${stamp}.sqlite`;
+    const stamp2 = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+    const fileName = `timetracker_snapshot_${stamp2}.sqlite`;
     const r = await uploadFileToDrive(dbFilePath(), fileName, email);
     return { ok: true, target: "drive", message: `Enviado ao Google Drive (${r.account}): ${r.name}`, link: r.link };
   } catch (e) {

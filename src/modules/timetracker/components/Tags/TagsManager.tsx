@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTagStore } from '../../store/tagStore'
 import { Tag } from '@/types'
+import { useProjectStore } from '../../../projects/store/projectStore'
 
 const PRESET_COLORS = [
   '#6366f1', '#3b82f6', '#22c55e', '#f59e0b',
@@ -16,7 +17,16 @@ interface FormState {
 const defaultForm: FormState = { name: '', color: '#6366f1', isProductive: 1 }
 
 export function TagsManager(): React.ReactElement {
-  const { tags, createTag, updateTag, deleteTag } = useTagStore()
+  const { tags, createTag, updateTag, deleteTag, refreshTags } = useTagStore()
+  const { projects, refresh: refreshProjects } = useProjectStore()
+  useEffect(() => {
+    if (!projects.length) void refreshProjects()
+  }, [])
+
+  async function linkProject(tag: Tag, projectId: number | null): Promise<void> {
+    await window.api.projects.linkTag(tag.id, projectId)
+    await refreshTags()
+  }
   const [form, setForm] = useState<FormState>(defaultForm)
   const [editing, setEditing] = useState<Tag | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -130,6 +140,20 @@ export function TagsManager(): React.ReactElement {
             <span className={`tag-badge ${tag.isProductive === 1 ? 'productive' : tag.isProductive === 2 ? 'semi-productive' : tag.isProductive === 3 ? 'productive-eros' : 'idle'}`}>
               {tag.isProductive === 1 ? 'Productive' : tag.isProductive === 2 ? 'Semi-productive' : tag.isProductive === 3 ? 'ProductiveEros' : 'Non-productive'}
             </span>
+            {tag.id !== 1 && tag.id !== 3 && projects.length > 0 && (
+              <select
+                value={tag.projectId ?? ''}
+                onChange={(e) => linkProject(tag, e.target.value ? Number(e.target.value) : null)}
+                title="Horas com este tag contam para o projeto"
+                aria-label="Projeto vinculado"
+                style={{ width: 'auto', maxWidth: 160, fontSize: 12 }}
+              >
+                <option value="">🗂 sem projeto</option>
+                {projects.filter((p) => p.status !== 'encerrado' || p.id === tag.projectId).map((p) => (
+                  <option key={p.id} value={p.id}>🗂 {p.name}</option>
+                ))}
+              </select>
+            )}
             <div className="tag-actions">
               <button
                 className="btn btn-secondary btn-sm"

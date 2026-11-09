@@ -22,6 +22,8 @@ import { EstudosDashboardPage } from './modules/estudos/pages/EstudosDashboardPa
 import { TopicWorkspacePage } from './modules/estudos/pages/TopicWorkspacePage'
 import { RevisoesPage } from './modules/estudos/pages/RevisoesPage'
 import { ProjectsPage } from './modules/projects/pages/ProjectsPage'
+import { ProjectDetailPage } from './modules/projects/pages/ProjectDetailPage'
+import { SaveContextModal } from './modules/projects/components/SaveContextModal'
 import { IssuesPage } from './modules/projects/pages/IssuesPage'
 import { WorktreesPage } from './modules/projects/pages/WorktreesPage'
 import { HabitsPage } from './modules/habits/pages/HabitsPage'
@@ -170,6 +172,7 @@ const PAGES: Record<Page, React.ComponentType> = {
   'estudos-topic': TopicWorkspacePage,
   'estudos-review': RevisoesPage,
   projects: ProjectsPage,
+  project: ProjectDetailPage,
   issues: IssuesPage,
   worktrees: WorktreesPage,
   habits: HabitsPage,
@@ -201,7 +204,7 @@ const QUICK_NAV: Page[] = ['home', 'timeline', 'inbox', 'projects']
 const COLLAPSED_KEY = 'rickos:collapsedGroups'
 
 export default function App(): React.ReactElement {
-  const { currentPage, setPage } = useUIStore()
+  const { currentPage, setPage, selectedProjectId } = useUIStore()
   const { refreshActive, stopActiveTask, activeTask } = useTaskStore()
   const { refreshTags } = useTagStore()
 
@@ -265,13 +268,19 @@ export default function App(): React.ReactElement {
       setPage('timeline')
       return
     }
-    const h = `#/${currentPage}`
+    const pid = useUIStore.getState().selectedProjectId
+    const h = currentPage === 'project' && pid ? `#/project?id=${pid}` : `#/${currentPage}`
     if (window.location.hash !== h) window.history.pushState(null, '', h)
-  }, [currentPage, setPage])
+  }, [currentPage, setPage, selectedProjectId])
 
   useEffect(() => {
     const onHash = (): void => {
       const p = window.location.hash.replace(/^#\/?/, '').split('?')[0] as Page
+      const id = window.location.hash.match(/[?&]id=(\d+)/)
+      if (p === 'project' && id && Number(id[1]) !== useUIStore.getState().selectedProjectId) {
+        useUIStore.getState().openProject(Number(id[1]))
+        return
+      }
       if (p && PAGES[p] && p !== useUIStore.getState().currentPage) setPage(p)
     }
     window.addEventListener('hashchange', onHash)
@@ -390,6 +399,7 @@ export default function App(): React.ReactElement {
       </main>
 
       <QuickCapture />
+      <SaveContextModal />
     </div>
     </AuthGate>
   )

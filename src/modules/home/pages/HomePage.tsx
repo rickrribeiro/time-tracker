@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useUIStore } from '../../../store/uiStore'
 import { DailyStandup } from '../components/DailyStandup'
+import { ProjectHomeBlocks } from '../../projects/components/ProjectHomeBlocks'
 import { LostWorkCard } from '../../projects/components/LostWorkCard'
 import '../../projects/worktrees.css'
 import { useTaskStore } from '../../timetracker/store/taskStore'
@@ -92,6 +93,9 @@ export function HomePage(): React.ReactElement {
       </button>
 
       <DailyStandup />
+
+      {/* ── Projetos: em foco, foco de hoje, onde parei, decisões ── */}
+      <ProjectHomeBlocks />
 
       {/* ── Hoje ── */}
       <div className="dash-section">

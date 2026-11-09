@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { renderMarkdown } from '../../estudos/markdown'
 import { localDateStr, localDayStartISO, localDayEndISO } from '../../../utils/dates'
+import { projectsDigest } from '../../projects/components/ProjectsReviewPanel'
 
 const STATE_KEY = 'rickos:dailyStandup'
 
@@ -54,13 +55,22 @@ export function DailyStandup(): React.ReactElement {
     const now = new Date()
     const yesterday = new Date(now.getTime() - 86400000)
     const yStr = localDateStr(yesterday)
-    const [todos, due, events, yStats, model] = await Promise.all([
+    const [todos, due, events, yStats, model, projects, todayFocus] = await Promise.all([
       window.api.todos.getAll(),
       window.api.study.due(now.toISOString()),
       window.api.calendar.range(localDayStartISO(today), localDayEndISO(today)),
       window.api.stats.daily(localDayStartISO(yStr), localDayEndISO(yStr)),
-      window.api.settings.get('claude_model')
+      window.api.settings.get('claude_model'),
+      projectsDigest().catch(() => ''),
+      window.api.settings.get('projects_today_focus')
     ])
+    let focusToday = ''
+    try {
+      const f = JSON.parse(todayFocus || 'null') as { date: string; items: { text: string; done: boolean }[] } | null
+      if (f && f.date === today) focusToday = f.items.map((i) => `- [${i.done ? 'x' : ' '}] ${i.text}`).join('\n')
+    } catch {
+      // ignore
+    }
     const open = todos.filter((t) => t.status !== 'done' && t.status !== 'inbox')
     const overdue = open.filter((t) => t.dueDate && t.dueDate < today)
     const dueToday = open.filter((t) => t.dueDate === today)
@@ -72,7 +82,9 @@ export function DailyStandup(): React.ReactElement {
 \nOutras tarefas abertas:\n${open.filter((t) => !t.dueDate).slice(0, 10).map(fmtT).join('\n') || '(nenhuma)'}
 \nFlashcards para revisar hoje: ${due.length}
 \nEventos de hoje:\n${events.map((e) => `- ${e.title} (${e.startTime.slice(11, 16)})`).join('\n') || '(nenhum)'}
-\nHoras trabalhadas ontem: ${Math.floor(yMin / 60)}h ${yMin % 60}m`
+\nHoras trabalhadas ontem: ${Math.floor(yMin / 60)}h ${yMin % 60}m
+\nProjetos (situação, próxima ação, alertas):\n${projects || '(nenhum)'}
+\nFoco de hoje escolhido:\n${focusToday || '(não escolhido)'}`
     return JSON.stringify({ model: model ?? '', ctx })
   }
 
@@ -85,8 +97,9 @@ export function DailyStandup(): React.ReactElement {
       const { model, ctx } = JSON.parse(await buildContext())
       const prompt = `Você é meu chefe de gabinete. Com base no contexto do meu dia abaixo, escreva um BRIEFING MATINAL curto e acionável em Markdown:
 1. Um resumo executivo de 2-3 linhas (o que exige atenção hoje).
-2. As 3 prioridades do dia (o que realmente importa).
+2. As 3 prioridades do dia (o que realmente importa) — use as próximas ações dos projetos EM FOCO e o "foco de hoje" se houver.
 3. Uma agenda sugerida em blocos de tempo (time-boxed) para hoje, encaixando tarefas, revisões de flashcards e eventos.
+4. Projetos esquecidos ou com alerta que pedem uma decisão rápida (1 linha cada, só se houver).
 Seja direto e realista. Não invente compromissos que não estão no contexto.
 
 Contexto:

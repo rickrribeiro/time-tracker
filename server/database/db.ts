@@ -206,6 +206,58 @@ const MIGRATIONS: Migration[] = [
       try { db.run('ALTER TABLE contacts ADD COLUMN country TEXT;') } catch { /* exists */ }
       try { db.run('ALTER TABLE contacts ADD COLUMN state TEXT;') } catch { /* exists */ }
     }
+  },
+  {
+    version: 16,
+    label: 'Central de Projetos: situação, área, foco, ciclos, vínculos com timer/todos',
+    run: (db) => {
+      const cols: [string, string][] = [
+        ['status', "TEXT NOT NULL DEFAULT 'incubadora'"], // incubadora|fila|foco|pausado|concluido|encerrado
+        ['area', "TEXT NOT NULL DEFAULT 'pessoal'"], // pessoal | profissional
+        ['priority', 'INTEGER NOT NULL DEFAULT 0'],
+        ['finishLine', 'TEXT'],
+        ['scope', 'TEXT'],
+        ['futureIdeas', 'TEXT'],
+        ['nextAction', 'TEXT'],
+        ['nextActionAt', 'TEXT'],
+        ['whereLeftOff', 'TEXT'],
+        ['whereLeftOffAt', 'TEXT'],
+        ['blocker', 'TEXT'],
+        ['blockerNeed', 'TEXT'],
+        ['pauseReason', 'TEXT'],
+        ['resumeAt', 'TEXT'],
+        ['resumeCondition', 'TEXT'],
+        ['closeReason', 'TEXT'],
+        ['retrospective', 'TEXT'],
+        ['closedAt', 'TEXT'],
+        ['statusChangedAt', 'TEXT'],
+        ['continuous', 'INTEGER NOT NULL DEFAULT 0'],
+        ['triagedAt', 'TEXT'],
+        ['lastReviewedAt', 'TEXT'],
+        ['createdAt', 'TEXT']
+      ]
+      for (const [c, def] of cols) {
+        try { db.run(`ALTER TABLE projects ADD COLUMN ${c} ${def};`) } catch { /* exists */ }
+      }
+      try { db.run('ALTER TABLE project_milestones ADD COLUMN cycleId INTEGER;') } catch { /* exists */ }
+      try { db.run('ALTER TABLE project_milestones ADD COLUMN description TEXT;') } catch { /* exists */ }
+      try { db.run('ALTER TABLE tasks ADD COLUMN projectId INTEGER;') } catch { /* exists */ }
+      try { db.run('ALTER TABLE tags ADD COLUMN projectId INTEGER;') } catch { /* exists */ }
+      try { db.run('ALTER TABLE todos ADD COLUMN milestoneId INTEGER;') } catch { /* exists */ }
+      try { db.run('ALTER TABLE todos ADD COLUMN doneAt TEXT;') } catch { /* exists */ }
+      // Dados existentes: "trabalho" era área disfarçada de estágio → estágio indefinido (triagem decide).
+      // "morto"/arquivado → encerrado. Projetos antigos entram na incubadora até a triagem.
+      const now = new Date().toISOString()
+      try {
+        db.run("UPDATE projects SET status = 'encerrado', closedAt = COALESCE(closedAt, ?) WHERE archived = 1 OR stage = 'morto'", [now])
+        db.run("UPDATE projects SET stage = '' WHERE stage IN ('trabalho', 'morto')")
+        db.run('UPDATE projects SET createdAt = ? WHERE createdAt IS NULL', [now])
+        db.run('UPDATE projects SET statusChangedAt = ? WHERE statusChangedAt IS NULL', [now])
+        db.run("UPDATE todos SET doneAt = createdAt WHERE status = 'done' AND doneAt IS NULL")
+      } catch {
+        // best-effort backfill
+      }
+    }
   }
 ]
 

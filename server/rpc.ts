@@ -33,6 +33,29 @@ import {
   createProjectMilestone,
   toggleProjectMilestone,
   deleteProjectMilestone,
+  getProject,
+  patchProject,
+  setProjectStatus,
+  completeNextAction,
+  getProjectEvents,
+  addProjectEvent,
+  updateProjectMilestone,
+  getProjectCycles,
+  createProjectCycle,
+  updateProjectCycle,
+  extendProjectCycle,
+  closeProjectCycle,
+  deleteProjectCycle,
+  getProjectNotes,
+  saveProjectNote,
+  deleteProjectNote,
+  linkTodosToProject,
+  setTodoMilestone,
+  setTagProject,
+  setTaskProject,
+  getProjectTasks,
+  getProjectHours,
+  getUnlinkedTagHours,
   getHabits,
   createHabit,
   updateHabit,
@@ -174,6 +197,8 @@ import { encodeSecret, decodeSecret, legacySecrets } from './services/secrets'
 import { broadcast } from './events'
 import { notify, notificationsChanged } from './services/notifications'
 import { suggestProjects, ignoreProjectSuggestion, restoreProjectSuggestions } from './services/projectScan'
+import { projectsOverview, projectCommits, readRoadmap, setRoadmapItem, createRoadmapTemplate, checkProjectRadar } from './services/projectHub'
+import type { ProjectStatusPayload } from './database/queries'
 import {
   scanGit,
   cachedScan,
@@ -240,6 +265,9 @@ export function startScheduler(): void {
   // Daily Google Calendar auto-sync: shortly after boot, then re-check every 6h.
   setTimeout(() => void maybeAutoSyncGoogle(), 8000)
   setInterval(() => void maybeAutoSyncGoogle(), 6 * 60 * 60 * 1000)
+  // Radar de projetos: notificações 1x/dia (pausa vencida, foco sem próxima ação, ciclos…).
+  setTimeout(() => void checkProjectRadar().catch(() => undefined), 60000)
+  setInterval(() => void checkProjectRadar().catch(() => undefined), 60 * 60 * 1000)
 }
 
 // ── IPC: Tags ─────────────────────────────────────────────────────────────────
@@ -266,11 +294,12 @@ ipcMain.handle('tasks:getForRange', (_, startDate: string, endDate: string) =>
 
 ipcMain.handle('tasks:getActive', () => getActiveTask())
 
-ipcMain.handle('tasks:start', async (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, studyNodeId?: number | null) => {
+ipcMain.handle('tasks:start', async (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, studyNodeId?: number | null, projectId?: number | null) => {
   const now = startTime || new Date().toISOString()
   await stopAllActiveTasks(now)
-  return createTask(title, tagId, secondaryTagId, now, null, studyNodeId ?? null)
+  return createTask(title, tagId, secondaryTagId, now, null, studyNodeId ?? null, projectId ?? null)
 })
+ipcMain.handle('tasks:setProject', (_, taskId: number, projectId: number | null) => setTaskProject(taskId, projectId))
 
 ipcMain.handle('tasks:stop', async (_, id: number, endTime?: string) => {
   const now = endTime || new Date().toISOString()
@@ -625,6 +654,54 @@ ipcMain.handle('milestones:getAll', () => getProjectMilestones())
 ipcMain.handle('milestones:create', (_, projectId: number, title: string, targetDate: string | null) => createProjectMilestone(projectId, title, targetDate))
 ipcMain.handle('milestones:toggle', (_, id: number, done: number) => toggleProjectMilestone(id, done))
 ipcMain.handle('milestones:delete', (_, id: number) => deleteProjectMilestone(id))
+ipcMain.handle('milestones:update', (_, id: number, title: string, targetDate: string | null, cycleId: number | null, description: string | null) =>
+  updateProjectMilestone(id, title, targetDate, cycleId, description)
+)
+
+// ── IPC: Central de Projetos ──────────────────────────────────────────────────
+const projectsChanged = (id?: number): void => broadcast('projects:updated', { id: id ?? null })
+ipcMain.handle('projects:get', (_, id: number) => getProject(id))
+ipcMain.handle('projects:patch', async (_, id: number, fields: Record<string, string | number | null>) => {
+  const p = await patchProject(id, fields)
+  projectsChanged(id)
+  return p
+})
+ipcMain.handle('projects:setStatus', async (_, id: number, status: string, payload?: ProjectStatusPayload) => {
+  const p = await setProjectStatus(id, status, payload ?? {})
+  projectsChanged(id)
+  return p
+})
+ipcMain.handle('projects:completeNextAction', async (_, id: number, next: string | null) => {
+  const p = await completeNextAction(id, next)
+  projectsChanged(id)
+  return p
+})
+ipcMain.handle('projects:overview', () => projectsOverview())
+ipcMain.handle('projects:events', (_, projectId?: number | null, limit?: number) => getProjectEvents(projectId ?? null, limit ?? 200))
+ipcMain.handle('projects:addEvent', async (_, projectId: number, kind: string, text: string | null) => {
+  await addProjectEvent(projectId, kind, text)
+  projectsChanged(projectId)
+})
+ipcMain.handle('projects:commits', (_, projectId: number, limit?: number) => projectCommits(projectId, limit ?? 30))
+ipcMain.handle('projects:tasks', (_, projectId: number, limit?: number) => getProjectTasks(projectId, limit ?? 100))
+ipcMain.handle('projects:hours', (_, from: string, to: string) => getProjectHours(from, to))
+ipcMain.handle('projects:unlinkedTags', () => getUnlinkedTagHours())
+ipcMain.handle('projects:linkTodos', (_, todoIds: number[], projectId: number | null, milestoneId?: number | null) => linkTodosToProject(todoIds, projectId, milestoneId ?? null))
+ipcMain.handle('projects:setTodoMilestone', (_, todoId: number, milestoneId: number | null) => setTodoMilestone(todoId, milestoneId))
+ipcMain.handle('projects:linkTag', (_, tagId: number, projectId: number | null) => setTagProject(tagId, projectId))
+ipcMain.handle('projects:roadmap', (_, projectId: number) => readRoadmap(projectId))
+ipcMain.handle('projects:roadmapSet', (_, projectId: number, line: number, expected: string, mark: ' ' | 'x' | '~' | '-') => setRoadmapItem(projectId, line, expected, mark))
+ipcMain.handle('projects:roadmapCreate', (_, projectId: number) => createRoadmapTemplate(projectId))
+ipcMain.handle('projects:radarCheck', () => checkProjectRadar(true))
+ipcMain.handle('cycles:getAll', (_, projectId?: number | null) => getProjectCycles(projectId ?? null))
+ipcMain.handle('cycles:create', (_, projectId: number, name: string, goal: string | null, startDate: string, dueDate: string | null) => createProjectCycle(projectId, name, goal, startDate, dueDate))
+ipcMain.handle('cycles:update', (_, id: number, name: string, goal: string | null, dueDate: string | null) => updateProjectCycle(id, name, goal, dueDate))
+ipcMain.handle('cycles:extend', (_, id: number, newDueDate: string, reason: string | null) => extendProjectCycle(id, newDueDate, reason))
+ipcMain.handle('cycles:close', (_, id: number, status: 'concluido' | 'cancelado', retrospective: string | null) => closeProjectCycle(id, status, retrospective))
+ipcMain.handle('cycles:delete', (_, id: number) => deleteProjectCycle(id))
+ipcMain.handle('projectNotes:getAll', (_, projectId: number) => getProjectNotes(projectId))
+ipcMain.handle('projectNotes:save', (_, note: { id?: number | null; projectId: number; kind: string; title: string; body: string | null; url: string | null; pinned?: number }) => saveProjectNote(note))
+ipcMain.handle('projectNotes:delete', (_, id: number) => deleteProjectNote(id))
 
 // ── IPC: Habits ───────────────────────────────────────────────────────────────
 

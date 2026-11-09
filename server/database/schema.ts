@@ -54,6 +54,44 @@ export const SCHEMA = `
     createdAt TEXT NOT NULL
   );
 
+  -- Central de Projetos: ciclos/versões, histórico de decisões e base de conhecimento
+  CREATE TABLE IF NOT EXISTS project_cycles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,                     -- ex: v1.3, Ciclo de novembro
+    goal TEXT,                              -- o que este ciclo entrega
+    startDate TEXT NOT NULL,                -- YYYY-MM-DD
+    dueDate TEXT,                           -- prazo atual (YYYY-MM-DD)
+    originalDueDate TEXT,                   -- prazo antes das extensões
+    extensions INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ativo',   -- ativo | concluido | cancelado
+    closedAt TEXT,
+    retrospective TEXT,
+    createdAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS project_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,                     -- status | decisao | proxima_acao | onde_parei | bloqueio | ciclo | marco | revisao | nota
+    fromStatus TEXT,
+    toStatus TEXT,
+    text TEXT,
+    createdAt TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_project_events_project ON project_events(projectId, createdAt);
+
+  CREATE TABLE IF NOT EXISTS project_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL DEFAULT 'nota',      -- nota | link | decisao
+    title TEXT NOT NULL,
+    body TEXT,
+    url TEXT,
+    pinned INTEGER NOT NULL DEFAULT 0,
+    createdAt TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS todos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,

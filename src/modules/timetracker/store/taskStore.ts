@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { Task, TaskWithTag } from '@/types'
 import { localDayStartISO, localDayEndISO } from '@/utils/dates'
+import { maybeAskContext } from '../../projects/store/contextPromptStore'
 
 interface TaskState {
   activeTask: TaskWithTag | null
@@ -11,9 +12,9 @@ interface TaskState {
   setTodayTasks: (tasks: TaskWithTag[]) => void
   setLoading: (v: boolean) => void
 
-  startTask: (title: string, tagId: number | null, secondaryTagId?: number | null, studyNodeId?: number | null) => Promise<void>
+  startTask: (title: string, tagId: number | null, secondaryTagId?: number | null, studyNodeId?: number | null, projectId?: number | null) => Promise<void>
   stopActiveTask: () => Promise<void>
-  switchTask: (title: string, tagId: number | null, secondaryTagId?: number | null, studyNodeId?: number | null) => Promise<void>
+  switchTask: (title: string, tagId: number | null, secondaryTagId?: number | null, studyNodeId?: number | null, projectId?: number | null) => Promise<void>
   refreshTasks: (date: string) => Promise<void>
   refreshActive: () => Promise<void>
   deleteTask: (id: number) => Promise<void>
@@ -47,9 +48,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set({ todayTasks: tasks, isLoading: false })
   },
 
-  startTask: async (title: string, tagId: number | null, secondaryTagId: number | null = null, studyNodeId: number | null = null) => {
-    await window.api.tasks.start(title, tagId, secondaryTagId, undefined, studyNodeId)
+  startTask: async (title: string, tagId: number | null, secondaryTagId: number | null = null, studyNodeId: number | null = null, projectId: number | null = null) => {
+    const prev = get().activeTask
+    await window.api.tasks.start(title, tagId, secondaryTagId, undefined, studyNodeId, projectId)
     await get().refreshActive()
+    maybeAskContext(prev, get().activeTask?.projectId ?? null)
   },
 
   stopActiveTask: async () => {
@@ -57,11 +60,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (!activeTask) return
     await window.api.tasks.stop(activeTask.id)
     await get().refreshActive()
+    // ao encerrar o timer de um projeto: sugere salvar "onde parei" + próximo passo
+    maybeAskContext(activeTask, null)
   },
 
-  switchTask: async (title: string, tagId: number | null, secondaryTagId: number | null = null, studyNodeId: number | null = null) => {
-    await window.api.tasks.start(title, tagId, secondaryTagId, undefined, studyNodeId)
+  switchTask: async (title: string, tagId: number | null, secondaryTagId: number | null = null, studyNodeId: number | null = null, projectId: number | null = null) => {
+    const prev = get().activeTask
+    await window.api.tasks.start(title, tagId, secondaryTagId, undefined, studyNodeId, projectId)
     await get().refreshActive()
+    maybeAskContext(prev, get().activeTask?.projectId ?? null)
   },
 
   deleteTask: async (id: number) => {

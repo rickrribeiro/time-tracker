@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useUIStore } from '../../../store/uiStore'
 import { renderMarkdown } from '../../estudos/markdown'
 import { localDateStr, localDayStartISO, localDayEndISO } from '../../../utils/dates'
+import { ProjectsReviewPanel, projectsDigest } from '../../projects/components/ProjectsReviewPanel'
 
 interface Step {
   key: string
@@ -9,6 +10,8 @@ interface Step {
   hint: string
   goto?: string
   build: () => Promise<{ summary: string; prompt: string }>
+  /** UI interativa do passo (ex.: decisões por projeto). */
+  panel?: () => React.ReactNode
 }
 
 export function WeeklyReviewPage(): React.ReactElement {
@@ -54,8 +57,29 @@ export function WeeklyReviewPage(): React.ReactElement {
       }
     },
     {
+      key: 'projects',
+      title: '3. Projetos',
+      hint: 'Uma decisão por projeto: continuar, pausar, retomar, focar, concluir ou encerrar. Nada morre em silêncio.',
+      goto: 'projects',
+      panel: () => <ProjectsReviewPanel />,
+      build: async () => {
+        const digest = await projectsDigest()
+        return {
+          summary: digest || '(nenhum projeto aberto)',
+          prompt: `Revisão semanal dos meus projetos pessoais e profissionais. Meu problema: tenho projetos demais em paralelo, esqueço alguns e não termino. Com base na lista abaixo:
+1. Aponte os projetos ESTAGNADOS (sem atividade, travados, pausa vencida, foco sem próxima ação).
+2. Para CADA projeto, recomende uma decisão: continuar / pausar (com condição de retomada) / retomar / focar / concluir / encerrar — e o porquê em uma linha.
+3. Diga quais devem ser os no máximo 3 projetos em foco na próxima semana.
+Seja direto e honesto, sem medo de recomendar encerrar.
+
+Projetos:
+${digest || '(nenhum)'}`
+        }
+      }
+    },
+    {
       key: 'habits',
-      title: '3. Hábitos da semana',
+      title: '4. Hábitos da semana',
       hint: 'Como foi a consistência? O que ajustar?',
       goto: 'habits',
       build: async () => {
@@ -82,7 +106,7 @@ export function WeeklyReviewPage(): React.ReactElement {
     },
     {
       key: 'finance',
-      title: '4. Finanças do mês',
+      title: '5. Finanças do mês',
       hint: 'Gastos vs. orçamento — algum ponto de atenção?',
       goto: 'finance-dashboard',
       build: async () => {
@@ -100,16 +124,17 @@ export function WeeklyReviewPage(): React.ReactElement {
     },
     {
       key: 'plan',
-      title: '5. Plano da semana',
+      title: '6. Plano da semana',
       hint: 'A IA monta um plano com base em tudo acima.',
       build: async () => {
         const todos = await window.api.todos.getAll()
         const open = todos.filter((t) => t.status !== 'done' && t.status !== 'inbox')
         const events = await window.api.calendar.range(localDayStartISO(today), localDayEndISO(localDateStr(new Date(Date.now() + 6 * 86400000))))
         const summary = `${open.length} tarefas abertas · ${events.length} eventos nos próximos 7 dias.`
+        const digest = await projectsDigest()
         return {
           summary,
-          prompt: `Monte meu plano para a próxima semana. Tarefas abertas (priorize):\n${open.slice(0, 20).map((t) => `- ${t.title}${t.dueDate ? ` (prazo ${t.dueDate})` : ''}`).join('\n')}\n\nEventos:\n${events.map((e) => `- ${e.title} (${e.startTime.slice(0, 16).replace('T', ' ')})`).join('\n') || '(nenhum)'}\n\nDê um plano realista por dia (seg-dom), com os 3 focos da semana no topo.`
+          prompt: `Monte meu plano para a próxima semana. Projetos (priorize os em foco e suas próximas ações):\n${digest || '(nenhum)'}\n\nTarefas abertas (priorize):\n${open.slice(0, 20).map((t) => `- ${t.title}${t.dueDate ? ` (prazo ${t.dueDate})` : ''}`).join('\n')}\n\nEventos:\n${events.map((e) => `- ${e.title} (${e.startTime.slice(0, 16).replace('T', ' ')})`).join('\n') || '(nenhum)'}\n\nDê um plano realista por dia (seg-dom), com os 3 focos da semana no topo.`
         }
       }
     }
@@ -170,6 +195,7 @@ export function WeeklyReviewPage(): React.ReactElement {
         </div>
         <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0' }}>{step.hint}</p>
         <pre className="ai-output" style={{ maxHeight: 160 }}>{summary}</pre>
+        {step.panel && <div style={{ marginTop: 10 }}>{step.panel()}</div>}
         <div style={{ marginTop: 8 }}>
           <button className="btn btn-primary btn-sm" onClick={generate} disabled={running}>
             {running ? 'Pensando…' : draft ? '↻ Gerar de novo' : '✨ Rascunho da IA'}

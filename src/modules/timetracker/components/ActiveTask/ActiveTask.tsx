@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useTaskStore } from '../../store/taskStore'
 import { useTagStore } from '../../store/tagStore'
 import { PomodoroWidget } from './PomodoroWidget'
+import { useProjectStore } from '../../../projects/store/projectStore'
+import { useUIStore } from '../../../../store/uiStore'
 
 function formatDuration(startTime: string): string {
   const diff = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000)
@@ -25,6 +27,10 @@ export function ActiveTask(): React.ReactElement {
   const [newTagId, setNewTagId] = useState<number | null>(null)
   const [newSecondaryTagId, setNewSecondaryTagId] = useState<number | null>(null)
   const [newStudyNodeId, setNewStudyNodeId] = useState<number | null>(null)
+  const [newProjectId, setNewProjectId] = useState<number | null>(null)
+  const { projects, refresh: refreshProjects } = useProjectStore()
+  const { openProject } = useUIStore()
+  const openProjects = projects.filter((p) => p.status !== 'concluido' && p.status !== 'encerrado')
   const [studyOptions, setStudyOptions] = useState<StudyOption[]>([])
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   // Phone: the switch form is collapsed behind a "Trocar" button (CSS < 900px only).
@@ -32,6 +38,7 @@ export function ActiveTask(): React.ReactElement {
 
   // Load "Tópico › Nó" options for optionally linking a focus session to a study node.
   useEffect(() => {
+    if (!projects.length) void refreshProjects()
     Promise.all([window.api.study.topics(), window.api.study.allNodes()]).then(([topics, nodes]) => {
       const topicName = (id: number): string => topics.find((t) => t.id === id)?.name ?? '—'
       setStudyOptions(nodes.map((n) => ({ id: n.id, label: `${topicName(n.topicId)} › ${n.title}` })).sort((a, b) => a.label.localeCompare(b.label)))
@@ -54,14 +61,16 @@ export function ActiveTask(): React.ReactElement {
 
   const handleStart = async () => {
     if (!newTitle.trim()) return
-    await startTask(newTitle.trim(), newTagId, newSecondaryTagId, newStudyNodeId)
+    await startTask(newTitle.trim(), newTagId, newSecondaryTagId, newStudyNodeId, newProjectId)
     setNewTitle('')
+    setNewProjectId(null)
   }
 
   const handleSwitch = async () => {
     if (!newTitle.trim()) return
-    await switchTask(newTitle.trim(), newTagId, newSecondaryTagId, newStudyNodeId)
+    await switchTask(newTitle.trim(), newTagId, newSecondaryTagId, newStudyNodeId, newProjectId)
     setNewTitle('')
+    setNewProjectId(null)
     setSwitchOpen(false)
   }
 
@@ -85,6 +94,16 @@ export function ActiveTask(): React.ReactElement {
               </span>
             )}
             <div style={{ display: 'flex', gap: 6 }}>
+              {activeTask.projectName && (
+                <button
+                  className="active-task-tag"
+                  style={{ background: activeTask.projectColor || '#6366f1', border: 'none', cursor: 'pointer' }}
+                  title="Abrir projeto"
+                  onClick={() => activeTask.projectId && openProject(activeTask.projectId)}
+                >
+                  🗂 {activeTask.projectName}
+                </button>
+              )}
               {activeTask.tagName && (
                 <span
                   className="active-task-tag"
@@ -146,6 +165,14 @@ export function ActiveTask(): React.ReactElement {
                   ))}
                 </select>
               )}
+              {openProjects.length > 0 && (
+                <select value={newProjectId ?? ''} onChange={(e) => setNewProjectId(e.target.value ? Number(e.target.value) : null)} title="Vincular a um projeto (conta horas)" style={{ minWidth: 0, width: 120 }}>
+                  <option value="">🗂 Projeto</option>
+                  {openProjects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
               <button className="btn btn-primary" onClick={handleSwitch}>
                 Switch
               </button>
@@ -193,6 +220,14 @@ export function ActiveTask(): React.ReactElement {
               ))}
             </select>
           )}
+          {openProjects.length > 0 && (
+                <select value={newProjectId ?? ''} onChange={(e) => setNewProjectId(e.target.value ? Number(e.target.value) : null)} title="Vincular a um projeto (conta horas)" style={{ minWidth: 0, width: 120 }}>
+                  <option value="">🗂 Projeto</option>
+                  {openProjects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
           <button className="btn btn-primary" onClick={handleStart}>
             ▶ Start
           </button>

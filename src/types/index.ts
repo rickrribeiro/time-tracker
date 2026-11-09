@@ -5,6 +5,7 @@ export interface Tag {
   name: string
   color: string
   isProductive: number // 1 = true, 0 = false, 2 = semi-productive, 3 = productive-eros
+  projectId?: number | null // tarefas com este tag contam horas para o projeto
 }
 
 export interface Task {
@@ -15,9 +16,12 @@ export interface Task {
   startTime: string
   endTime: string | null
   studyNodeId: number | null
+  projectId?: number | null
 }
 
 export interface TaskWithTag extends Task {
+  projectName?: string | null
+  projectColor?: string | null
   tagName: string | null
   tagColor: string | null
   tagIsProductive: number | null
@@ -65,6 +69,8 @@ export interface Todo {
   recurrence: string | null // JSON: { type, n?, day? } | null
   type: string // projeto | compra | urgente | lembrete
   createdAt: string
+  milestoneId?: number | null
+  doneAt?: string | null
 }
 
 /** Uma execução do Claude CLI com o uso de tokens reportado pelo próprio CLI. */
@@ -139,6 +145,113 @@ export interface Project {
   businessModel: string | null
   pricing: string | null
   audience: string | null
+  status: ProjectStatus
+  area: ProjectArea
+  priority: number
+  finishLine: string | null
+  scope: string | null
+  futureIdeas: string | null
+  nextAction: string | null
+  nextActionAt: string | null
+  whereLeftOff: string | null
+  whereLeftOffAt: string | null
+  blocker: string | null
+  blockerNeed: string | null
+  pauseReason: string | null
+  resumeAt: string | null
+  resumeCondition: string | null
+  closeReason: string | null
+  retrospective: string | null
+  closedAt: string | null
+  statusChangedAt: string | null
+  continuous: number
+  triagedAt: string | null
+  lastReviewedAt: string | null
+  createdAt: string | null
+}
+export type ProjectStatus = 'incubadora' | 'fila' | 'foco' | 'pausado' | 'concluido' | 'encerrado'
+export type ProjectArea = 'pessoal' | 'profissional'
+export type ProjectPatch = Partial<
+  Pick<
+    Project,
+    | 'name' | 'description' | 'githubRepoUrl' | 'color' | 'claudeCommand' | 'localPath' | 'stage' | 'businessModel' | 'pricing' | 'audience'
+    | 'area' | 'priority' | 'finishLine' | 'scope' | 'futureIdeas' | 'nextAction' | 'whereLeftOff' | 'blocker' | 'blockerNeed'
+    | 'pauseReason' | 'resumeAt' | 'resumeCondition' | 'closeReason' | 'retrospective' | 'continuous' | 'triagedAt' | 'lastReviewedAt'
+  >
+>
+export interface ProjectStatusPayload {
+  reason?: string | null
+  resumeAt?: string | null
+  resumeCondition?: string | null
+  nextAction?: string | null
+  retrospective?: string | null
+  note?: string | null
+}
+export interface ProjectAlert {
+  kind: string
+  severity: 'alta' | 'media' | 'baixa'
+  text: string
+}
+export interface ProjectCycle {
+  id: number
+  projectId: number
+  name: string
+  goal: string | null
+  startDate: string
+  dueDate: string | null
+  originalDueDate: string | null
+  extensions: number
+  status: 'ativo' | 'concluido' | 'cancelado'
+  closedAt: string | null
+  retrospective: string | null
+  createdAt: string
+}
+export interface ProjectOverview {
+  projectId: number
+  minutesTotal: number
+  minutes7d: number
+  minutes30d: number
+  openTodos: number
+  doneTodos: number
+  openIssues: number
+  milestonesTotal: number
+  milestonesDone: number
+  progress: number
+  lastCommitAt: string | null
+  commits7d: number
+  lastActivityAt: string | null
+  lastActivitySource: string | null
+  idleDays: number | null
+  pulse: 'vivo' | 'morno' | 'frio' | 'parado'
+  activeCycle: ProjectCycle | null
+  hasRoadmap: boolean
+  alerts: ProjectAlert[]
+}
+export interface ProjectEvent {
+  id: number
+  projectId: number
+  kind: string
+  fromStatus: string | null
+  toStatus: string | null
+  text: string | null
+  createdAt: string
+}
+export interface ProjectNote {
+  id: number
+  projectId: number
+  kind: 'nota' | 'link' | 'decisao'
+  title: string
+  body: string | null
+  url: string | null
+  pinned: number
+  createdAt: string
+}
+export interface ProjectCommit {
+  hash: string
+  subject: string
+  author: string
+  date: string
+  refs: string
 }
 export interface ProjectMilestone {
   id: number
@@ -147,6 +260,8 @@ export interface ProjectMilestone {
   targetDate: string | null
   doneAt: string | null
   createdAt: string
+  cycleId: number | null
+  description: string | null
 }
 
 export interface Habit {
@@ -495,6 +610,7 @@ export type Page =
   | 'estudos-review'
   // Projetos
   | 'projects'
+  | 'project'
   | 'issues'
   | 'worktrees'
   // Finanças
@@ -553,7 +669,8 @@ declare global {
         getAll: () => Promise<TaskWithTag[]>
         getForRange: (startDate: string, endDate: string) => Promise<TaskWithTag[]>
         getActive: () => Promise<TaskWithTag | null>
-        start: (title: string, tagId: number | null, secondaryTagId: number | null, startTime?: string, studyNodeId?: number | null) => Promise<Task>
+        start: (title: string, tagId: number | null, secondaryTagId: number | null, startTime?: string, studyNodeId?: number | null, projectId?: number | null) => Promise<Task>
+        setProject: (taskId: number, projectId: number | null) => Promise<void>
         stop: (id: number, endTime?: string) => Promise<Task>
         update: (
           id: number,
@@ -692,11 +809,44 @@ declare global {
         suggestions: () => Promise<ProjectSuggestionsResult>
         ignoreSuggestion: (path: string) => Promise<void>
         restoreSuggestions: () => Promise<void>
+        get: (id: number) => Promise<Project | null>
+        patch: (id: number, fields: ProjectPatch) => Promise<Project>
+        setStatus: (id: number, status: ProjectStatus, payload?: ProjectStatusPayload) => Promise<Project>
+        completeNextAction: (id: number, next: string | null) => Promise<Project>
+        overview: () => Promise<ProjectOverview[]>
+        events: (projectId?: number | null, limit?: number) => Promise<ProjectEvent[]>
+        addEvent: (projectId: number, kind: string, text: string | null) => Promise<void>
+        commits: (projectId: number, limit?: number) => Promise<ProjectCommit[]>
+        tasks: (projectId: number, limit?: number) => Promise<TaskWithTag[]>
+        hours: (from: string, to: string) => Promise<{ projectId: number; minutes: number }[]>
+        unlinkedTags: () => Promise<{ tagId: number; tagName: string; tagColor: string; minutes: number }[]>
+        linkTodos: (todoIds: number[], projectId: number | null, milestoneId?: number | null) => Promise<void>
+        setTodoMilestone: (todoId: number, milestoneId: number | null) => Promise<void>
+        linkTag: (tagId: number, projectId: number | null) => Promise<void>
+        roadmap: (projectId: number) => Promise<{ path: string | null; exists: boolean; content: string }>
+        roadmapSet: (projectId: number, line: number, expected: string, mark: ' ' | 'x' | '~' | '-') => Promise<{ content: string }>
+        roadmapCreate: (projectId: number) => Promise<{ content: string }>
+        radarCheck: () => Promise<number>
+        onChanged: (cb: () => void) => () => void
       }
       milestones: {
         getAll: () => Promise<ProjectMilestone[]>
         create: (projectId: number, title: string, targetDate: string | null) => Promise<ProjectMilestone>
         toggle: (id: number, done: number) => Promise<void>
+        delete: (id: number) => Promise<void>
+        update: (id: number, title: string, targetDate: string | null, cycleId: number | null, description: string | null) => Promise<void>
+      }
+      cycles: {
+        getAll: (projectId?: number | null) => Promise<ProjectCycle[]>
+        create: (projectId: number, name: string, goal: string | null, startDate: string, dueDate: string | null) => Promise<ProjectCycle>
+        update: (id: number, name: string, goal: string | null, dueDate: string | null) => Promise<void>
+        extend: (id: number, newDueDate: string, reason: string | null) => Promise<void>
+        close: (id: number, status: 'concluido' | 'cancelado', retrospective: string | null) => Promise<void>
+        delete: (id: number) => Promise<void>
+      }
+      projectNotes: {
+        getAll: (projectId: number) => Promise<ProjectNote[]>
+        save: (note: { id?: number | null; projectId: number; kind: string; title: string; body: string | null; url: string | null; pinned?: number }) => Promise<ProjectNote>
         delete: (id: number) => Promise<void>
       }
       habits: {

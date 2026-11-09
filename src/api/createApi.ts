@@ -1,5 +1,6 @@
 import { invoke, subscribe, downloadUrl } from './transport'
 import { ExportFile, downloadText, pickFile, pickFolderFiles, pickJson, fileToBase64, saveFolder } from './files'
+import type { ProjectPatch, ProjectStatus, ProjectStatusPayload } from '../types'
 
 /** Open a URL outside the app: system browser on desktop, new tab on web. */
 export function openExternal(url: string): void {
@@ -70,8 +71,9 @@ export function createApi() {
       getForRange: (startDate: string, endDate: string) =>
         invoke('tasks:getForRange', startDate, endDate),
       getActive: () => invoke('tasks:getActive'),
-      start: (title: string, tagId: number | null, secondaryTagId: number | null, startTime?: string, studyNodeId?: number | null) =>
-        invoke('tasks:start', title, tagId, secondaryTagId, startTime || new Date().toISOString(), studyNodeId ?? null),
+      start: (title: string, tagId: number | null, secondaryTagId: number | null, startTime?: string, studyNodeId?: number | null, projectId?: number | null) =>
+        invoke('tasks:start', title, tagId, secondaryTagId, startTime || new Date().toISOString(), studyNodeId ?? null, projectId ?? null),
+      setProject: (taskId: number, projectId: number | null) => invoke('tasks:setProject', taskId, projectId),
       stop: (id: number, endTime?: string) =>
         invoke('tasks:stop', id, endTime),
       update: (
@@ -203,13 +205,47 @@ export function createApi() {
         audience?: string | null
       ) => invoke('projects:update', id, name, description, githubRepoUrl, color, archived, claudeCommand, localPath, stage, businessModel, pricing, audience),
       setStage: (id: number, stage: string) => invoke('projects:setStage', id, stage),
-      delete: (id: number) => invoke('projects:delete', id)
+      delete: (id: number) => invoke('projects:delete', id),
+      get: (id: number) => invoke('projects:get', id),
+      patch: (id: number, fields: ProjectPatch) => invoke('projects:patch', id, fields),
+      setStatus: (id: number, status: ProjectStatus, payload?: ProjectStatusPayload) => invoke('projects:setStatus', id, status, payload ?? {}),
+      completeNextAction: (id: number, next: string | null) => invoke('projects:completeNextAction', id, next),
+      overview: () => invoke('projects:overview'),
+      events: (projectId?: number | null, limit?: number) => invoke('projects:events', projectId ?? null, limit),
+      addEvent: (projectId: number, kind: string, text: string | null) => invoke('projects:addEvent', projectId, kind, text),
+      commits: (projectId: number, limit?: number) => invoke('projects:commits', projectId, limit),
+      tasks: (projectId: number, limit?: number) => invoke('projects:tasks', projectId, limit),
+      hours: (from: string, to: string) => invoke('projects:hours', from, to),
+      unlinkedTags: () => invoke('projects:unlinkedTags'),
+      linkTodos: (todoIds: number[], projectId: number | null, milestoneId?: number | null) => invoke('projects:linkTodos', todoIds, projectId, milestoneId ?? null),
+      setTodoMilestone: (todoId: number, milestoneId: number | null) => invoke('projects:setTodoMilestone', todoId, milestoneId),
+      linkTag: (tagId: number, projectId: number | null) => invoke('projects:linkTag', tagId, projectId),
+      roadmap: (projectId: number) => invoke('projects:roadmap', projectId),
+      roadmapSet: (projectId: number, line: number, expected: string, mark: ' ' | 'x' | '~' | '-') => invoke('projects:roadmapSet', projectId, line, expected, mark),
+      roadmapCreate: (projectId: number) => invoke('projects:roadmapCreate', projectId),
+      radarCheck: () => invoke('projects:radarCheck'),
+      onChanged: (cb: () => void) => subscribe('projects:updated', () => cb())
     },
     milestones: {
       getAll: () => invoke('milestones:getAll'),
       create: (projectId: number, title: string, targetDate: string | null) => invoke('milestones:create', projectId, title, targetDate),
       toggle: (id: number, done: number) => invoke('milestones:toggle', id, done),
-      delete: (id: number) => invoke('milestones:delete', id)
+      delete: (id: number) => invoke('milestones:delete', id),
+      update: (id: number, title: string, targetDate: string | null, cycleId: number | null, description: string | null) =>
+        invoke('milestones:update', id, title, targetDate, cycleId, description)
+    },
+    cycles: {
+      getAll: (projectId?: number | null) => invoke('cycles:getAll', projectId ?? null),
+      create: (projectId: number, name: string, goal: string | null, startDate: string, dueDate: string | null) => invoke('cycles:create', projectId, name, goal, startDate, dueDate),
+      update: (id: number, name: string, goal: string | null, dueDate: string | null) => invoke('cycles:update', id, name, goal, dueDate),
+      extend: (id: number, newDueDate: string, reason: string | null) => invoke('cycles:extend', id, newDueDate, reason),
+      close: (id: number, status: 'concluido' | 'cancelado', retrospective: string | null) => invoke('cycles:close', id, status, retrospective),
+      delete: (id: number) => invoke('cycles:delete', id)
+    },
+    projectNotes: {
+      getAll: (projectId: number) => invoke('projectNotes:getAll', projectId),
+      save: (note: { id?: number | null; projectId: number; kind: string; title: string; body: string | null; url: string | null; pinned?: number }) => invoke('projectNotes:save', note),
+      delete: (id: number) => invoke('projectNotes:delete', id)
     },
     // Habits
     habits: {

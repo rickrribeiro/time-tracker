@@ -61,7 +61,7 @@ export function QuickCapture(): React.ReactElement | null {
         <input
           ref={inputRef}
           type="text"
-          placeholder="Título… (use // para uma nota rápida)"
+          placeholder="Título… (// nota rápida · #projeto ou [projeto] vincula)"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}

@@ -7,6 +7,7 @@ export interface DbTag {
   name: string
   color: string
   isProductive: number
+  projectId?: number | null
 }
 
 export interface DbTask {
@@ -17,9 +18,12 @@ export interface DbTask {
   startTime: string
   endTime: string | null
   studyNodeId: number | null
+  projectId?: number | null
 }
 
 export interface DbTaskWithTag extends DbTask {
+  projectName?: string | null
+  projectColor?: string | null
   tagName: string | null
   tagColor: string | null
   tagIsProductive: number | null
@@ -80,19 +84,28 @@ function getAll<T>(db: Database, sql: string, params: (string | number | null)[]
   return rows
 }
 
-function run(db: Database, sql: string, params: (string | number | null)[] = []): void {
-  const stmt = db.prepare(sql)
-  stmt.run(params)
-  stmt.free()
-  saveDb()
-}
+// db.export() (dentro de saveDb) zera o last_insert_rowid do sql.js → guardamos o id
+// do último INSERT antes de salvar, para lastInsertId() devolver o valor certo.
+let lastRowId = 0
 
-function lastInsertId(db: Database): number {
+function readLastRowId(db: Database): number {
   const stmt = db.prepare('SELECT last_insert_rowid() as id')
   stmt.step()
   const id = stmt.getAsObject().id as number
   stmt.free()
   return id
+}
+
+function run(db: Database, sql: string, params: (string | number | null)[] = []): void {
+  const stmt = db.prepare(sql)
+  stmt.run(params)
+  stmt.free()
+  if (/^\s*(INSERT|REPLACE)\b/i.test(sql)) lastRowId = readLastRowId(db)
+  saveDb()
+}
+
+function lastInsertId(db: Database): number {
+  return readLastRowId(db) || lastRowId
 }
 
 // ── Tags ──────────────────────────────────────────────────────────────────────
@@ -139,6 +152,7 @@ export async function deleteTag(id: number): Promise<void> {
 
 const TASK_WITH_TAG_SQL = `
   SELECT t.id, t.title, t.tagId, t.secondaryTagId, t.startTime, t.endTime, t.studyNodeId,
+         COALESCE(t.projectId, tg.projectId) as projectId, pj.name as projectName, pj.color as projectColor,
          tg.name as tagName, tg.color as tagColor, tg.isProductive as tagIsProductive,
          stg.name as secondaryTagName, stg.color as secondaryTagColor,
          sn.title as studyNodeTitle, st.id as studyTopicId, st.name as studyTopicName, st.color as studyTopicColor
@@ -147,6 +161,7 @@ const TASK_WITH_TAG_SQL = `
   LEFT JOIN tags stg ON t.secondaryTagId = stg.id
   LEFT JOIN study_nodes sn ON t.studyNodeId = sn.id
   LEFT JOIN study_topics st ON sn.topicId = st.id
+  LEFT JOIN projects pj ON pj.id = COALESCE(t.projectId, tg.projectId)
 `
 
 export async function getTasksForRange(startDate: string, endDate: string): Promise<DbTaskWithTag[]> {
@@ -185,19 +200,21 @@ export async function createTask(
   secondaryTagId: number | null,
   startTime: string,
   endTime: string | null = null,
-  studyNodeId: number | null = null
+  studyNodeId: number | null = null,
+  projectId: number | null = null
 ): Promise<DbTask> {
   const db = await getDb()
-  run(db, 'INSERT INTO tasks (title, tagId, secondaryTagId, startTime, endTime, studyNodeId) VALUES (?, ?, ?, ?, ?, ?)', [
+  run(db, 'INSERT INTO tasks (title, tagId, secondaryTagId, startTime, endTime, studyNodeId, projectId) VALUES (?, ?, ?, ?, ?, ?, ?)', [
     title,
     tagId,
     secondaryTagId,
     startTime,
     endTime,
-    studyNodeId
+    studyNodeId,
+    projectId
   ])
   const id = lastInsertId(db)
-  return { id, title, tagId, secondaryTagId, startTime, endTime, studyNodeId }
+  return { id, title, tagId, secondaryTagId, startTime, endTime, studyNodeId, projectId }
 }
 
 /** Total focused minutes per study topic (from tasks linked to a study node). */
@@ -374,6 +391,29 @@ export interface DbProject {
   businessModel: string | null
   pricing: string | null
   audience: string | null
+  status: string
+  area: string
+  priority: number
+  finishLine: string | null
+  scope: string | null
+  futureIdeas: string | null
+  nextAction: string | null
+  nextActionAt: string | null
+  whereLeftOff: string | null
+  whereLeftOffAt: string | null
+  blocker: string | null
+  blockerNeed: string | null
+  pauseReason: string | null
+  resumeAt: string | null
+  resumeCondition: string | null
+  closeReason: string | null
+  retrospective: string | null
+  closedAt: string | null
+  statusChangedAt: string | null
+  continuous: number
+  triagedAt: string | null
+  lastReviewedAt: string | null
+  createdAt: string | null
 }
 export interface DbProjectMilestone {
   id: number
@@ -382,6 +422,8 @@ export interface DbProjectMilestone {
   targetDate: string | null
   doneAt: string | null
   createdAt: string
+  cycleId: number | null
+  description: string | null
 }
 
 export interface DbTodo {
@@ -397,6 +439,8 @@ export interface DbTodo {
   recurrence: string | null
   type: string
   createdAt: string
+  milestoneId?: number | null
+  doneAt?: string | null
 }
 
 export interface DbHabit {
@@ -441,6 +485,14 @@ export async function createTodo(
 ): Promise<DbTodo> {
   const db = await getDb()
   const createdAt = new Date().toISOString()
+  if (projectId == null) {
+    // "[projeto] título" ou "título #projeto" → vincula ao projeto e limpa o marcador
+    const hit = detectProjectMention(db, title)
+    if (hit) {
+      projectId = hit.projectId
+      title = hit.title
+    }
+  }
   run(
     db,
     'INSERT INTO todos (title, notes, status, priority, dueDate, projectId, source, aiGenerated, recurrence, type, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -473,6 +525,12 @@ export async function updateTodo(
   if (type !== undefined) {
     cols.push('type = ?')
     params.push(type)
+  }
+  if (status === 'done' && prev?.status !== 'done') {
+    cols.push('doneAt = ?')
+    params.push(new Date().toISOString())
+  } else if (status !== 'done' && prev?.status === 'done') {
+    cols.push('doneAt = NULL')
   }
   params.push(id)
   run(db, `UPDATE todos SET ${cols.join(', ')} WHERE id = ?`, params)
@@ -548,8 +606,8 @@ export async function createProject(
   const db = await getDb()
   run(
     db,
-    'INSERT INTO projects (name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience]
+    'INSERT INTO projects (name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience, status, createdAt, statusChangedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience, 'incubadora', new Date().toISOString(), new Date().toISOString()]
   )
   const id = lastInsertId(db)
   return getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])!
@@ -2304,4 +2362,411 @@ export async function deleteNotification(id: number): Promise<void> {
 export async function clearNotifications(onlyRead = false): Promise<void> {
   const db = await getDb()
   run(db, onlyRead ? 'DELETE FROM notifications WHERE readAt IS NOT NULL' : 'DELETE FROM notifications')
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Central de Projetos — situação, próxima ação, ciclos, histórico, base de conhecimento
+// ══════════════════════════════════════════════════════════════════════════════
+
+export const PROJECT_STATUSES = ['incubadora', 'fila', 'foco', 'pausado', 'concluido', 'encerrado'] as const
+
+/** Normaliza p/ comparar nomes: minúsculas, sem acento, só letras/dígitos. */
+export function normName(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+}
+
+/** "[RickOS] corrigir bug" ou "corrigir bug #rickos" → projeto + título limpo. */
+function detectProjectMention(db: Database, title: string): { projectId: number; title: string } | null {
+  const projects = getAll<{ id: number; name: string }>(db, 'SELECT id, name FROM projects')
+  if (!projects.length) return null
+  const find = (raw: string): number | null => {
+    const k = normName(raw)
+    if (!k) return null
+    const exact = projects.find((p) => normName(p.name) === k)
+    return exact ? exact.id : null
+  }
+  const bracket = title.match(/^\s*\[([^\]]+)\]\s*/)
+  if (bracket) {
+    const id = find(bracket[1])
+    if (id) return { projectId: id, title: title.slice(bracket[0].length).trim() || title }
+  }
+  const hashRe = /(^|\s)#([\p{L}\p{N}_\-/.]+)/gu
+  let m: RegExpExecArray | null
+  while ((m = hashRe.exec(title))) {
+    const id = find(m[2])
+    if (id) {
+      const clean = (title.slice(0, m.index) + m[1] + title.slice(m.index + m[0].length)).replace(/\s{2,}/g, ' ').trim()
+      return { projectId: id, title: clean || title }
+    }
+  }
+  return null
+}
+
+export async function getProject(id: number): Promise<DbProject | null> {
+  const db = await getDb()
+  return getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])
+}
+
+export interface DbProjectEvent {
+  id: number
+  projectId: number
+  kind: string
+  fromStatus: string | null
+  toStatus: string | null
+  text: string | null
+  createdAt: string
+}
+
+export async function addProjectEvent(projectId: number, kind: string, text: string | null, fromStatus: string | null = null, toStatus: string | null = null): Promise<void> {
+  const db = await getDb()
+  run(db, 'INSERT INTO project_events (projectId, kind, fromStatus, toStatus, text, createdAt) VALUES (?, ?, ?, ?, ?, ?)', [
+    projectId, kind, fromStatus, toStatus, text, new Date().toISOString()
+  ])
+}
+
+export async function getProjectEvents(projectId?: number | null, limit = 200): Promise<DbProjectEvent[]> {
+  const db = await getDb()
+  if (projectId != null) {
+    return getAll<DbProjectEvent>(db, 'SELECT * FROM project_events WHERE projectId = ? ORDER BY createdAt DESC LIMIT ?', [projectId, limit])
+  }
+  return getAll<DbProjectEvent>(db, 'SELECT * FROM project_events ORDER BY createdAt DESC LIMIT ?', [limit])
+}
+
+/** Campos editáveis livremente pelo cliente (situação passa por setProjectStatus). */
+const PROJECT_PATCHABLE = new Set([
+  'name', 'description', 'githubRepoUrl', 'color', 'claudeCommand', 'localPath', 'stage', 'businessModel', 'pricing', 'audience',
+  'area', 'priority', 'finishLine', 'scope', 'futureIdeas', 'nextAction', 'whereLeftOff', 'blocker', 'blockerNeed',
+  'pauseReason', 'resumeAt', 'resumeCondition', 'closeReason', 'retrospective', 'continuous', 'triagedAt', 'lastReviewedAt'
+])
+
+/** Atualiza só os campos enviados. Mudanças em próxima ação / onde parei / bloqueio entram no histórico. */
+export async function patchProject(id: number, fields: Record<string, string | number | null>): Promise<DbProject> {
+  const db = await getDb()
+  const prev = getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])
+  if (!prev) throw new Error('Projeto não encontrado')
+  const cols: string[] = []
+  const params: (string | number | null)[] = []
+  const now = new Date().toISOString()
+  for (const [k, v] of Object.entries(fields)) {
+    if (!PROJECT_PATCHABLE.has(k)) continue
+    cols.push(`${k} = ?`)
+    params.push(typeof v === 'string' ? (v.trim() === '' ? null : v.trim()) : v)
+  }
+  if ('nextAction' in fields) cols.push(`nextActionAt = '${now}'`)
+  if ('whereLeftOff' in fields) cols.push(`whereLeftOffAt = '${now}'`)
+  if (!cols.length) return prev
+  params.push(id)
+  run(db, `UPDATE projects SET ${cols.join(', ')} WHERE id = ?`, params)
+  const next = getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])!
+  const log = (kind: string, text: string | null): void =>
+    run(db, 'INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)', [id, kind, text, now])
+  if ('nextAction' in fields && next.nextAction !== prev.nextAction && next.nextAction) log('proxima_acao', next.nextAction)
+  if ('whereLeftOff' in fields && next.whereLeftOff !== prev.whereLeftOff && next.whereLeftOff) log('onde_parei', next.whereLeftOff)
+  if ('blocker' in fields && next.blocker !== prev.blocker) log('bloqueio', next.blocker ? `Bloqueado: ${next.blocker}${next.blockerNeed ? ` — precisa: ${next.blockerNeed}` : ''}` : 'Bloqueio resolvido')
+  if ('finishLine' in fields && next.finishLine !== prev.finishLine && next.finishLine) log('decisao', `Linha de chegada: ${next.finishLine}`)
+  return next
+}
+
+export interface ProjectStatusPayload {
+  reason?: string | null
+  resumeAt?: string | null
+  resumeCondition?: string | null
+  nextAction?: string | null
+  retrospective?: string | null
+  note?: string | null
+}
+
+/** Muda a situação registrando a decisão no histórico (motivo de pausa/encerramento, retomada, etc.). */
+export async function setProjectStatus(id: number, status: string, payload: ProjectStatusPayload = {}): Promise<DbProject> {
+  if (!(PROJECT_STATUSES as readonly string[]).includes(status)) throw new Error(`Situação inválida: ${status}`)
+  const db = await getDb()
+  const prev = getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])
+  if (!prev) throw new Error('Projeto não encontrado')
+  const now = new Date().toISOString()
+  const closed = status === 'concluido' || status === 'encerrado'
+  const sets: string[] = ['status = ?', 'statusChangedAt = ?', 'archived = ?', 'triagedAt = COALESCE(triagedAt, ?)']
+  const params: (string | number | null)[] = [status, now, closed ? 1 : 0, now]
+  if (status === 'pausado') {
+    sets.push('pauseReason = ?', 'resumeAt = ?', 'resumeCondition = ?')
+    params.push(payload.reason ?? null, payload.resumeAt ?? null, payload.resumeCondition ?? null)
+  } else {
+    sets.push('pauseReason = NULL', 'resumeAt = NULL', 'resumeCondition = NULL')
+  }
+  if (closed) {
+    sets.push('closedAt = ?', 'closeReason = ?')
+    params.push(now, payload.reason ?? null)
+    if (payload.retrospective !== undefined) {
+      sets.push('retrospective = ?')
+      params.push(payload.retrospective)
+    }
+  } else {
+    sets.push('closedAt = NULL')
+  }
+  if (payload.nextAction) {
+    sets.push('nextAction = ?', 'nextActionAt = ?')
+    params.push(payload.nextAction, now)
+  }
+  params.push(id)
+  run(db, `UPDATE projects SET ${sets.join(', ')} WHERE id = ?`, params)
+  const parts = [payload.reason, payload.resumeAt ? `retomar em ${payload.resumeAt}` : null, payload.resumeCondition ? `retomar quando: ${payload.resumeCondition}` : null, payload.note]
+    .filter(Boolean)
+    .join(' · ')
+  run(db, 'INSERT INTO project_events (projectId, kind, fromStatus, toStatus, text, createdAt) VALUES (?, ?, ?, ?, ?, ?)', [
+    id, 'status', prev.status, status, parts || null, now
+  ])
+  if (payload.nextAction && payload.nextAction !== prev.nextAction) {
+    run(db, 'INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)', [id, 'proxima_acao', payload.nextAction, now])
+  }
+  return getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])!
+}
+
+/** Conclui a próxima ação (fica no histórico) e já define a seguinte, se informada. */
+export async function completeNextAction(id: number, next: string | null): Promise<DbProject> {
+  const db = await getDb()
+  const prev = getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])
+  if (!prev) throw new Error('Projeto não encontrado')
+  const now = new Date().toISOString()
+  if (prev.nextAction) {
+    run(db, 'INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)', [id, 'acao_concluida', prev.nextAction, now])
+  }
+  const n = next && next.trim() ? next.trim() : null
+  run(db, 'UPDATE projects SET nextAction = ?, nextActionAt = ? WHERE id = ?', [n, now, id])
+  if (n) run(db, 'INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)', [id, 'proxima_acao', n, now])
+  return getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])!
+}
+
+// ── Milestones (edição) ──
+export async function updateProjectMilestone(id: number, title: string, targetDate: string | null, cycleId: number | null, description: string | null): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE project_milestones SET title = ?, targetDate = ?, cycleId = ?, description = ? WHERE id = ?', [title, targetDate, cycleId, description, id])
+}
+
+// ── Ciclos / versões ──
+export interface DbProjectCycle {
+  id: number
+  projectId: number
+  name: string
+  goal: string | null
+  startDate: string
+  dueDate: string | null
+  originalDueDate: string | null
+  extensions: number
+  status: string
+  closedAt: string | null
+  retrospective: string | null
+  createdAt: string
+}
+
+export async function getProjectCycles(projectId?: number | null): Promise<DbProjectCycle[]> {
+  const db = await getDb()
+  if (projectId != null) return getAll<DbProjectCycle>(db, 'SELECT * FROM project_cycles WHERE projectId = ? ORDER BY startDate DESC, id DESC', [projectId])
+  return getAll<DbProjectCycle>(db, 'SELECT * FROM project_cycles ORDER BY startDate DESC, id DESC')
+}
+
+export async function createProjectCycle(projectId: number, name: string, goal: string | null, startDate: string, dueDate: string | null): Promise<DbProjectCycle> {
+  const db = await getDb()
+  const now = new Date().toISOString()
+  run(db, 'INSERT INTO project_cycles (projectId, name, goal, startDate, dueDate, originalDueDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)', [
+    projectId, name, goal, startDate, dueDate, dueDate, now
+  ])
+  const id = lastInsertId(db)
+  run(db, 'UPDATE projects SET continuous = 1 WHERE id = ?', [projectId])
+  run(db, 'INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)', [projectId, 'ciclo', `Ciclo "${name}" iniciado${dueDate ? ` (prazo ${dueDate})` : ''}`, now])
+  return getOne<DbProjectCycle>(db, 'SELECT * FROM project_cycles WHERE id = ?', [id])!
+}
+
+export async function updateProjectCycle(id: number, name: string, goal: string | null, dueDate: string | null): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE project_cycles SET name = ?, goal = ?, dueDate = ?, originalDueDate = COALESCE(originalDueDate, ?) WHERE id = ?', [name, goal, dueDate, dueDate, id])
+}
+
+/** Estende o prazo do ciclo (conta extensões e registra o motivo). */
+export async function extendProjectCycle(id: number, newDueDate: string, reason: string | null): Promise<void> {
+  const db = await getDb()
+  const c = getOne<DbProjectCycle>(db, 'SELECT * FROM project_cycles WHERE id = ?', [id])
+  if (!c) return
+  run(db, 'UPDATE project_cycles SET dueDate = ?, extensions = extensions + 1, originalDueDate = COALESCE(originalDueDate, ?) WHERE id = ?', [newDueDate, c.dueDate, id])
+  run(db, 'INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)', [
+    c.projectId, 'ciclo', `Prazo de "${c.name}" estendido ${c.dueDate ?? '—'} → ${newDueDate} (extensão nº ${c.extensions + 1})${reason ? `: ${reason}` : ''}`, new Date().toISOString()
+  ])
+}
+
+export async function closeProjectCycle(id: number, status: 'concluido' | 'cancelado', retrospective: string | null): Promise<void> {
+  const db = await getDb()
+  const c = getOne<DbProjectCycle>(db, 'SELECT * FROM project_cycles WHERE id = ?', [id])
+  if (!c) return
+  const now = new Date().toISOString()
+  run(db, 'UPDATE project_cycles SET status = ?, closedAt = ?, retrospective = ? WHERE id = ?', [status, now, retrospective, id])
+  run(db, 'INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)', [
+    c.projectId, 'ciclo', `Ciclo "${c.name}" ${status === 'concluido' ? 'concluído 🎉' : 'cancelado'}`, now
+  ])
+}
+
+export async function deleteProjectCycle(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE project_milestones SET cycleId = NULL WHERE cycleId = ?', [id])
+  run(db, 'DELETE FROM project_cycles WHERE id = ?', [id])
+}
+
+// ── Base de conhecimento ──
+export interface DbProjectNote {
+  id: number
+  projectId: number
+  kind: string
+  title: string
+  body: string | null
+  url: string | null
+  pinned: number
+  createdAt: string
+}
+
+export async function getProjectNotes(projectId: number): Promise<DbProjectNote[]> {
+  const db = await getDb()
+  return getAll<DbProjectNote>(db, 'SELECT * FROM project_notes WHERE projectId = ? ORDER BY pinned DESC, createdAt DESC', [projectId])
+}
+
+export async function saveProjectNote(note: { id?: number | null; projectId: number; kind: string; title: string; body: string | null; url: string | null; pinned?: number }): Promise<DbProjectNote> {
+  const db = await getDb()
+  if (note.id) {
+    run(db, 'UPDATE project_notes SET kind = ?, title = ?, body = ?, url = ?, pinned = ? WHERE id = ?', [note.kind, note.title, note.body, note.url, note.pinned ?? 0, note.id])
+    return getOne<DbProjectNote>(db, 'SELECT * FROM project_notes WHERE id = ?', [note.id])!
+  }
+  const now = new Date().toISOString()
+  run(db, 'INSERT INTO project_notes (projectId, kind, title, body, url, pinned, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)', [
+    note.projectId, note.kind, note.title, note.body, note.url, note.pinned ?? 0, now
+  ])
+  if (note.kind === 'decisao') {
+    run(db, 'INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)', [note.projectId, 'decisao', note.title, now])
+  }
+  return getOne<DbProjectNote>(db, 'SELECT * FROM project_notes WHERE id = ?', [lastInsertId(db)])!
+}
+
+export async function deleteProjectNote(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM project_notes WHERE id = ?', [id])
+}
+
+// ── Vínculos (TODOs, tags, tarefas do timer) ──
+export async function linkTodosToProject(todoIds: number[], projectId: number | null, milestoneId: number | null = null): Promise<void> {
+  const db = await getDb()
+  for (const id of todoIds) {
+    run(db, 'UPDATE todos SET projectId = ?, milestoneId = ? WHERE id = ?', [projectId, milestoneId, id])
+  }
+}
+
+export async function setTodoMilestone(todoId: number, milestoneId: number | null): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE todos SET milestoneId = ? WHERE id = ?', [milestoneId, todoId])
+}
+
+export async function setTagProject(tagId: number, projectId: number | null): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE tags SET projectId = ? WHERE id = ?', [projectId, tagId])
+}
+
+export async function setTaskProject(taskId: number, projectId: number | null): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE tasks SET projectId = ? WHERE id = ?', [projectId, taskId])
+}
+
+/** Projeto de um tag (para tarefas do timer iniciadas sem projeto explícito). */
+export async function projectForTag(tagId: number | null): Promise<number | null> {
+  if (tagId == null) return null
+  const db = await getDb()
+  const r = getOne<{ projectId: number | null }>(db, 'SELECT projectId FROM tags WHERE id = ?', [tagId])
+  return r?.projectId ?? null
+}
+
+// ── Números por projeto (horas, tarefas, atividade) ──
+export interface ProjectNumbers {
+  projectId: number
+  minutesTotal: number
+  minutes7d: number
+  minutes30d: number
+  lastTaskAt: string | null
+  openTodos: number
+  doneTodos: number
+  lastTodoAt: string | null
+  lastEventAt: string | null
+}
+
+const TASK_MINUTES = "(julianday(COALESCE(t.endTime, strftime('%Y-%m-%dT%H:%M:%fZ','now'))) - julianday(t.startTime)) * 24 * 60"
+
+export async function getProjectNumbers(): Promise<ProjectNumbers[]> {
+  const db = await getDb()
+  const since7 = new Date(Date.now() - 7 * 86400000).toISOString()
+  const since30 = new Date(Date.now() - 30 * 86400000).toISOString()
+  const hours = getAll<{ projectId: number; total: number; m7: number; m30: number; lastAt: string | null }>(
+    db,
+    `SELECT COALESCE(t.projectId, tg.projectId) as projectId,
+            SUM(${TASK_MINUTES}) as total,
+            SUM(CASE WHEN t.startTime >= ? THEN ${TASK_MINUTES} ELSE 0 END) as m7,
+            SUM(CASE WHEN t.startTime >= ? THEN ${TASK_MINUTES} ELSE 0 END) as m30,
+            MAX(COALESCE(t.endTime, t.startTime)) as lastAt
+       FROM tasks t LEFT JOIN tags tg ON tg.id = t.tagId
+      WHERE COALESCE(t.projectId, tg.projectId) IS NOT NULL
+      GROUP BY COALESCE(t.projectId, tg.projectId)`,
+    [since7, since30]
+  )
+  const todos = getAll<{ projectId: number; open: number; done: number; lastAt: string | null }>(
+    db,
+    `SELECT projectId, SUM(status <> 'done') as open, SUM(status = 'done') as done,
+            MAX(COALESCE(doneAt, createdAt)) as lastAt
+       FROM todos WHERE projectId IS NOT NULL GROUP BY projectId`
+  )
+  const events = getAll<{ projectId: number; lastAt: string }>(db, 'SELECT projectId, MAX(createdAt) as lastAt FROM project_events GROUP BY projectId')
+  const ids = new Set<number>([...hours.map((h) => h.projectId), ...todos.map((t) => t.projectId), ...events.map((e) => e.projectId)])
+  return [...ids].map((id) => {
+    const h = hours.find((x) => x.projectId === id)
+    const t = todos.find((x) => x.projectId === id)
+    const e = events.find((x) => x.projectId === id)
+    return {
+      projectId: id,
+      minutesTotal: Math.round(h?.total ?? 0),
+      minutes7d: Math.round(h?.m7 ?? 0),
+      minutes30d: Math.round(h?.m30 ?? 0),
+      lastTaskAt: h?.lastAt ?? null,
+      openTodos: t?.open ?? 0,
+      doneTodos: t?.done ?? 0,
+      lastTodoAt: t?.lastAt ?? null,
+      lastEventAt: e?.lastAt ?? null
+    }
+  })
+}
+
+/** Tarefas do timer de um projeto (mais recentes primeiro). */
+export async function getProjectTasks(projectId: number, limit = 100): Promise<DbTaskWithTag[]> {
+  const db = await getDb()
+  return getAll<DbTaskWithTag>(db, `${TASK_WITH_TAG_SQL} WHERE COALESCE(t.projectId, tg.projectId) = ? ORDER BY t.startTime DESC LIMIT ?`, [projectId, limit])
+}
+
+/** Horas por projeto num intervalo (para métricas). */
+export async function getProjectHours(from: string, to: string): Promise<{ projectId: number; minutes: number }[]> {
+  const db = await getDb()
+  return getAll<{ projectId: number; minutes: number }>(
+    db,
+    `SELECT COALESCE(t.projectId, tg.projectId) as projectId, CAST(ROUND(SUM(${TASK_MINUTES})) AS INTEGER) as minutes
+       FROM tasks t LEFT JOIN tags tg ON tg.id = t.tagId
+      WHERE t.startTime >= ? AND t.startTime < ? AND COALESCE(t.projectId, tg.projectId) IS NOT NULL
+      GROUP BY COALESCE(t.projectId, tg.projectId) ORDER BY minutes DESC`,
+    [from, to]
+  )
+}
+
+/** Tags sem projeto com horas nos últimos 90 dias (para sugerir vínculos). */
+export async function getUnlinkedTagHours(): Promise<{ tagId: number; tagName: string; tagColor: string; minutes: number }[]> {
+  const db = await getDb()
+  const since = new Date(Date.now() - 90 * 86400000).toISOString()
+  return getAll(
+    db,
+    `SELECT tg.id as tagId, tg.name as tagName, tg.color as tagColor, CAST(ROUND(SUM(${TASK_MINUTES})) AS INTEGER) as minutes
+       FROM tasks t JOIN tags tg ON tg.id = t.tagId
+      WHERE tg.projectId IS NULL AND t.projectId IS NULL AND t.startTime >= ? AND tg.id NOT IN (1, 3)
+      GROUP BY tg.id ORDER BY minutes DESC`,
+    [since]
+  )
 }

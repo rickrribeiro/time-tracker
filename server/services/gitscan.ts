@@ -107,6 +107,8 @@ function run(cmd: string, args: string[], cwd: string, timeoutMs = 20000): Promi
 
 const git = (cwd: string, args: string[], timeoutMs?: number): Promise<string> => run('git', args, cwd, timeoutMs)
 const gitOk = (cwd: string, args: string[]): Promise<string | null> => git(cwd, args).catch(() => null)
+/** Read-only git for other services (null on any error). */
+export const gitQuiet = gitOk
 
 /** Small concurrency limiter so a repo with 200 branches doesn't spawn 600 processes at once. */
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {

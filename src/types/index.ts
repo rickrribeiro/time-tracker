@@ -106,6 +106,26 @@ export interface AiUsage {
   isError: number
 }
 
+/** Pasta da pasta de projetos do computador que parece um projeto e ainda não foi cadastrada. */
+export interface ProjectSuggestion {
+  name: string
+  path: string
+  displayPath: string
+  description: string | null
+  githubRepoUrl: string | null
+  tags: string[]
+  lastActivity: string | null
+  group: string | null
+}
+
+export interface ProjectSuggestionsResult {
+  /** Pasta lida (setting `projects_root`, padrão ~/Projects). */
+  root: string
+  rootExists: boolean
+  items: ProjectSuggestion[]
+  ignoredCount: number
+}
+
 export interface Project {
   id: number
   name: string
@@ -669,6 +689,9 @@ declare global {
         ) => Promise<Project>
         setStage: (id: number, stage: string) => Promise<void>
         delete: (id: number) => Promise<void>
+        suggestions: () => Promise<ProjectSuggestionsResult>
+        ignoreSuggestion: (path: string) => Promise<void>
+        restoreSuggestions: () => Promise<void>
       }
       milestones: {
         getAll: () => Promise<ProjectMilestone[]>

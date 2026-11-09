@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Project, ProjectMilestone } from '../../../types'
+import { Project, ProjectMilestone, ProjectSuggestion, ProjectSuggestionsResult } from '../../../types'
 import { useProjectStore } from '../store/projectStore'
 import { ProgressModal } from '../components/ProgressModal'
+import { ProjectSuggestions, suggestionColor } from '../components/ProjectSuggestions'
 import { useUIStore } from '../../../store/uiStore'
 import { WORKTREES_FILTER_KEY } from '../git'
 
@@ -43,6 +44,25 @@ export function ProjectsPage(): React.ReactElement {
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([])
   const [msTitle, setMsTitle] = useState('')
   const [msDate, setMsDate] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [suggestions, setSuggestions] = useState<ProjectSuggestionsResult | null>(null)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+
+  async function loadSuggestions(): Promise<void> {
+    setLoadingSuggestions(true)
+    try {
+      setSuggestions(await window.api.projects.suggestions())
+    } catch {
+      setSuggestions(null)
+    } finally {
+      setLoadingSuggestions(false)
+    }
+  }
+
+  async function createFromSuggestion(s: ProjectSuggestion): Promise<void> {
+    await create(s.name, s.description, s.githubRepoUrl, suggestionColor(s.name), null, s.path, 'trabalho', null, null, null)
+    await loadSuggestions()
+  }
 
   async function refreshMilestones(): Promise<void> {
     setMilestones(await window.api.milestones.getAll())
@@ -51,6 +71,7 @@ export function ProjectsPage(): React.ReactElement {
   useEffect(() => {
     refresh()
     refreshMilestones()
+    void loadSuggestions()
   }, [])
 
   function changeView(v: 'cards' | 'pipeline'): void {
@@ -199,17 +220,38 @@ export function ProjectsPage(): React.ReactElement {
             Associe um repo do GitHub e veja as issues em <strong>Issues (Kanban)</strong>.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="seg-toggle">
             <button className={view === 'cards' ? 'active' : ''} onClick={() => changeView('cards')}>Cards</button>
             <button className={view === 'pipeline' ? 'active' : ''} onClick={() => changeView('pipeline')}>Pipeline</button>
           </div>
+          <button
+            className={`btn btn-secondary btn-sm psug-toggle ${showSuggestions ? 'active' : ''}`}
+            onClick={() => {
+              setShowSuggestions((v) => !v)
+              if (!showSuggestions) void loadSuggestions()
+            }}
+            title="Projetos sugeridos a partir da sua pasta de projetos"
+          >
+            💡 Sugestões
+            {!!suggestions?.items.length && <span className="psug-count">{suggestions.items.length}</span>}
+          </button>
           <button className="btn btn-secondary" onClick={() => setShowProgress(true)}>📊 Progresso</button>
           <button className="btn btn-primary" onClick={startCreate}>
             + Novo Projeto
           </button>
         </div>
       </div>
+
+      {showSuggestions && (
+        <ProjectSuggestions
+          data={suggestions}
+          loading={loadingSuggestions}
+          onReload={loadSuggestions}
+          onCreate={createFromSuggestion}
+          onClose={() => setShowSuggestions(false)}
+        />
+      )}
 
       {showForm && (
         <div className="chart-section" style={{ marginBottom: 16, maxWidth: 520 }}>

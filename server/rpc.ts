@@ -173,6 +173,7 @@ import { searchFlightPrice, refreshWatchPrice } from './services/flights'
 import { encodeSecret, decodeSecret, legacySecrets } from './services/secrets'
 import { broadcast } from './events'
 import { notify, notificationsChanged } from './services/notifications'
+import { suggestProjects, ignoreProjectSuggestion, restoreProjectSuggestions } from './services/projectScan'
 import {
   scanGit,
   cachedScan,
@@ -615,6 +616,10 @@ ipcMain.handle(
 
 ipcMain.handle('projects:setStage', (_, id: number, stage: string) => setProjectStage(id, stage))
 ipcMain.handle('projects:delete', (_, id: number) => deleteProject(id))
+// Sugestões: pastas da pasta de projetos do computador (padrão ~/Projects) ainda não cadastradas.
+ipcMain.handle('projects:suggestions', () => suggestProjects())
+ipcMain.handle('projects:ignoreSuggestion', (_, dir: string) => ignoreProjectSuggestion(dir))
+ipcMain.handle('projects:restoreSuggestions', () => restoreProjectSuggestions())
 
 ipcMain.handle('milestones:getAll', () => getProjectMilestones())
 ipcMain.handle('milestones:create', (_, projectId: number, title: string, targetDate: string | null) => createProjectMilestone(projectId, title, targetDate))

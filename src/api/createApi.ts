@@ -183,6 +183,9 @@ export function createApi() {
     // Projects
     projects: {
       getAll: () => invoke('projects:getAll'),
+      suggestions: () => invoke('projects:suggestions'),
+      ignoreSuggestion: (path: string) => invoke('projects:ignoreSuggestion', path),
+      restoreSuggestions: () => invoke('projects:restoreSuggestions'),
       create: (name: string, description: string | null, githubRepoUrl: string | null, color: string, claudeCommand: string | null, localPath?: string | null, stage?: string, businessModel?: string | null, pricing?: string | null, audience?: string | null) =>
         invoke('projects:create', name, description, githubRepoUrl, color, claudeCommand, localPath, stage, businessModel, pricing, audience),
       update: (

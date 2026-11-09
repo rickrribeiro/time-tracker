@@ -4,6 +4,7 @@ import type { NextActionSize, Project, ProjectArea, ProjectOverview, ProjectStat
 export const STATUSES: { key: ProjectStatus; label: string; icon: string; hint: string }[] = [
   { key: 'foco', label: 'Em foco', icon: '🎯', hint: 'Poucos, com próxima ação definida. É aqui que o tempo vai.' },
   { key: 'fila', label: 'Fila', icon: '⏭', hint: 'Decidido: entra em foco quando abrir vaga.' },
+  { key: 'baixa', label: 'Baixa prioridade', icon: '🐢', hint: 'Em andamento, mas sem o seu foco: avança de vez em quando, sem cobrança.' },
   { key: 'incubadora', label: 'Incubadora', icon: '🥚', hint: 'Ideias e projetos ainda não decididos. Todo projeto novo começa aqui.' },
   { key: 'pausado', label: 'Pausado', icon: '⏸', hint: 'Parado de propósito, com motivo e data/condição de retomada.' },
   { key: 'concluido', label: 'Concluído', icon: '🏁', hint: 'Cruzou a linha de chegada.' },

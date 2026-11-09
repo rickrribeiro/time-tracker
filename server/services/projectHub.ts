@@ -247,6 +247,9 @@ export async function projectsOverview(): Promise<ProjectOverview[]> {
     if (p.status === 'foco' && (idleDays == null || idleDays >= 7)) alerts.push({ kind: 'parado', severity: 'media', text: idleDays == null ? 'Em foco sem nenhuma atividade' : `Em foco, mas parado há ${idleDays} dias` })
     if ((p.status === 'fila' || p.status === 'incubadora') && idleDays != null && idleDays >= 45)
       alerts.push({ kind: 'esquecido', severity: 'baixa', text: `Esquecido há ${idleDays} dias` })
+    // baixa prioridade: andar devagar é o combinado — só avisa depois de 3 meses sem nada
+    else if (p.status === 'baixa' && idleDays != null && idleDays >= 90)
+      alerts.push({ kind: 'esquecido', severity: 'baixa', text: `Esquecido há ${idleDays} dias` })
     if (activeCycle?.dueDate) {
       if (activeCycle.dueDate < today) alerts.push({ kind: 'ciclo_vencido', severity: 'alta', text: `Ciclo "${activeCycle.name}" venceu em ${activeCycle.dueDate}` })
       else if (new Date(`${activeCycle.dueDate}T12:00:00`).getTime() - Date.now() <= 3 * DAY)

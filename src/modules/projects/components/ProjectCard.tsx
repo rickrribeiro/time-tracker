@@ -68,7 +68,7 @@ export function ProjectCard({ project: p, ov, compact, onStatus, onCompleteActio
 
       {p.blocker && <div className="ph-card-blocker">🧱 {p.blocker}</div>}
 
-      {(p.status === 'foco' || p.status === 'fila') && (
+      {(p.status === 'foco' || p.status === 'fila' || p.status === 'baixa') && (
         <div className={`ph-card-next ${p.nextAction ? '' : 'missing'}`} onClick={stop}>
           {p.nextAction ? (
             <>
@@ -97,7 +97,7 @@ export function ProjectCard({ project: p, ov, compact, onStatus, onCompleteActio
         </span>
         {ov && ov.commits7d > 0 && <span className="ph-muted">⎇ {ov.commits7d}</span>}
         <span style={{ flex: 1 }} />
-        {(p.status === 'foco' || p.status === 'fila') && (
+        {(p.status === 'foco' || p.status === 'fila' || p.status === 'baixa') && (
           <button className="btn btn-primary btn-sm" onClick={() => startWorking(p)} title="Inicia o timer vinculado a este projeto">
             ▶ Trabalhar
           </button>

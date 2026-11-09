@@ -41,7 +41,7 @@ export function StatusChangeModal({ project, to, onClose }: { project: Project; 
         reason: reason.trim() || null,
         resumeAt: resumeAt || null,
         resumeCondition: resumeCondition.trim() || null,
-        nextAction: to === 'foco' ? nextAction.trim() : null,
+        nextAction: to === 'foco' || to === 'baixa' ? nextAction.trim() || null : null,
         note: note.trim() || null
       })
       onClose()
@@ -94,6 +94,13 @@ export function StatusChangeModal({ project, to, onClose }: { project: Project; 
             <label className="ph-label">Por que encerrar?</label>
             <textarea autoFocus rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex: perdi interesse, mercado não existe, outro projeto resolve isso…" />
             <p className="ph-muted">Encerrar não é fracasso: é liberar espaço. O projeto vai para a estante com o motivo registrado.</p>
+          </>
+        )}
+
+        {to === 'baixa' && (
+          <>
+            <label className="ph-label">Próxima ação (opcional — para quando sobrar um tempo)</label>
+            <input autoFocus value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="Ex: adicionar gráfico semanal" />
           </>
         )}
 

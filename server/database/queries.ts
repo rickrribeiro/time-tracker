@@ -2374,7 +2374,7 @@ export async function clearNotifications(onlyRead = false): Promise<void> {
 // Central de Projetos — situação, próxima ação, ciclos, histórico, base de conhecimento
 // ══════════════════════════════════════════════════════════════════════════════
 
-export const PROJECT_STATUSES = ['incubadora', 'fila', 'foco', 'pausado', 'concluido', 'encerrado'] as const
+export const PROJECT_STATUSES = ['incubadora', 'fila', 'baixa', 'foco', 'pausado', 'concluido', 'encerrado'] as const
 
 /** Normaliza p/ comparar nomes: minúsculas, sem acento, só letras/dígitos. */
 export function normName(s: string): string {

@@ -65,7 +65,7 @@ export function ProjectHomeBlocks(): React.ReactElement | null {
     .flatMap((p) => (overview[p.id]?.alerts ?? []).filter((a) => a.severity !== 'baixa').map((a) => ({ p, a })))
     .sort((x, y) => (x.a.severity === y.a.severity ? 0 : x.a.severity === 'alta' ? -1 : 1))
   const forgotten = open.filter((p) => (p.status === 'fila' || p.status === 'incubadora') && (overview[p.id]?.idleDays ?? 0) >= 30)
-  const candidates = open.filter((p) => (p.status === 'foco' || p.status === 'fila') && p.nextAction && !today.items.some((i) => i.projectId === p.id && i.text === p.nextAction))
+  const candidates = open.filter((p) => (p.status === 'foco' || p.status === 'fila' || p.status === 'baixa') && p.nextAction && !today.items.some((i) => i.projectId === p.id && i.text === p.nextAction))
   const name = (id: number): Project | undefined => projects.find((p) => p.id === id)
 
   return (

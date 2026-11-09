@@ -95,9 +95,9 @@ export function TriageModal({ onClose }: { onClose: () => void }): React.ReactEl
                 </select>
               </div>
             </div>
-            {(status === 'foco' || status === 'fila') && (
+            {(status === 'foco' || status === 'fila' || status === 'baixa') && (
               <>
-                <label className="ph-label">Próxima ação {status === 'fila' && '(opcional)'}</label>
+                <label className="ph-label">Próxima ação {status !== 'foco' && '(opcional)'}</label>
                 <input value={nextAction} onChange={(e) => setNextAction(e.target.value)} placeholder="Uma ação concreta" />
               </>
             )}

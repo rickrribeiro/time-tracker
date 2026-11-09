@@ -206,7 +206,7 @@ export interface ClaudeHookStatus {
   model: string
   last: { at: string; project: string | null; status: string } | null
 }
-export type ProjectStatus = 'incubadora' | 'fila' | 'foco' | 'pausado' | 'concluido' | 'encerrado'
+export type ProjectStatus = 'incubadora' | 'fila' | 'baixa' | 'foco' | 'pausado' | 'concluido' | 'encerrado'
 export type ProjectArea = 'pessoal' | 'profissional'
 export type ProjectPatch = Partial<
   Pick<

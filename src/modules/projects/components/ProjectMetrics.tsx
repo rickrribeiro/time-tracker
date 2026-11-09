@@ -51,7 +51,7 @@ export function ProjectMetrics({ projects }: { projects: Project[] }): React.Rea
     area: a,
     minutes: hours.filter((h) => projects.find((p) => p.id === h.projectId)?.area === a).reduce((s, h) => s + h.minutes, 0)
   }))
-  const inFlight = projects.filter((p) => p.status === 'foco' || p.status === 'fila').length
+  const inFlight = projects.filter((p) => p.status === 'foco' || p.status === 'fila' || p.status === 'baixa').length
 
   return (
     <div className="ph-metrics">
@@ -59,7 +59,7 @@ export function ProjectMetrics({ projects }: { projects: Project[] }): React.Rea
         <div className="stat-card">
           <div className="stat-card-label">Iniciados</div>
           <div className="stat-card-value">{projects.length}</div>
-          <div className="stat-card-sub">{inFlight} em foco/fila</div>
+          <div className="stat-card-sub">{inFlight} em andamento</div>
         </div>
         <div className="stat-card">
           <div className="stat-card-label">Concluídos</div>

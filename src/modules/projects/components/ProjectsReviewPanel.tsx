@@ -17,7 +17,7 @@ export function ProjectsReviewPanel(): React.ReactElement {
     void window.api.settings.set(LAST_REVIEW_KEY, new Date().toISOString())
   }, [])
 
-  const order: ProjectStatus[] = ['foco', 'pausado', 'fila', 'incubadora']
+  const order: ProjectStatus[] = ['foco', 'pausado', 'fila', 'baixa', 'incubadora']
   const list = projects.filter((p) => !isClosed(p)).sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status))
 
   async function keep(p: Project): Promise<void> {

@@ -22,7 +22,7 @@ const VIEWS: { key: View; label: string }[] = [
   { key: 'estante', label: '🏆 Estante' },
   { key: 'metricas', label: '📈 Métricas' }
 ]
-const COCKPIT_ORDER: ProjectStatus[] = ['foco', 'fila', 'incubadora', 'pausado']
+const COCKPIT_ORDER: ProjectStatus[] = ['foco', 'fila', 'baixa', 'incubadora', 'pausado']
 
 function readLS<T extends string>(k: string, def: T): T {
   try {
@@ -236,7 +236,7 @@ export function ProjectsPage(): React.ReactElement {
                 <div className={`ph-grid ${isFocus ? 'focus' : ''}`}>
                   {list.length === 0 && <div className="empty-hint">{isFocus ? 'Nada em foco. Escolha 1–3 projetos da fila.' : 'Vazio — arraste um card para cá.'}</div>}
                   {list.map((p) => (
-                    <ProjectCard key={p.id} project={p} ov={overview[p.id]} compact={st === 'incubadora' || st === 'pausado'} {...cardProps} />
+                    <ProjectCard key={p.id} project={p} ov={overview[p.id]} compact={st === 'incubadora' || st === 'pausado' || st === 'baixa'} {...cardProps} />
                   ))}
                 </div>
               </section>

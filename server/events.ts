@@ -1,6 +1,6 @@
 /**
  * Server → client push events, delivered over SSE (`GET /api/events`).
- * Channels: ai:chunk, ai:done, calendar:updated, inbox:updated, notify, db:replaced.
+ * Channels: ai:chunk, ai:done, calendar:updated, inbox:updated, notify, notifications:updated, db:replaced.
  */
 export type EventListener = (channel: string, payload: unknown) => void
 
@@ -19,9 +19,4 @@ export function broadcast(channel: string, payload: unknown): void {
       // a broken listener must not stop the others
     }
   }
-}
-
-/** Ask every connected client to show a notification (native on desktop, Notification API on web). */
-export function notify(title: string, body: string): void {
-  broadcast('notify', { title, body })
 }

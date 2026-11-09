@@ -413,4 +413,16 @@ export const SCHEMA = `
     isError INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX IF NOT EXISTS idx_ai_usage_createdAt ON ai_usage(createdAt);
+
+  -- Central de notificações (sino da sidebar): regras, agentes, IA, sistema
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    createdAt TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT 'sistema', -- automacao | agendador | ia | sistema | …
+    page TEXT,                              -- página do app aberta ao clicar (opcional)
+    readAt TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_notifications_createdAt ON notifications(createdAt);
 `;

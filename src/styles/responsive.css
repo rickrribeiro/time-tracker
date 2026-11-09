@@ -110,6 +110,28 @@
     font-size: 18px;
   }
 
+  /* Notificações: painel ocupa a largura da tela; ações sempre visíveis (sem hover no toque) */
+  .notif-panel {
+    left: 8px !important;
+    right: 8px;
+    width: auto;
+    top: calc(60px + env(safe-area-inset-top)) !important;
+    max-height: calc(100dvh - 76px - env(safe-area-inset-top));
+  }
+  .notif-bell {
+    width: 38px;
+    height: 38px;
+    font-size: 17px;
+  }
+  .notif-actions {
+    opacity: 1;
+  }
+  .notif-actions button {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+
   .main-content {
     width: 100%;
     min-width: 0;

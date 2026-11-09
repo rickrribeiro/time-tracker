@@ -155,8 +155,15 @@ import {
   updateScheduledJob,
   setJobRan,
   deleteScheduledJob,
-  getAiUsage
+  getAiUsage,
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationRead,
+  markAllNotificationsRead,
+  deleteNotification,
+  clearNotifications
 } from './database/queries'
+import type { NotificationInput } from './database/queries'
 import type { DbTransaction, DbSkill, DbAgent, StudyBundle, DbStayFavorite, DbStayWatch, DbStayPricePoint } from './database/queries'
 import { syncGithubIssues, createIssueViaClaude } from './services/github'
 import { runClaude } from './services/claude'
@@ -164,7 +171,8 @@ import { beginGoogleConnect, awaitGoogleConnect, googleConnected, listGoogleAcco
 import { syncPluggy, pluggyConfigured, createConnectToken } from './services/pluggy'
 import { searchFlightPrice, refreshWatchPrice } from './services/flights'
 import { encodeSecret, decodeSecret, legacySecrets } from './services/secrets'
-import { broadcast, notify } from './events'
+import { broadcast } from './events'
+import { notify, notificationsChanged } from './services/notifications'
 import {
   scanGit,
   cachedScan,
@@ -380,9 +388,30 @@ ipcMain.handle('jobs:update', (_, id: number, name: string, prompt: string, hour
 ipcMain.handle('jobs:delete', (_, id: number) => deleteScheduledJob(id))
 
 // ── Automation engines (run while the app is open) ────────────────────────────
-function notifyNative(title: string, body: string): void {
-  notify(title, body)
+function notifyNative(title: string, body: string, page?: string): void {
+  void notify({ title, body, source: 'automacao', page: page ?? null })
 }
+
+// ── Notificações (sino da sidebar) ────────────────────────────────────────────
+ipcMain.handle('notifications:list', (_, limit?: number) => getNotifications(limit ?? 100))
+ipcMain.handle('notifications:unreadCount', () => getUnreadNotificationCount())
+ipcMain.handle('notifications:create', (_, n: NotificationInput) => notify(n))
+ipcMain.handle('notifications:markRead', async (_, id: number, read?: boolean) => {
+  await markNotificationRead(id, read !== false)
+  notificationsChanged()
+})
+ipcMain.handle('notifications:markAllRead', async () => {
+  await markAllNotificationsRead()
+  notificationsChanged()
+})
+ipcMain.handle('notifications:delete', async (_, id: number) => {
+  await deleteNotification(id)
+  notificationsChanged()
+})
+ipcMain.handle('notifications:clear', async (_, onlyRead?: boolean) => {
+  await clearNotifications(!!onlyRead)
+  notificationsChanged()
+})
 
 function todayRangeISO(): { start: string; end: string } {
   const n = new Date()
@@ -414,6 +443,7 @@ async function runScheduledJobs(): Promise<void> {
         if (text) {
           await createTodo(`🤖 ${job.name}`, text.slice(0, 4000), 'inbox', 'agent', 1, null, null, 1)
           broadcast('inbox:updated', { jobId: job.id })
+          void notify({ title: `🤖 ${job.name}`, body: 'O agente agendado terminou — resultado no Inbox.', source: 'agendador', page: 'inbox' })
         }
       } catch {
         // leave it marked as run today; try again tomorrow
@@ -460,7 +490,7 @@ async function evaluateRules(): Promise<void> {
           workStart.setHours(startHour, 0, 0, 0)
           const ref = lastEnd || workStart.getTime()
           if (now - ref >= minutes * 60000) {
-            notifyNative('⏳ Hora de focar?', `Você está há ~${Math.round((now - ref) / 60000)}min sem tarefa produtiva.`)
+            notifyNative('⏳ Hora de focar?', `Você está há ~${Math.round((now - ref) / 60000)}min sem tarefa produtiva.`, 'timeline')
             await setRuleFired(r.id, new Date().toISOString())
           }
         } else if (r.type === 'due_flashcards') {
@@ -468,7 +498,7 @@ async function evaluateRules(): Promise<void> {
           if (now - last < 6 * 3600 * 1000) continue
           const due = await getDueFlashcards(new Date().toISOString())
           if (due.length > count) {
-            notifyNative('🔁 Revisões acumulando', `${due.length} flashcards vencidos — hora de revisar.`)
+            notifyNative('🔁 Revisões acumulando', `${due.length} flashcards vencidos — hora de revisar.`, 'estudos-review')
             await setRuleFired(r.id, new Date().toISOString())
           }
         } else if (r.type === 'stale_branches') {
@@ -482,7 +512,8 @@ async function evaluateRules(): Promise<void> {
             const repos = [...new Set(lost.map((b) => b.repoName))]
             notifyNative(
               '🌿 Trabalho esquecido em branches',
-              `${lost.length} branch(es) parada(s) há ${days}+ dias com código não entregue: ${repos.slice(0, 4).join(', ')}${repos.length > 4 ? '…' : ''}`
+              `${lost.length} branch(es) parada(s) há ${days}+ dias com código não entregue: ${repos.slice(0, 4).join(', ')}${repos.length > 4 ? '…' : ''}`,
+              'worktrees'
             )
             await setRuleFired(r.id, new Date().toISOString())
           }
@@ -500,7 +531,7 @@ async function evaluateRules(): Promise<void> {
             const cats = await getCategories()
             const names = crossed.map((b) => cats.find((c) => c.id === b.categoryId)?.name ?? `#${b.categoryId}`)
             await createTodo(`Revisar orçamento: ${names.join(', ')} passou de ${percent}%`, 'Gerado por regra automática', 'inbox', 'rule', 2, null, null, 1)
-            notifyNative('💸 Orçamento estourando', `${names.join(', ')} passou de ${percent}%.`)
+            notifyNative('💸 Orçamento estourando', `${names.join(', ')} passou de ${percent}%.`, 'budget')
             await setRuleFired(r.id, new Date().toISOString())
           }
         }
@@ -1037,6 +1068,13 @@ ipcMain.handle('ai:start', async (_, params: AiStartParams) => {
   const runId = randomUUID()
   const run: AiRun = { id: runId, status: 'running', output: '', error: null }
   aiRuns.set(runId, run)
+  const startedAt = Date.now()
+  // Execuções longas (≥ 1 min) avisam ao terminar: o usuário provavelmente saiu da tela.
+  const notifyIfLong = (title: string, body: string): void => {
+    if (Date.now() - startedAt < 60 * 1000) return
+    void notify({ title, body, source: 'ia', page: params.save !== false ? 'ai-history' : null })
+  }
+  const promptPreview = (params.userPrompt || params.prompt).replace(/\s+/g, ' ').trim().slice(0, 120)
   const command = await resolveClaudeCommand(params.projectId ?? undefined)
   const model = await resolveModel(params.model)
   const context = await buildProjectContext(params.projectId)
@@ -1071,12 +1109,14 @@ ipcMain.handle('ai:start', async (_, params: AiStartParams) => {
         }
       }
       broadcast('ai:done', { runId, ok: true, output: result, error: null })
+      notifyIfLong('✅ Execução de IA concluída', promptPreview)
     })
     .catch((e) => {
       const cancelled = run.status === 'cancelled'
       run.status = cancelled ? 'cancelled' : 'error'
       run.error = cancelled ? 'Execução cancelada.' : e instanceof Error ? e.message : String(e)
       broadcast('ai:done', { runId, ok: false, output: run.output, error: run.error })
+      if (!cancelled) notifyIfLong('⚠️ Execução de IA falhou', run.error ?? promptPreview)
     })
     .finally(() => {
       // keep the finished run available for reconnect for a while, then prune

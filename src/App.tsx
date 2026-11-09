@@ -51,6 +51,7 @@ import { HistoryPage } from './modules/ai/pages/HistoryPage'
 import { JarvisPage } from './modules/jarvis/pages/JarvisPage'
 import { Page } from './types'
 import { AuthGate } from './components/AuthGate'
+import { NotificationBell, UnreadDot } from './components/NotificationBell'
 
 interface NavItem {
   id: Page
@@ -292,12 +293,14 @@ export default function App(): React.ReactElement {
     <div className={`app ${navOpen ? 'nav-open' : ''}`}>
       <button className="mobile-menu-btn" onClick={() => setNavOpen((v) => !v)} aria-label="Abrir menu">
         ☰
+        <UnreadDot />
       </button>
       <div className="nav-scrim" onClick={() => setNavOpen(false)} />
       <nav className="sidebar">
         <div className="sidebar-logo">
           <span className="logo-icon">🧭</span>
           <span className="logo-text">RickOS</span>
+          <NotificationBell />
         </div>
         <div className="nav-list">
           <button

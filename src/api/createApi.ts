@@ -124,6 +124,15 @@ export function createApi() {
       log: (id: number) => invoke('contacts:log', id),
       delete: (id: number) => invoke('contacts:delete', id)
     },
+    notifications: {
+      list: (limit?: number) => invoke('notifications:list', limit),
+      unreadCount: () => invoke('notifications:unreadCount'),
+      create: (n: { title: string; body?: string; source?: string; page?: string | null }) => invoke('notifications:create', n),
+      markRead: (id: number, read?: boolean) => invoke('notifications:markRead', id, read),
+      markAllRead: () => invoke('notifications:markAllRead'),
+      delete: (id: number) => invoke('notifications:delete', id),
+      clear: (onlyRead?: boolean) => invoke('notifications:clear', onlyRead)
+    },
     rules: {
       getAll: () => invoke('rules:getAll'),
       create: (type: string, params: string) => invoke('rules:create', type, params),

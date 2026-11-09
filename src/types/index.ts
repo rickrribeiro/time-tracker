@@ -68,6 +68,26 @@ export interface Todo {
 }
 
 /** Uma execução do Claude CLI com o uso de tokens reportado pelo próprio CLI. */
+/** Item da central de notificações (sino da sidebar). */
+export interface AppNotification {
+  id: number
+  createdAt: string
+  title: string
+  body: string
+  /** Origem: automacao | agendador | ia | sistema | … */
+  source: string
+  /** Página aberta ao clicar (opcional). */
+  page: Page | null
+  readAt: string | null
+}
+
+export interface AppNotificationInput {
+  title: string
+  body?: string
+  source?: string
+  page?: Page | null
+}
+
 export interface AiUsage {
   id: number
   createdAt: string
@@ -564,6 +584,15 @@ declare global {
         update: (id: number, name: string, location: string | null, country: string | null, state: string | null, birthday: string | null, interests: string | null, context: string | null, lastContactAt: string | null, nextFollowUp: string | null) => Promise<Contact>
         log: (id: number) => Promise<Contact>
         delete: (id: number) => Promise<void>
+      }
+      notifications: {
+        list: (limit?: number) => Promise<AppNotification[]>
+        unreadCount: () => Promise<number>
+        create: (n: AppNotificationInput) => Promise<AppNotification | null>
+        markRead: (id: number, read?: boolean) => Promise<void>
+        markAllRead: () => Promise<void>
+        delete: (id: number) => Promise<void>
+        clear: (onlyRead?: boolean) => Promise<void>
       }
       rules: {
         getAll: () => Promise<Rule[]>

@@ -2236,3 +2236,72 @@ export async function getAiUsage(from: string, to: string): Promise<DbAiUsage[]>
     [from, to]
   )
 }
+
+// ── Notificações ──────────────────────────────────────────────────────────────
+export interface DbNotification {
+  id: number
+  createdAt: string
+  title: string
+  body: string
+  source: string
+  page: string | null
+  readAt: string | null
+}
+
+export interface NotificationInput {
+  title: string
+  body?: string
+  source?: string
+  page?: string | null
+}
+
+/** Quantas notificações manter; as mais antigas são descartadas ao criar novas. */
+const NOTIFICATIONS_KEEP = 500
+
+export async function createNotification(n: NotificationInput): Promise<DbNotification> {
+  const db = await getDb()
+  run(db, 'INSERT INTO notifications (createdAt, title, body, source, page) VALUES (?, ?, ?, ?, ?)', [
+    new Date().toISOString(),
+    n.title,
+    n.body ?? '',
+    n.source || 'sistema',
+    n.page ?? null
+  ])
+  // sql.js é síncrono: a última linha é a recém-inserida (last_insert_rowid zera após o export do saveDb)
+  const created = getOne<DbNotification>(db, 'SELECT * FROM notifications ORDER BY id DESC LIMIT 1')!
+  if (created.id > NOTIFICATIONS_KEEP) {
+    run(db, 'DELETE FROM notifications WHERE id <= ?', [created.id - NOTIFICATIONS_KEEP])
+  }
+  return created
+}
+
+export async function getNotifications(limit = 100): Promise<DbNotification[]> {
+  const db = await getDb()
+  return getAll<DbNotification>(db, 'SELECT * FROM notifications ORDER BY id DESC LIMIT ?', [limit])
+}
+
+export async function getUnreadNotificationCount(): Promise<number> {
+  const db = await getDb()
+  return getOne<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM notifications WHERE readAt IS NULL')?.n ?? 0
+}
+
+export async function markNotificationRead(id: number, read = true): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE notifications SET readAt = ? WHERE id = ?', [read ? new Date().toISOString() : null, id])
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE notifications SET readAt = ? WHERE readAt IS NULL', [new Date().toISOString()])
+}
+
+export async function deleteNotification(id: number): Promise<void> {
+  const db = await getDb()
+  run(db, 'DELETE FROM notifications WHERE id = ?', [id])
+}
+
+/** Remove todas (onlyRead = só as já lidas). */
+export async function clearNotifications(onlyRead = false): Promise<void> {
+  const db = await getDb()
+  run(db, onlyRead ? 'DELETE FROM notifications WHERE readAt IS NOT NULL' : 'DELETE FROM notifications')
+}

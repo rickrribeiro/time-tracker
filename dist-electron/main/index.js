@@ -3267,6 +3267,268 @@ async function notify(input) {
 function notificationsChanged() {
   broadcast("notifications:updated", {});
 }
+const PROJECTS_ROOT_KEY = "projects_root";
+const IGNORED_KEY = "projects_suggestions_ignored";
+const DEFAULT_ROOT = "~/Projects";
+const SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", "wt", "worktrees", "tmp", "temp", "dump", "dist", "build", "out", "vendor", "__pycache__"]);
+const MARKERS = [
+  ".git",
+  "package.json",
+  "pyproject.toml",
+  "requirements.txt",
+  "setup.py",
+  "Cargo.toml",
+  "go.mod",
+  "pom.xml",
+  "build.gradle",
+  "build.gradle.kts",
+  "Gemfile",
+  "composer.json",
+  "pubspec.yaml",
+  "project.godot",
+  "CMakeLists.txt",
+  "Makefile",
+  "docker-compose.yml",
+  "Dockerfile",
+  "index.html",
+  "CLAUDE.md"
+];
+function expandHome$1(p) {
+  return p.startsWith("~") ? path.join(os.homedir(), p.slice(1)) : p;
+}
+function tildify(p) {
+  const home = os.homedir();
+  return p === home || p.startsWith(home + path.sep) ? "~" + p.slice(home.length) : p;
+}
+function realpath(p) {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return path.resolve(p);
+  }
+}
+function safeList(dir) {
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+}
+function readText(file, max = 64 * 1024) {
+  try {
+    const fd = fs.openSync(file, "r");
+    try {
+      const buf = Buffer.alloc(max);
+      const n = fs.readSync(fd, buf, 0, max, 0);
+      return buf.subarray(0, n).toString("utf8");
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    return null;
+  }
+}
+function isWorktree(dir) {
+  try {
+    return fs.statSync(path.join(dir, ".git")).isFile();
+  } catch {
+    return false;
+  }
+}
+function hasReadme(entries) {
+  const f = entries.find((e) => e.isFile() && /^readme(\.(md|markdown|txt|rst))?$/i.test(e.name));
+  return f ? f.name : null;
+}
+function isGitRepo(dir) {
+  try {
+    return fs.statSync(path.join(dir, ".git")).isDirectory();
+  } catch {
+    return false;
+  }
+}
+function isContainer(dir, entries) {
+  if (entries.some((e) => e.name === ".git")) return false;
+  return entries.some((e) => e.isDirectory() && !skipName(e.name) && isGitRepo(path.join(dir, e.name)));
+}
+function looksLikeProject(entries) {
+  const names = new Set(entries.map((e) => e.name));
+  return MARKERS.some((m) => names.has(m)) || !!hasReadme(entries);
+}
+function originUrl(dir) {
+  const cfg2 = readText(path.join(dir, ".git", "config"));
+  if (!cfg2) return null;
+  const m = cfg2.match(/\[remote "origin"\][^[]*?url\s*=\s*(\S+)/);
+  return m ? normalizeRepoUrl(m[1]) : null;
+}
+function normalizeRepoUrl(url) {
+  let u = url.trim();
+  const ssh = u.match(/^[\w.-]+@([^:/]+):(?!\/)(.+)$/);
+  if (ssh) u = `https://${ssh[1]}/${ssh[2]}`;
+  u = u.replace(/^ssh:\/\/git@/, "https://").replace(/^git:\/\//, "https://");
+  u = u.replace(/\/\/[^/@]+@/, "//");
+  return u.replace(/\.git$/, "").replace(/\/+$/, "");
+}
+function repoKey(url) {
+  return url ? normalizeRepoUrl(url).toLowerCase().replace(/^https?:\/\/(www\.)?/, "") : null;
+}
+function readmeSummary(file) {
+  const txt = readText(file, 16 * 1024);
+  if (!txt) return null;
+  let inCode = false;
+  const para = [];
+  for (const raw of txt.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line.startsWith("```")) {
+      inCode = !inCode;
+      continue;
+    }
+    if (inCode) continue;
+    if (!line) {
+      if (para.length) break;
+      continue;
+    }
+    if (/^(#|>|!\[|\[!\[|<|---|===|\|)/.test(line)) {
+      if (para.length) break;
+      continue;
+    }
+    para.push(line);
+  }
+  const s = para.join(" ").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/[*_`]/g, "").trim();
+  return s ? s.length > 220 ? s.slice(0, 217) + "…" : s : null;
+}
+function detect(dir, entries) {
+  const names = new Set(entries.map((e) => e.name));
+  const tags = [];
+  let description = null;
+  if (names.has("package.json")) {
+    try {
+      const pkg = JSON.parse(readText(path.join(dir, "package.json")) || "{}");
+      if (pkg.description?.trim()) description = pkg.description.trim();
+      const deps = { ...pkg.dependencies || {}, ...pkg.devDependencies || {} };
+      if (deps.next) tags.push("Next.js");
+      else if (deps.react) tags.push("React");
+      if (deps.vue) tags.push("Vue");
+      if (deps.svelte) tags.push("Svelte");
+      if (deps.electron) tags.push("Electron");
+      if (deps["react-native"] || deps.expo) tags.push("React Native");
+      if (deps.typescript) tags.push("TypeScript");
+      if (deps.three) tags.push("Three.js");
+      if (!tags.length) tags.push("Node");
+    } catch {
+      tags.push("Node");
+    }
+  }
+  if (names.has("pyproject.toml") || names.has("requirements.txt") || names.has("setup.py")) tags.push("Python");
+  if (names.has("Cargo.toml")) tags.push("Rust");
+  if (names.has("go.mod")) tags.push("Go");
+  if (names.has("pom.xml") || names.has("build.gradle") || names.has("build.gradle.kts")) tags.push("JVM");
+  if (names.has("Gemfile")) tags.push("Ruby");
+  if (names.has("composer.json")) tags.push("PHP");
+  if (names.has("pubspec.yaml")) tags.push("Flutter");
+  if (names.has("project.godot")) tags.push("Godot");
+  if (names.has("Assets") && names.has("ProjectSettings")) tags.push("Unity");
+  if (names.has("Dockerfile") || names.has("docker-compose.yml")) tags.push("Docker");
+  if (!tags.length && names.has("index.html")) tags.push("HTML");
+  if (names.has(".git")) tags.push("Git");
+  if (!description) {
+    const readme = hasReadme(entries);
+    if (readme) description = readmeSummary(path.join(dir, readme));
+  }
+  return { tags, description };
+}
+function mtimeMs(p) {
+  try {
+    return fs.statSync(p).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+function lastActivity(dir, entries) {
+  let t = Math.max(mtimeMs(path.join(dir, ".git", "logs", "HEAD")), mtimeMs(path.join(dir, ".git", "index")));
+  for (const e of entries) {
+    if (e.name.startsWith(".") || SKIP_DIRS.has(e.name)) continue;
+    t = Math.max(t, mtimeMs(path.join(dir, e.name)));
+  }
+  return t ? new Date(t).toISOString() : null;
+}
+function skipName(name) {
+  return name.startsWith(".") || name.startsWith("_") || SKIP_DIRS.has(name.toLowerCase());
+}
+async function getIgnored() {
+  try {
+    const v = JSON.parse(await getSetting(IGNORED_KEY) || "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+async function getProjectsRoot() {
+  return (await getSetting(PROJECTS_ROOT_KEY) || "").trim() || DEFAULT_ROOT;
+}
+async function ignoreProjectSuggestion(dir) {
+  const list = await getIgnored();
+  if (!list.includes(dir)) list.push(dir);
+  await setSetting(IGNORED_KEY, JSON.stringify(list));
+}
+async function restoreProjectSuggestions() {
+  await setSetting(IGNORED_KEY, "[]");
+}
+async function suggestProjects() {
+  const rootSetting = await getProjectsRoot();
+  const root = expandHome$1(rootSetting);
+  const rootExists = fs.existsSync(root);
+  if (!rootExists) return { root: rootSetting, rootExists, items: [], ignoredCount: 0 };
+  const projects = await getProjects();
+  const registeredPaths = projects.map((p) => p.localPath?.trim()).filter((p) => !!p).map((p) => realpath(expandHome$1(p)));
+  const registeredRepos = new Set(projects.map((p) => repoKey(p.githubRepoUrl)).filter((k) => !!k));
+  const isRegistered = (dir, repo) => {
+    const real = realpath(dir);
+    if (registeredPaths.some((r) => r === real || real.startsWith(r + path.sep))) return true;
+    const k = repoKey(repo);
+    return !!k && registeredRepos.has(k);
+  };
+  const ignored = new Set(await getIgnored());
+  let ignoredCount = 0;
+  const items = [];
+  const consider = (dir, entries, group) => {
+    const repo = originUrl(dir);
+    if (isRegistered(dir, repo)) return;
+    if (ignored.has(dir)) {
+      ignoredCount++;
+      return;
+    }
+    const { tags, description } = detect(dir, entries);
+    items.push({
+      name: path.basename(dir),
+      path: dir,
+      displayPath: tildify(dir),
+      description,
+      githubRepoUrl: repo,
+      tags,
+      lastActivity: lastActivity(dir, entries),
+      group
+    });
+  };
+  for (const e of safeList(root)) {
+    if (!e.isDirectory() || skipName(e.name)) continue;
+    const dir = path.join(root, e.name);
+    if (isWorktree(dir)) continue;
+    const entries = safeList(dir);
+    if (!isContainer(dir, entries) && looksLikeProject(entries)) {
+      consider(dir, entries, null);
+      continue;
+    }
+    for (const c of entries) {
+      if (!c.isDirectory() || skipName(c.name)) continue;
+      const sub = path.join(dir, c.name);
+      if (isWorktree(sub)) continue;
+      const subEntries = safeList(sub);
+      if (looksLikeProject(subEntries)) consider(sub, subEntries, e.name);
+    }
+  }
+  items.sort((a, b) => (b.lastActivity ?? "").localeCompare(a.lastActivity ?? ""));
+  return { root: rootSetting, rootExists, items, ignoredCount };
+}
 function toolPath() {
   const home = os.homedir();
   const extra = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", path.join(home, ".local", "bin")];
@@ -3990,6 +4252,9 @@ ipcMain.handle(
 );
 ipcMain.handle("projects:setStage", (_, id, stage) => setProjectStage(id, stage));
 ipcMain.handle("projects:delete", (_, id) => deleteProject(id));
+ipcMain.handle("projects:suggestions", () => suggestProjects());
+ipcMain.handle("projects:ignoreSuggestion", (_, dir) => ignoreProjectSuggestion(dir));
+ipcMain.handle("projects:restoreSuggestions", () => restoreProjectSuggestions());
 ipcMain.handle("milestones:getAll", () => getProjectMilestones());
 ipcMain.handle("milestones:create", (_, projectId, title, targetDate) => createProjectMilestone(projectId, title, targetDate));
 ipcMain.handle("milestones:toggle", (_, id, done) => toggleProjectMilestone(id, done));

@@ -8,8 +8,9 @@ const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 const CALENDAR_API = 'https://www.googleapis.com/calendar/v3'
 // calendar (read) + drive.file (upload app-created backups only)
+// calendar.events: criar os blocos recorrentes dos projetos (contas antigas precisam reconectar)
 const SCOPE =
-  'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.file'
+  'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file'
 
 function base64url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -391,4 +392,77 @@ export async function syncGoogleCalendar(): Promise<number> {
   if (okCount === 0 && lastErr) throw lastErr
   await replaceGoogleEvents(all)
   return all.length
+}
+
+// ── Blocos recorrentes dos projetos ("terça e quinta: apostas lol") ──────────────
+const BYDAY = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
+
+function scopeError(status: number, t: string): Error | null {
+  if (status === 403 || /insufficient|scope/i.test(t)) {
+    return new Error('Esta conta Google só tem permissão de leitura. Reconecte-a em Configurações para permitir criar eventos.')
+  }
+  return null
+}
+
+/**
+ * Cria (ou substitui) um evento semanal recorrente na agenda principal.
+ * days: 0=dom … 6=sáb · start: "HH:MM" · minutes: duração.
+ */
+export async function upsertRecurringBlock(opts: {
+  summary: string
+  description: string
+  days: number[]
+  start: string
+  minutes: number
+  eventId?: string | null
+  email?: string | null
+}): Promise<{ eventId: string; account: string; link: string | null }> {
+  const accounts = await getAccounts()
+  if (!accounts.length) throw new Error('Nenhuma conta Google conectada (Configurações).')
+  const acc = (opts.email && accounts.find((a) => a.email === opts.email)) || accounts[0]
+  const token = await accessTokenFor(acc.refreshToken)
+  const days = [...new Set(opts.days)].filter((d) => d >= 0 && d <= 6).sort()
+  if (!days.length) throw new Error('Escolha ao menos um dia da semana.')
+  const [hh, mm] = opts.start.split(':').map(Number)
+  // primeira ocorrência: o próximo dia (a partir de hoje) que esteja na lista
+  const first = new Date()
+  first.setHours(hh || 0, mm || 0, 0, 0)
+  for (let i = 0; i < 7 && !days.includes(first.getDay()); i++) first.setDate(first.getDate() + 1)
+  const end = new Date(first.getTime() + Math.max(15, opts.minutes) * 60000)
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  const local = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:00`
+  const body = {
+    summary: opts.summary,
+    description: opts.description,
+    start: { dateTime: local(first), timeZone: tz },
+    end: { dateTime: local(end), timeZone: tz },
+    recurrence: [`RRULE:FREQ=WEEKLY;BYDAY=${days.map((d) => BYDAY[d]).join(',')}`],
+    reminders: { useDefault: true }
+  }
+  const base = `${CALENDAR_API}/calendars/primary/events`
+  let res = opts.eventId
+    ? await fetch(`${base}/${encodeURIComponent(opts.eventId)}`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    : null
+  if (!res || res.status === 404 || res.status === 410) {
+    res = await fetch(base, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  }
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    throw scopeError(res.status, t) ?? new Error(`Google Calendar recusou (${res.status}). ${t.slice(0, 160)}`)
+  }
+  const j = (await res.json()) as { id: string; htmlLink?: string }
+  return { eventId: j.id, account: acc.email, link: j.htmlLink ?? null }
+}
+
+export async function deleteRecurringBlock(eventId: string, email?: string | null): Promise<void> {
+  const accounts = await getAccounts()
+  const acc = (email && accounts.find((a) => a.email === email)) || accounts[0]
+  if (!acc) return
+  const token = await accessTokenFor(acc.refreshToken)
+  const res = await fetch(`${CALENDAR_API}/calendars/primary/events/${encodeURIComponent(eventId)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok && res.status !== 404 && res.status !== 410) {
+    const t = await res.text().catch(() => '')
+    throw scopeError(res.status, t) ?? new Error(`Falha ao remover o evento (${res.status}).`)
+  }
 }

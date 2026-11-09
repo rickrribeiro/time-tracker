@@ -11,9 +11,15 @@ import {
   getTodos,
   getSetting,
   setSetting,
+  patchProject,
+  addProjectEvent,
+  getProjectCycle,
+  setCycleChangelog,
   DbProject,
   DbProjectCycle
 } from '../database/queries'
+import { runClaude } from './claude'
+import { upsertRecurringBlock, deleteRecurringBlock } from './google'
 import { gitQuiet } from './gitscan'
 import { notify } from './notifications'
 
@@ -309,4 +315,113 @@ export async function checkProjectRadar(force = false): Promise<number> {
     sent++
   }
   return sent
+}
+
+// ── Changelog do ciclo (a partir dos commits) ────────────────────────────────
+const GROUPS: { key: string; title: string; re: RegExp }[] = [
+  { key: 'feat', title: '✨ Novidades', re: /^feat(\(.+?\))?!?:/i },
+  { key: 'fix', title: '🐛 Correções', re: /^fix(\(.+?\))?!?:/i },
+  { key: 'perf', title: '⚡ Melhorias', re: /^(perf|refactor|style|ux)(\(.+?\))?!?:/i },
+  { key: 'docs', title: '📝 Documentação', re: /^docs(\(.+?\))?!?:/i },
+  { key: 'chore', title: '🔧 Manutenção', re: /^(chore|build|ci|test)(\(.+?\))?!?:/i }
+]
+
+export interface CycleCommit {
+  hash: string
+  subject: string
+  date: string
+}
+
+export async function cycleCommits(cycleId: number): Promise<CycleCommit[]> {
+  const c = await getProjectCycle(cycleId)
+  if (!c) throw new Error('Ciclo não encontrado')
+  const p = await getProject(c.projectId)
+  if (!p?.localPath) return []
+  const until = c.closedAt ?? new Date().toISOString()
+  const out = await gitQuiet(expandHome(p.localPath), ['log', '--no-merges', `--since=${c.startDate}T00:00:00`, `--until=${until}`, '--format=%h%x1f%s%x1f%aI'])
+  return (out ?? '')
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => {
+      const [hash, subject, date] = l.split('\x1f')
+      return { hash, subject, date }
+    })
+}
+
+/** Versão mecânica: agrupa por prefixo convencional (feat/fix/…) — sem IA. */
+export function groupedChangelog(name: string, commits: CycleCommit[]): string {
+  if (!commits.length) return `## ${name}\n\n_Nenhum commit no período do ciclo._`
+  const buckets = new Map<string, string[]>()
+  for (const c of commits) {
+    const g = GROUPS.find((x) => x.re.test(c.subject))
+    const title = g?.title ?? '📦 Outros'
+    const text = g ? c.subject.replace(g.re, '').trim() : c.subject
+    if (!buckets.has(title)) buckets.set(title, [])
+    buckets.get(title)!.push(`- ${text.charAt(0).toUpperCase()}${text.slice(1)} (${c.hash})`)
+  }
+  const order = [...GROUPS.map((g) => g.title), '📦 Outros']
+  return [`## ${name}`, '', ...order.filter((t) => buckets.has(t)).flatMap((t) => [`### ${t}`, ...buckets.get(t)!, ''])].join('\n').trim()
+}
+
+export async function generateCycleChangelog(cycleId: number, useAi: boolean): Promise<string> {
+  const c = await getProjectCycle(cycleId)
+  if (!c) throw new Error('Ciclo não encontrado')
+  const p = await getProject(c.projectId)
+  const commits = await cycleCommits(cycleId)
+  let md = groupedChangelog(c.name, commits)
+  if (useAi && commits.length) {
+    try {
+      const command = p?.claudeCommand?.trim() || (await getSetting('claude_command')) || 'claude'
+      const out = await runClaude(
+        `[rickos:changelog] Escreva o CHANGELOG da versão/ciclo "${c.name}" do projeto "${p?.name ?? ''}"${c.goal ? ` (objetivo: ${c.goal})` : ''} a partir dos commits abaixo.
+Markdown, em português, voltado a quem USA o produto: comece com "## ${c.name}" e 1 frase de destaque; depois seções curtas (✨ Novidades, ⚡ Melhorias, 🐛 Correções) com bullets claros. Junte commits repetidos, ignore ruído (merges, builds, "wip", atualizações de dist). Não invente nada. Responda só o Markdown.
+
+Commits (${commits.length}):
+${commits.map((x) => `- ${x.date.slice(0, 10)} ${x.subject}`).join('\n')}`,
+        command,
+        { model: ((await getSetting('claude_model')) || '').trim(), timeoutMs: 180000, usage: { source: 'changelog', projectId: c.projectId } }
+      )
+      if (out.trim()) md = out.trim()
+    } catch {
+      // mantém a versão agrupada
+    }
+  }
+  await setCycleChangelog(cycleId, md)
+  return md
+}
+
+// ── Dias da semana do projeto + bloco no Google Calendar ─────────────────────
+export async function setProjectSchedule(
+  projectId: number,
+  days: number[],
+  start: string | null,
+  minutes: number | null,
+  syncCalendar: boolean
+): Promise<{ eventLink: string | null }> {
+  const p = await getProject(projectId)
+  if (!p) throw new Error('Projeto não encontrado')
+  const clean = [...new Set(days)].filter((d) => d >= 0 && d <= 6).sort()
+  await patchProject(projectId, { workDays: clean.length ? JSON.stringify(clean) : null, workStart: start, workMinutes: minutes })
+  let eventLink: string | null = null
+  if (syncCalendar) {
+    if (clean.length && start && minutes) {
+      const ev = await upsertRecurringBlock({
+        summary: `🗂 ${p.name}`,
+        description: `Bloco do projeto ${p.name} (rickOS).${p.nextAction ? `\nPróxima ação: ${p.nextAction}` : ''}${p.finishLine ? `\nPronto quando: ${p.finishLine}` : ''}`,
+        days: clean,
+        start,
+        minutes,
+        eventId: p.calendarEventId,
+        email: p.calendarAccount
+      })
+      await patchProject(projectId, { calendarEventId: ev.eventId, calendarAccount: ev.account })
+      eventLink = ev.link
+      const names = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+      await addProjectEvent(projectId, 'decisao', `Dias do projeto: ${clean.map((d) => names[d]).join(', ')} às ${start} (${minutes} min) — bloco no Google Calendar`)
+    } else if (p.calendarEventId) {
+      await deleteRecurringBlock(p.calendarEventId, p.calendarAccount)
+      await patchProject(projectId, { calendarEventId: null, calendarAccount: null })
+    }
+  }
+  return { eventLink }
 }

@@ -92,6 +92,24 @@ export const SCHEMA = `
     createdAt TEXT NOT NULL
   );
 
+  -- Próximas ações delegadas ao Claude (rodam num worktree isolado, voltam para revisão)
+  CREATE TABLE IF NOT EXISTS project_delegations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projectId INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    action TEXT NOT NULL,
+    instructions TEXT,
+    repoPath TEXT NOT NULL,
+    branch TEXT NOT NULL,
+    worktreePath TEXT NOT NULL,
+    baseRef TEXT,
+    status TEXT NOT NULL DEFAULT 'rodando', -- rodando | pronta | erro | cancelada | aceita | descartada
+    output TEXT,
+    error TEXT,
+    prUrl TEXT,
+    createdAt TEXT NOT NULL,
+    finishedAt TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS todos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,

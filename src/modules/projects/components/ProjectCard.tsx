@@ -2,7 +2,7 @@ import React from 'react'
 import type { Project, ProjectOverview, ProjectStatus } from '../../../types'
 import { useUIStore } from '../../../store/uiStore'
 import { useProjectStore } from '../store/projectStore'
-import { PULSE, STATUSES, areaLabel, fmtDate, fmtMinutes, stageLabel } from '../lib/constants'
+import { PULSE, STATUSES, areaLabel, fmtDate, fmtMinutes, stageLabel, sizeDef, workDaysLabel, isProjectDay } from '../lib/constants'
 import { timeAgo } from '../../../utils/dates'
 
 interface Props {
@@ -17,7 +17,10 @@ interface Props {
 /** Card do cockpit: pulso, progresso, próxima ação, onde parei, bloqueio e ações rápidas. */
 export function ProjectCard({ project: p, ov, compact, onStatus, onCompleteAction, onSetAction }: Props): React.ReactElement {
   const { openProject } = useUIStore()
-  const { startWorking } = useProjectStore()
+  const { startWorking, delegations } = useProjectStore()
+  const deleg = delegations.find((d) => d.projectId === p.id && (d.status === 'rodando' || d.status === 'pronta'))
+  const size = sizeDef(p.nextActionSize)
+  const today = isProjectDay(p)
   const pulse = ov ? PULSE[ov.pulse] : PULSE.parado
   const worst = ov?.alerts.find((a) => a.severity === 'alta') ?? ov?.alerts.find((a) => a.severity === 'media')
   const stop = (e: React.SyntheticEvent): void => e.stopPropagation()
@@ -48,6 +51,12 @@ export function ProjectCard({ project: p, ov, compact, onStatus, onCompleteActio
           <span>{areaLabel(p.area)}</span>
           {p.stage && <span>{stageLabel(p.stage)}</span>}
           {ov?.activeCycle && <span>🔁 {ov.activeCycle.name}{ov.activeCycle.dueDate ? ` · ${fmtDate(ov.activeCycle.dueDate)}` : ''}</span>}
+          {p.workDays && workDaysLabel(p.workDays) && <span className={today ? 'ph-today' : ''}>📅 {today ? 'hoje · ' : ''}{workDaysLabel(p.workDays)}</span>}
+        </div>
+      )}
+      {deleg && (
+        <div className={`ph-deleg-status ${deleg.status === 'rodando' ? 'run' : 'ready'}`} title={deleg.action}>
+          🤖 {deleg.status === 'rodando' ? 'Claude trabalhando…' : 'delegação pronta p/ revisão'}
         </div>
       )}
 
@@ -65,6 +74,7 @@ export function ProjectCard({ project: p, ov, compact, onStatus, onCompleteActio
             <>
               <button className="ph-tick" title="Concluir próxima ação" onClick={() => onCompleteAction(p)}>○</button>
               <span onClick={() => onSetAction(p)}>{p.nextAction}</span>
+              {size && <span className="ph-size" title={size.label}>{size.icon}</span>}
             </>
           ) : (
             <button className="ph-linkbtn" onClick={() => onSetAction(p)}>+ definir próxima ação</button>

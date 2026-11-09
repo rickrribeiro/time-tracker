@@ -259,6 +259,35 @@
 .ph-home-name:hover { text-decoration: underline; }
 .ph-today-item.done .grow { text-decoration: line-through; opacity: 0.6; }
 
+/* ── Delegação, dias, tamanho, changelog ── */
+.ph-size { font-size: 12px; flex: 0 0 auto; }
+.ph-today { color: var(--accent); font-weight: 600; }
+.ph-next-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ph-next-foot .ph-seg button { padding: 3px 8px; font-size: 11px; }
+.ph-deleg { border-top: 1px solid var(--border); padding-top: 6px; }
+.ph-deleg:first-of-type { border-top: none; }
+.ph-deleg-head { width: 100%; display: flex; gap: 8px; align-items: center; background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 4px 0; text-align: left; font-size: 13px; }
+.ph-deleg-action { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-deleg-status { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--bg-tertiary); color: var(--text-secondary); white-space: nowrap; flex: 0 0 auto; align-self: flex-start; }
+.ph-deleg-status.run { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
+.ph-deleg-status.ready { color: var(--accent); background: var(--accent-dim); }
+.ph-deleg-status.ok { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+.ph-deleg-status.err { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.ph-deleg-body { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 8px; }
+.ph-deleg-out { min-height: 0; max-height: 320px; overflow-y: auto; font-size: 13px; }
+.ph-diffstat { font-size: 11px; white-space: pre-wrap; overflow-x: auto; margin: 0; padding: 6px 8px; border-radius: var(--radius); background: var(--bg-tertiary); color: var(--text-secondary); }
+.ph-days { display: flex; gap: 4px; }
+.ph-days button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); cursor: pointer; font-weight: 600; font-size: 12px; }
+.ph-days button.active { background: var(--pc, var(--accent)); border-color: var(--pc, var(--accent)); color: #fff; }
+.ph-days + .ph-row input[type='time'], .ph-row select { width: auto; }
+.ph-cycle-row { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.ph-changelog { min-height: 120px; max-height: 50vh; overflow-y: auto; margin-top: 8px; }
+.ph-dayline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; padding: 8px 10px; margin-bottom: 6px; border-radius: var(--radius); background: var(--accent-dim); }
+.ph-linkbtn.on { font-weight: 700; }
+.ph-clamp { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.ph-hook-status { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ph-modal .ph-panel input { width: 100%; }
+
 /* ── Celular ── */
 @media (max-width: 900px) {
   .ph-overview, .ph-history, .ph-two { grid-template-columns: 1fr; }
@@ -280,4 +309,6 @@
   .ph-modal, .ph-modal-wide { width: calc(100vw - 24px); padding: 16px; }
   .ph-link-row { flex-wrap: wrap; }
   .ph-link-row select { max-width: none; flex: 1; }
+  .ph-days button { width: 36px; height: 36px; }
+  .ph-next-foot .btn { margin-left: auto; }
 }

@@ -258,6 +258,24 @@ const MIGRATIONS: Migration[] = [
         // best-effort backfill
       }
     }
+  },
+  {
+    version: 17,
+    label: 'Projetos: tamanho da próxima ação, dias da semana, changelog de ciclo',
+    run: (db) => {
+      const cols: [string, string, string][] = [
+        ['projects', 'nextActionSize', 'TEXT'], // rapida (⚡ 15 min) | longa (🧠 2 h)
+        ['projects', 'workDays', 'TEXT'], // JSON: [2,4] (0=dom … 6=sáb)
+        ['projects', 'workStart', 'TEXT'], // HH:MM do bloco
+        ['projects', 'workMinutes', 'INTEGER'],
+        ['projects', 'calendarEventId', 'TEXT'], // evento recorrente no Google
+        ['projects', 'calendarAccount', 'TEXT'],
+        ['project_cycles', 'changelog', 'TEXT']
+      ]
+      for (const [t, c, def] of cols) {
+        try { db.run(`ALTER TABLE ${t} ADD COLUMN ${c} ${def};`) } catch { /* exists */ }
+      }
+    }
   }
 ]
 

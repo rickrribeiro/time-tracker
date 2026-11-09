@@ -414,6 +414,12 @@ export interface DbProject {
   triagedAt: string | null
   lastReviewedAt: string | null
   createdAt: string | null
+  nextActionSize: string | null
+  workDays: string | null
+  workStart: string | null
+  workMinutes: number | null
+  calendarEventId: string | null
+  calendarAccount: string | null
 }
 export interface DbProjectMilestone {
   id: number
@@ -2440,7 +2446,8 @@ export async function getProjectEvents(projectId?: number | null, limit = 200): 
 const PROJECT_PATCHABLE = new Set([
   'name', 'description', 'githubRepoUrl', 'color', 'claudeCommand', 'localPath', 'stage', 'businessModel', 'pricing', 'audience',
   'area', 'priority', 'finishLine', 'scope', 'futureIdeas', 'nextAction', 'whereLeftOff', 'blocker', 'blockerNeed',
-  'pauseReason', 'resumeAt', 'resumeCondition', 'closeReason', 'retrospective', 'continuous', 'triagedAt', 'lastReviewedAt'
+  'pauseReason', 'resumeAt', 'resumeCondition', 'closeReason', 'retrospective', 'continuous', 'triagedAt', 'lastReviewedAt',
+  'nextActionSize', 'workDays', 'workStart', 'workMinutes', 'calendarEventId', 'calendarAccount'
 ])
 
 /** Atualiza só os campos enviados. Mudanças em próxima ação / onde parei / bloqueio entram no histórico. */
@@ -2525,7 +2532,7 @@ export async function setProjectStatus(id: number, status: string, payload: Proj
 }
 
 /** Conclui a próxima ação (fica no histórico) e já define a seguinte, se informada. */
-export async function completeNextAction(id: number, next: string | null): Promise<DbProject> {
+export async function completeNextAction(id: number, next: string | null, size: string | null = null): Promise<DbProject> {
   const db = await getDb()
   const prev = getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])
   if (!prev) throw new Error('Projeto não encontrado')
@@ -2534,7 +2541,7 @@ export async function completeNextAction(id: number, next: string | null): Promi
     run(db, 'INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)', [id, 'acao_concluida', prev.nextAction, now])
   }
   const n = next && next.trim() ? next.trim() : null
-  run(db, 'UPDATE projects SET nextAction = ?, nextActionAt = ? WHERE id = ?', [n, now, id])
+  run(db, 'UPDATE projects SET nextAction = ?, nextActionAt = ?, nextActionSize = ? WHERE id = ?', [n, now, n ? size : null, id])
   if (n) run(db, 'INSERT INTO project_events (projectId, kind, text, createdAt) VALUES (?, ?, ?, ?)', [id, 'proxima_acao', n, now])
   return getOne<DbProject>(db, 'SELECT * FROM projects WHERE id = ?', [id])!
 }
@@ -2559,6 +2566,17 @@ export interface DbProjectCycle {
   closedAt: string | null
   retrospective: string | null
   createdAt: string
+  changelog: string | null
+}
+
+export async function setCycleChangelog(id: number, changelog: string | null): Promise<void> {
+  const db = await getDb()
+  run(db, 'UPDATE project_cycles SET changelog = ? WHERE id = ?', [changelog, id])
+}
+
+export async function getProjectCycle(id: number): Promise<DbProjectCycle | null> {
+  const db = await getDb()
+  return getOne<DbProjectCycle>(db, 'SELECT * FROM project_cycles WHERE id = ?', [id])
 }
 
 export async function getProjectCycles(projectId?: number | null): Promise<DbProjectCycle[]> {
@@ -2769,4 +2787,48 @@ export async function getUnlinkedTagHours(): Promise<{ tagId: number; tagName: s
       GROUP BY tg.id ORDER BY minutes DESC`,
     [since]
   )
+}
+
+// ── Delegações (próxima ação executada pelo Claude num worktree) ──
+export interface DbProjectDelegation {
+  id: number
+  projectId: number
+  action: string
+  instructions: string | null
+  repoPath: string
+  branch: string
+  worktreePath: string
+  baseRef: string | null
+  status: string
+  output: string | null
+  error: string | null
+  prUrl: string | null
+  createdAt: string
+  finishedAt: string | null
+}
+
+export async function createDelegation(d: { projectId: number; action: string; instructions: string | null; repoPath: string; branch: string; worktreePath: string; baseRef: string | null }): Promise<DbProjectDelegation> {
+  const db = await getDb()
+  run(db, 'INSERT INTO project_delegations (projectId, action, instructions, repoPath, branch, worktreePath, baseRef, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [
+    d.projectId, d.action, d.instructions, d.repoPath, d.branch, d.worktreePath, d.baseRef, new Date().toISOString()
+  ])
+  return getOne<DbProjectDelegation>(db, 'SELECT * FROM project_delegations WHERE id = ?', [lastInsertId(db)])!
+}
+
+export async function updateDelegation(id: number, fields: Partial<Pick<DbProjectDelegation, 'status' | 'output' | 'error' | 'prUrl' | 'finishedAt'>>): Promise<void> {
+  const db = await getDb()
+  const keys = Object.keys(fields) as (keyof typeof fields)[]
+  if (!keys.length) return
+  run(db, `UPDATE project_delegations SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`, [...keys.map((k) => fields[k] ?? null), id])
+}
+
+export async function getDelegation(id: number): Promise<DbProjectDelegation | null> {
+  const db = await getDb()
+  return getOne<DbProjectDelegation>(db, 'SELECT * FROM project_delegations WHERE id = ?', [id])
+}
+
+export async function getDelegations(projectId?: number | null): Promise<DbProjectDelegation[]> {
+  const db = await getDb()
+  if (projectId != null) return getAll<DbProjectDelegation>(db, 'SELECT * FROM project_delegations WHERE projectId = ? ORDER BY createdAt DESC', [projectId])
+  return getAll<DbProjectDelegation>(db, 'SELECT * FROM project_delegations ORDER BY createdAt DESC LIMIT 100')
 }

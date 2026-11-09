@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import type { GitBranch, GithubIssue, ProjectCommit, ProjectEvent, ProjectNote, ProjectStatus, TaskWithTag, Todo } from '../../../types'
+import type { ProjectCycle, GitBranch, GithubIssue, ProjectCommit, ProjectEvent, ProjectNote, ProjectStatus, TaskWithTag, Todo } from '../../../types'
 import { useUIStore } from '../../../store/uiStore'
 import { useProjectStore } from '../store/projectStore'
 import { StatusChangeModal } from '../components/StatusChangeModal'
@@ -7,7 +7,10 @@ import { NextActionModal } from '../components/NextActionModal'
 import { ProjectForm } from '../components/ProjectForm'
 import { RoadmapView } from '../components/RoadmapView'
 import { CycleModal } from '../components/CycleModal'
-import { EVENT_LABEL, PULSE, STATUSES, areaLabel, fmtDate, fmtMinutes, isClosed, stageLabel, statusDef } from '../lib/constants'
+import { ChangelogModal } from '../components/ChangelogModal'
+import { DelegateModal, DelegationsPanel } from '../components/Delegations'
+import { ScheduleEditor } from '../components/ScheduleEditor'
+import { EVENT_LABEL, PULSE, SIZES, STATUSES, areaLabel, fmtDate, fmtMinutes, isClosed, stageLabel, statusDef } from '../lib/constants'
 import { projectContext, runJson, runText } from '../lib/ai'
 import { repoFromUrl } from '../store/githubStore'
 import { WORKTREES_FILTER_KEY } from '../git'
@@ -69,6 +72,8 @@ export function ProjectDetailPage(): React.ReactElement {
   const [aiBusy, setAiBusy] = useState<string | null>(null)
   const [aiError, setAiError] = useState('')
   const [cycleMode, setCycleMode] = useState<'new' | 'extend' | 'close' | null>(null)
+  const [changelogCycle, setChangelogCycle] = useState<ProjectCycle | null>(null)
+  const [delegating, setDelegating] = useState(false)
   const [msTitle, setMsTitle] = useState('')
   const [msDate, setMsDate] = useState('')
   const [newTodo, setNewTodo] = useState('')
@@ -312,7 +317,29 @@ ${ctx}`
               ) : (
                 <button className="btn btn-secondary btn-sm" onClick={() => setActionMode('set')}>+ Definir a próxima ação</button>
               )}
-              {project.nextActionAt && <div className="ph-muted">definida há {timeAgo(project.nextActionAt)}</div>}
+              <div className="ph-next-foot">
+                {project.nextAction && (
+                  <div className="ph-seg" role="group" aria-label="Tamanho da próxima ação">
+                    {SIZES.map((sz) => (
+                      <button
+                        key={sz.key}
+                        className={project.nextActionSize === sz.key ? 'active' : ''}
+                        onClick={() => save({ nextActionSize: project.nextActionSize === sz.key ? null : sz.key })}
+                        title={sz.key === 'rapida' ? 'Cabe numa brecha de 15 minutos' : 'Pede um bloco de foco'}
+                      >
+                        {sz.icon} {sz.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {project.nextActionAt && <span className="ph-muted">definida há {timeAgo(project.nextActionAt)}</span>}
+                <span style={{ flex: 1 }} />
+                {project.nextAction && project.localPath && !isClosed(project) && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => setDelegating(true)} title="O Claude executa a próxima ação num worktree isolado; você revisa depois">
+                    🤖 Delegar
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="ph-panel">
@@ -405,6 +432,13 @@ ${ctx}`
               </div>
             </div>
 
+            <DelegationsPanel
+              project={project}
+              onAccepted={(d) => {
+                if (d.action === project.nextAction) setActionMode('complete')
+              }}
+            />
+
             {project.status === 'pausado' && (
               <div className="ph-panel">
                 <div className="ph-panel-title">⏸ Pausado</div>
@@ -432,6 +466,7 @@ ${ctx}`
                   <div className="ph-btnrow">
                     <button className="btn btn-secondary btn-sm" onClick={() => setCycleMode('extend')}>⏩ Estender</button>
                     <button className="btn btn-primary btn-sm" onClick={() => setCycleMode('close')}>🏁 Fechar ciclo</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setChangelogCycle(activeCycle)} title="Prévia do changelog com os commits até agora">📜</button>
                   </div>
                 </>
               ) : (
@@ -440,11 +475,16 @@ ${ctx}`
               {projCycles.filter((c) => c.status !== 'ativo').length > 0 && (
                 <div className="ph-cycle-history">
                   {projCycles.filter((c) => c.status !== 'ativo').slice(0, 4).map((c) => (
-                    <div key={c.id} className="ph-muted">{c.status === 'concluido' ? '✓' : '✕'} {c.name} · {fmtDate(c.closedAt)}{c.extensions ? ` · +${c.extensions}` : ''}</div>
+                    <div key={c.id} className="ph-muted ph-cycle-row">
+                      <span>{c.status === 'concluido' ? '✓' : '✕'} {c.name} · {fmtDate(c.closedAt)}{c.extensions ? ` · +${c.extensions}` : ''}</span>
+                      {c.status === 'concluido' && <button className="ph-linkbtn" onClick={() => setChangelogCycle(c)}>📜 changelog</button>}
+                    </div>
                   ))}
                 </div>
               )}
             </div>
+
+            {!isClosed(project) && <ScheduleEditor project={project} />}
 
             <div className="ph-panel">
               <div className="ph-panel-title">🎯 Marcos</div>
@@ -735,7 +775,22 @@ ${ctx}`
       {statusTo && <StatusChangeModal project={project} to={statusTo} onClose={() => setStatusTo(null)} />}
       {actionMode && <NextActionModal project={project} mode={actionMode} onClose={() => setActionMode(null)} />}
       {editing && <ProjectForm project={project} onClose={() => setEditing(false)} />}
-      {cycleMode && <CycleModal project={project} cycle={activeCycle} mode={cycleMode} onClose={() => setCycleMode(null)} onDone={cycleChanged} />}
+      {cycleMode && (
+        <CycleModal
+          project={project}
+          cycle={activeCycle}
+          mode={cycleMode}
+          onClose={() => setCycleMode(null)}
+          onDone={cycleChanged}
+          onClosed={async (id) => {
+            const all = await window.api.cycles.getAll(project.id)
+            const c = all.find((x) => x.id === id)
+            if (c) setChangelogCycle(c)
+          }}
+        />
+      )}
+      {changelogCycle && <ChangelogModal cycle={changelogCycle} onClose={() => setChangelogCycle(null)} />}
+      {delegating && <DelegateModal project={project} onClose={() => setDelegating(false)} />}
     </div>
   )
 }

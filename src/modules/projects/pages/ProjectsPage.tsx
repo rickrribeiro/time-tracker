@@ -11,6 +11,7 @@ import { TriageModal } from '../components/TriageModal'
 import { ProjectForm } from '../components/ProjectForm'
 import { ProjectShelf } from '../components/ProjectShelf'
 import { ProjectMetrics } from '../components/ProjectMetrics'
+import { ProjectsSettingsModal } from '../components/ProjectsSettingsModal'
 import { AREAS, STAGES, FOCUS_LIMIT_KEY, isClosed, statusDef } from '../lib/constants'
 import '../projects-hub.css'
 
@@ -53,6 +54,8 @@ export function ProjectsPage(): React.ReactElement {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [focusLimit, setFocusLimit] = useState(3)
   const [dragOver, setDragOver] = useState<string | null>(null)
+  const [quickOnly, setQuickOnly] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     void refreshAll()
@@ -94,7 +97,7 @@ export function ProjectsPage(): React.ReactElement {
   }
 
   const visible = useMemo(() => projects.filter((p) => area === 'todas' || p.area === area), [projects, area])
-  const open = visible.filter((p) => !isClosed(p))
+  const open = visible.filter((p) => !isClosed(p) && (!quickOnly || p.nextActionSize === 'rapida'))
   const untriaged = projects.filter((p) => !p.triagedAt && !isClosed(p)).length
   const byPriority = (a: Project, b: Project): number => b.priority - a.priority || a.name.localeCompare(b.name)
 
@@ -149,6 +152,7 @@ export function ProjectsPage(): React.ReactElement {
             {!!suggestions?.items.length && <span className="psug-count">{suggestions.items.length}</span>}
           </button>
           <button className="btn btn-secondary btn-sm" onClick={() => setShowProgress(true)}>📊 GitHub</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)} title="Automações (onde parei via Claude Code)" aria-label="Automações dos projetos">⚙️</button>
           <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Novo</button>
         </div>
       </div>
@@ -165,6 +169,9 @@ export function ProjectsPage(): React.ReactElement {
             <button key={a.key} className={`seg-btn ${area === a.key ? 'active' : ''}`} onClick={() => changeArea(a.key)}>{a.label}</button>
           ))}
         </div>
+        <button className={`btn btn-sm ${quickOnly ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setQuickOnly((v) => !v)} title="Só projetos cuja próxima ação cabe em 15 minutos">
+          ⚡ Tenho 15 min
+        </button>
         {loadingOverview && <span className="ph-muted">atualizando…</span>}
       </div>
 
@@ -283,6 +290,7 @@ export function ProjectsPage(): React.ReactElement {
       {actionModal && <NextActionModal project={projects.find((p) => p.id === actionModal.p.id) ?? actionModal.p} mode={actionModal.mode} onClose={() => setActionModal(null)} />}
       {showTriage && <TriageModal onClose={() => setShowTriage(false)} />}
       {showForm && <ProjectForm project={null} onClose={() => setShowForm(false)} />}
+      {showSettings && <ProjectsSettingsModal onClose={() => setShowSettings(false)} />}
       {showProgress && <ProgressModal projects={open} onClose={() => setShowProgress(false)} />}
     </div>
   )

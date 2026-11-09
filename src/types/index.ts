@@ -168,6 +168,43 @@ export interface Project {
   triagedAt: string | null
   lastReviewedAt: string | null
   createdAt: string | null
+  nextActionSize: NextActionSize | null
+  workDays: string | null // JSON [2,4] (0=dom … 6=sáb)
+  workStart: string | null // HH:MM
+  workMinutes: number | null
+  calendarEventId: string | null
+  calendarAccount: string | null
+}
+export type NextActionSize = 'rapida' | 'longa'
+export interface ProjectDelegation {
+  id: number
+  projectId: number
+  action: string
+  instructions: string | null
+  repoPath: string
+  branch: string
+  worktreePath: string
+  baseRef: string | null
+  status: 'rodando' | 'pronta' | 'erro' | 'cancelada' | 'aceita' | 'descartada'
+  output: string | null
+  error: string | null
+  prUrl: string | null
+  createdAt: string
+  finishedAt: string | null
+}
+export interface DelegationReview {
+  commits: { hash: string; subject: string }[]
+  diffStat: string
+  uncommitted: string[]
+  worktreeExists: boolean
+}
+export interface ClaudeHookStatus {
+  installed: boolean
+  enabled: boolean
+  settingsPath: string
+  scriptPath: string
+  model: string
+  last: { at: string; project: string | null; status: string } | null
 }
 export type ProjectStatus = 'incubadora' | 'fila' | 'foco' | 'pausado' | 'concluido' | 'encerrado'
 export type ProjectArea = 'pessoal' | 'profissional'
@@ -177,6 +214,7 @@ export type ProjectPatch = Partial<
     | 'name' | 'description' | 'githubRepoUrl' | 'color' | 'claudeCommand' | 'localPath' | 'stage' | 'businessModel' | 'pricing' | 'audience'
     | 'area' | 'priority' | 'finishLine' | 'scope' | 'futureIdeas' | 'nextAction' | 'whereLeftOff' | 'blocker' | 'blockerNeed'
     | 'pauseReason' | 'resumeAt' | 'resumeCondition' | 'closeReason' | 'retrospective' | 'continuous' | 'triagedAt' | 'lastReviewedAt'
+    | 'nextActionSize'
   >
 >
 export interface ProjectStatusPayload {
@@ -205,6 +243,7 @@ export interface ProjectCycle {
   closedAt: string | null
   retrospective: string | null
   createdAt: string
+  changelog: string | null
 }
 export interface ProjectOverview {
   projectId: number
@@ -812,7 +851,12 @@ declare global {
         get: (id: number) => Promise<Project | null>
         patch: (id: number, fields: ProjectPatch) => Promise<Project>
         setStatus: (id: number, status: ProjectStatus, payload?: ProjectStatusPayload) => Promise<Project>
-        completeNextAction: (id: number, next: string | null) => Promise<Project>
+        completeNextAction: (id: number, next: string | null, size?: NextActionSize | null) => Promise<Project>
+        setSchedule: (projectId: number, days: number[], start: string | null, minutes: number | null, syncCalendar: boolean) => Promise<{ eventLink: string | null }>
+        hookStatus: () => Promise<ClaudeHookStatus>
+        hookInstall: () => Promise<ClaudeHookStatus>
+        hookUninstall: () => Promise<ClaudeHookStatus>
+        hookConfig: (enabled: boolean, model: string | null) => Promise<ClaudeHookStatus>
         overview: () => Promise<ProjectOverview[]>
         events: (projectId?: number | null, limit?: number) => Promise<ProjectEvent[]>
         addEvent: (projectId: number, kind: string, text: string | null) => Promise<void>
@@ -843,6 +887,17 @@ declare global {
         extend: (id: number, newDueDate: string, reason: string | null) => Promise<void>
         close: (id: number, status: 'concluido' | 'cancelado', retrospective: string | null) => Promise<void>
         delete: (id: number) => Promise<void>
+        changelog: (id: number, useAi: boolean) => Promise<string>
+        commits: (id: number) => Promise<{ hash: string; subject: string; date: string }[]>
+      }
+      delegations: {
+        getAll: (projectId?: number | null) => Promise<ProjectDelegation[]>
+        start: (projectId: number, action: string | null, instructions: string | null) => Promise<ProjectDelegation>
+        cancel: (id: number) => Promise<void>
+        review: (id: number) => Promise<DelegationReview>
+        discard: (id: number) => Promise<void>
+        accept: (id: number) => Promise<void>
+        pr: (id: number) => Promise<{ url: string }>
       }
       projectNotes: {
         getAll: (projectId: number) => Promise<ProjectNote[]>

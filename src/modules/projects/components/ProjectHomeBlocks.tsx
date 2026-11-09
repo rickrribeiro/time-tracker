@@ -3,7 +3,7 @@ import type { Project } from '../../../types'
 import { useUIStore } from '../../../store/uiStore'
 import { useProjectStore } from '../store/projectStore'
 import { NextActionModal } from './NextActionModal'
-import { PULSE, TODAY_FOCUS_KEY, isClosed } from '../lib/constants'
+import { PULSE, TODAY_FOCUS_KEY, isClosed, isProjectDay, sizeDef } from '../lib/constants'
 import { timeAgo, localDateStr } from '../../../utils/dates'
 import '../projects-hub.css'
 
@@ -27,6 +27,7 @@ export function ProjectHomeBlocks(): React.ReactElement | null {
   const { openProject, setPage } = useUIStore()
   const [today, setToday] = useState<TodayFocus>({ date: localDateStr(new Date()), items: [] })
   const [picking, setPicking] = useState(false)
+  const [quick, setQuick] = useState(false)
   const [action, setAction] = useState<{ p: Project; mode: 'complete' | 'set' } | null>(null)
   const todayStr = localDateStr(new Date())
 
@@ -51,7 +52,12 @@ export function ProjectHomeBlocks(): React.ReactElement | null {
 
   const open = projects.filter((p) => !isClosed(p))
   if (!open.length) return null
-  const focus = open.filter((p) => p.status === 'foco').sort((a, b) => b.priority - a.priority)
+  // ⚡ modo brecha: qualquer projeto aberto cuja próxima ação cabe em 15 min
+  const focus = quick
+    ? open.filter((p) => p.nextAction && p.nextActionSize === 'rapida' && p.status !== 'incubadora').sort((a, b) => (a.status === 'foco' ? -1 : 0) - (b.status === 'foco' ? -1 : 0))
+    : open.filter((p) => p.status === 'foco').sort((a, b) => b.priority - a.priority)
+  const dayProjects = open.filter((p) => isProjectDay(p))
+  const dayNames = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
   const resume = open
     .filter((p) => p.whereLeftOff && p.whereLeftOffAt)
     .sort((a, b) => (b.whereLeftOffAt ?? '').localeCompare(a.whereLeftOffAt ?? ''))[0]
@@ -66,10 +72,31 @@ export function ProjectHomeBlocks(): React.ReactElement | null {
     <div className="ph-home">
       <div className="chart-section">
         <div className="chart-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>🎯 Em foco</span>
-          <button className="ph-linkbtn" onClick={() => setPage('projects')}>cockpit →</button>
+          <span>{quick ? '⚡ Cabe em 15 min' : '🎯 Em foco'}</span>
+          <span style={{ display: 'flex', gap: 10 }}>
+            <button className={`ph-linkbtn ${quick ? 'on' : ''}`} onClick={() => setQuick((v) => !v)} title="Só próximas ações rápidas, de qualquer projeto">
+              {quick ? '← em foco' : '⚡ tenho 15 min'}
+            </button>
+            <button className="ph-linkbtn" onClick={() => setPage('projects')}>cockpit →</button>
+          </span>
         </div>
-        {focus.length === 0 && <div className="empty-hint">Nenhum projeto em foco. Escolha 1–3 no cockpit.</div>}
+        {dayProjects.length > 0 && !quick && (
+          <div className="ph-dayline">
+            📅 {dayNames[new Date().getDay()]} é dia de{' '}
+            {dayProjects.map((p, i) => (
+              <React.Fragment key={p.id}>
+                {i > 0 && ', '}
+                <button className="ph-linkbtn" onClick={() => openProject(p.id)}>{p.name}</button>
+              </React.Fragment>
+            ))}
+            {dayProjects[0] && (
+              <button className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => startWorking(dayProjects[0])}>▶ {dayProjects[0].name}</button>
+            )}
+          </div>
+        )}
+        {focus.length === 0 && (
+          <div className="empty-hint">{quick ? 'Nenhuma próxima ação marcada como ⚡ 15 min.' : 'Nenhum projeto em foco. Escolha 1–3 no cockpit.'}</div>
+        )}
         {focus.map((p) => {
           const ov = overview[p.id]
           return (
@@ -78,7 +105,9 @@ export function ProjectHomeBlocks(): React.ReactElement | null {
               <div className="grow">
                 <div className="ph-home-name" onClick={() => openProject(p.id)}>{p.name}</div>
                 {p.nextAction ? (
-                  <div className="ph-muted" onClick={() => setAction({ p, mode: 'set' })} style={{ cursor: 'pointer' }}>👉 {p.nextAction}</div>
+                  <div className="ph-muted" onClick={() => setAction({ p, mode: 'set' })} style={{ cursor: 'pointer' }}>
+                    👉 {p.nextAction} {sizeDef(p.nextActionSize)?.icon ?? ''}
+                  </div>
                 ) : (
                   <button className="ph-linkbtn" onClick={() => setAction({ p, mode: 'set' })}>+ próxima ação</button>
                 )}
@@ -144,7 +173,7 @@ export function ProjectHomeBlocks(): React.ReactElement | null {
           <div className="ph-home-item" style={{ alignItems: 'flex-start' }}>
             <div className="grow">
               <div className="ph-home-name" onClick={() => openProject(resume.id)}>{resume.name}</div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>{resume.whereLeftOff}</div>
+              <div className="ph-clamp" style={{ fontSize: 13, marginTop: 4 }} title={resume.whereLeftOff ?? ''}>{resume.whereLeftOff}</div>
               <div className="ph-muted" style={{ marginTop: 4 }}>
                 há {timeAgo(resume.whereLeftOffAt!)}
                 {resume.nextAction ? ` · próximo: ${resume.nextAction}` : ''}

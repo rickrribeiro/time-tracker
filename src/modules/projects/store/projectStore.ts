@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Project, ProjectCycle, ProjectMilestone, ProjectOverview, ProjectPatch, ProjectStatus, ProjectStatusPayload } from '../../../types'
+import { NextActionSize, Project, ProjectCycle, ProjectDelegation, ProjectMilestone, ProjectOverview, ProjectPatch, ProjectStatus, ProjectStatusPayload } from '../../../types'
 import { useTaskStore } from '../../timetracker/store/taskStore'
 import { useTagStore } from '../../timetracker/store/tagStore'
 
@@ -8,7 +8,9 @@ interface ProjectState {
   overview: Record<number, ProjectOverview>
   milestones: ProjectMilestone[]
   cycles: ProjectCycle[]
+  delegations: ProjectDelegation[]
   loadingOverview: boolean
+  refreshDelegations: () => Promise<void>
   refresh: () => Promise<void>
   refreshAll: () => Promise<void>
   refreshOverview: () => Promise<void>
@@ -29,7 +31,7 @@ interface ProjectState {
   update: (project: Project) => Promise<void>
   patch: (id: number, fields: ProjectPatch) => Promise<Project>
   setStatus: (id: number, status: ProjectStatus, payload?: ProjectStatusPayload) => Promise<void>
-  completeNextAction: (id: number, next: string | null) => Promise<void>
+  completeNextAction: (id: number, next: string | null, size?: NextActionSize | null) => Promise<void>
   setStage: (id: number, stage: string) => Promise<void>
   remove: (id: number) => Promise<void>
   /** "Trabalhar nisso": inicia o timer vinculado ao projeto. */
@@ -41,7 +43,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   overview: {},
   milestones: [],
   cycles: [],
+  delegations: [],
   loadingOverview: false,
+  refreshDelegations: async () => set({ delegations: await window.api.delegations.getAll() }),
 
   refresh: async () => {
     const projects = await window.api.projects.getAll()
@@ -49,7 +53,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   refreshAll: async () => {
-    await Promise.all([get().refresh(), get().refreshMilestones(), get().refreshCycles(), get().refreshOverview()])
+    await Promise.all([get().refresh(), get().refreshMilestones(), get().refreshCycles(), get().refreshOverview(), get().refreshDelegations()])
   },
 
   refreshOverview: async () => {
@@ -107,8 +111,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     void get().refreshOverview()
   },
 
-  completeNextAction: async (id, next) => {
-    const p = await window.api.projects.completeNextAction(id, next)
+  completeNextAction: async (id, next, size) => {
+    const p = await window.api.projects.completeNextAction(id, next, size ?? null)
     set({ projects: get().projects.map((x) => (x.id === id ? p : x)) })
     void get().refreshOverview()
   },

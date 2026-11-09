@@ -4,12 +4,15 @@ import { useUIStore } from '../../../store/uiStore'
 import { useProjectStore } from '../store/projectStore'
 import { fmtDate, fmtMinutes } from '../lib/constants'
 import { renderMarkdown } from '../../estudos/markdown'
+import { ChangelogModal } from './ChangelogModal'
+import type { ProjectCycle } from '../../../types'
 
 /** Estante: projetos concluídos/encerrados e ciclos fechados — o histórico do que terminou. */
 export function ProjectShelf({ projects, onStatus }: { projects: Project[]; onStatus: (p: Project, to: ProjectStatus) => void }): React.ReactElement {
   const { overview, cycles, projects: all } = useProjectStore()
   const { openProject } = useUIStore()
   const [openRetro, setOpenRetro] = useState<number | null>(null)
+  const [changelog, setChangelog] = useState<ProjectCycle | null>(null)
   const done = projects.filter((p) => p.status === 'concluido').sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? ''))
   const dropped = projects.filter((p) => p.status === 'encerrado').sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? ''))
   const closedCycles = cycles.filter((c) => c.status === 'concluido').sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? ''))
@@ -62,10 +65,12 @@ export function ProjectShelf({ projects, onStatus }: { projects: Project[]; onSt
                 {fmtDate(c.closedAt)}
                 {c.extensions ? ` · ${c.extensions} extensão(ões)` : ''}
               </span>
+              <button className="btn btn-secondary btn-sm" onClick={() => setChangelog(c)}>📜 Changelog</button>
             </div>
           ))}
         </div>
       </section>
+      {changelog && <ChangelogModal cycle={changelog} onClose={() => setChangelog(null)} />}
       <section>
         <h3 className="ph-section-title">🪦 Encerrados <span className="kanban-count">{dropped.length}</span></h3>
         <div className="ph-shelf-grid">{dropped.length ? dropped.map(row) : <div className="empty-hint">Nada encerrado.</div>}</div>

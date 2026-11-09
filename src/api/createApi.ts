@@ -1,6 +1,6 @@
 import { invoke, subscribe, downloadUrl } from './transport'
 import { ExportFile, downloadText, pickFile, pickFolderFiles, pickJson, fileToBase64, saveFolder } from './files'
-import type { ProjectPatch, ProjectStatus, ProjectStatusPayload } from '../types'
+import type { NextActionSize, ProjectPatch, ProjectStatus, ProjectStatusPayload } from '../types'
 
 /** Open a URL outside the app: system browser on desktop, new tab on web. */
 export function openExternal(url: string): void {
@@ -209,7 +209,13 @@ export function createApi() {
       get: (id: number) => invoke('projects:get', id),
       patch: (id: number, fields: ProjectPatch) => invoke('projects:patch', id, fields),
       setStatus: (id: number, status: ProjectStatus, payload?: ProjectStatusPayload) => invoke('projects:setStatus', id, status, payload ?? {}),
-      completeNextAction: (id: number, next: string | null) => invoke('projects:completeNextAction', id, next),
+      completeNextAction: (id: number, next: string | null, size?: NextActionSize | null) => invoke('projects:completeNextAction', id, next, size ?? null),
+      setSchedule: (projectId: number, days: number[], start: string | null, minutes: number | null, syncCalendar: boolean) =>
+        invoke('projects:setSchedule', projectId, days, start, minutes, syncCalendar),
+      hookStatus: () => invoke('projects:hookStatus'),
+      hookInstall: () => invoke('projects:hookInstall'),
+      hookUninstall: () => invoke('projects:hookUninstall'),
+      hookConfig: (enabled: boolean, model: string | null) => invoke('projects:hookConfig', enabled, model),
       overview: () => invoke('projects:overview'),
       events: (projectId?: number | null, limit?: number) => invoke('projects:events', projectId ?? null, limit),
       addEvent: (projectId: number, kind: string, text: string | null) => invoke('projects:addEvent', projectId, kind, text),
@@ -240,7 +246,18 @@ export function createApi() {
       update: (id: number, name: string, goal: string | null, dueDate: string | null) => invoke('cycles:update', id, name, goal, dueDate),
       extend: (id: number, newDueDate: string, reason: string | null) => invoke('cycles:extend', id, newDueDate, reason),
       close: (id: number, status: 'concluido' | 'cancelado', retrospective: string | null) => invoke('cycles:close', id, status, retrospective),
-      delete: (id: number) => invoke('cycles:delete', id)
+      delete: (id: number) => invoke('cycles:delete', id),
+      changelog: (id: number, useAi: boolean) => invoke('cycles:changelog', id, useAi),
+      commits: (id: number) => invoke('cycles:commits', id)
+    },
+    delegations: {
+      getAll: (projectId?: number | null) => invoke('delegations:getAll', projectId ?? null),
+      start: (projectId: number, action: string | null, instructions: string | null) => invoke('delegations:start', projectId, action, instructions),
+      cancel: (id: number) => invoke('delegations:cancel', id),
+      review: (id: number) => invoke('delegations:review', id),
+      discard: (id: number) => invoke('delegations:discard', id),
+      accept: (id: number) => invoke('delegations:accept', id),
+      pr: (id: number) => invoke('delegations:pr', id)
     },
     projectNotes: {
       getAll: (projectId: number) => invoke('projectNotes:getAll', projectId),

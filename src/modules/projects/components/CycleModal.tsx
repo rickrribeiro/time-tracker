@@ -6,7 +6,7 @@ import { fmtDate } from '../lib/constants'
 type Mode = 'new' | 'extend' | 'close'
 
 /** Ciclos/versões: iniciar (com prazo), estender (conta extensões + motivo) e entregar/cancelar. */
-export function CycleModal({ project, cycle, mode, onClose, onDone }: { project: Project; cycle: ProjectCycle | null; mode: Mode; onClose: () => void; onDone: () => void }): React.ReactElement {
+export function CycleModal({ project, cycle, mode, onClose, onDone, onClosed }: { project: Project; cycle: ProjectCycle | null; mode: Mode; onClose: () => void; onDone: () => void; onClosed?: (cycleId: number) => void }): React.ReactElement {
   const [name, setName] = useState('')
   const [goal, setGoal] = useState('')
   const [due, setDue] = useState(mode === 'extend' ? cycle?.dueDate ?? '' : localDateStr(new Date(Date.now() + 14 * 86400000)))
@@ -30,6 +30,7 @@ export function CycleModal({ project, cycle, mode, onClose, onDone }: { project:
     }
     onDone()
     onClose()
+    if (mode === 'close' && cycle && status === 'concluido') onClosed?.(cycle.id)
   }
 
   return (
@@ -72,6 +73,7 @@ export function CycleModal({ project, cycle, mode, onClose, onDone }: { project:
             <h2>🏁 Fechar “{cycle.name}”</h2>
             <label className="ph-label">Retrospectiva rápida (opcional)</label>
             <textarea autoFocus rows={3} value={retro} onChange={(e) => setRetro(e.target.value)} placeholder="O que foi entregue? O que ficou para o próximo?" />
+            <p className="ph-muted">Ao entregar, o rickOS monta o changelog do ciclo a partir dos commits — dá para reescrever com IA e copiar.</p>
           </>
         )}
         {error && <div className="ph-error">{error}</div>}

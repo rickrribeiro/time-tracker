@@ -1,4 +1,4 @@
-import type { Project, ProjectArea, ProjectOverview, ProjectStatus } from '../../../types'
+import type { NextActionSize, Project, ProjectArea, ProjectOverview, ProjectStatus } from '../../../types'
 
 /** Situação = onde o projeto está na minha atenção. Independe do estágio (maturidade). */
 export const STATUSES: { key: ProjectStatus; label: string; icon: string; hint: string }[] = [
@@ -53,7 +53,9 @@ export const EVENT_LABEL: Record<string, string> = {
   ciclo: '🔁 Ciclo',
   marco: '🎯 Marco',
   revisao: '🗓️ Revisão',
-  nota: '📝 Nota'
+  nota: '📝 Nota',
+  sessao_claude: '🤖 Sessão Claude',
+  delegacao: '🤖 Delegação'
 }
 
 export function fmtMinutes(min: number): string {
@@ -77,3 +79,31 @@ export function daysBetween(fromIso: string, to: Date = new Date()): number {
 export const FOCUS_LIMIT_KEY = 'projects_focus_limit'
 export const TODAY_FOCUS_KEY = 'projects_today_focus'
 export const LAST_REVIEW_KEY = 'projects_last_review'
+
+/** Tamanho da próxima ação: cabe numa brecha de 15 min ou pede um bloco de foco. */
+export const SIZES: { key: NextActionSize; icon: string; label: string }[] = [
+  { key: 'rapida', icon: '⚡', label: '15 min' },
+  { key: 'longa', icon: '🧠', label: '2 h' }
+]
+export const sizeDef = (k: string | null | undefined): (typeof SIZES)[number] | null => SIZES.find((s) => s.key === k) ?? null
+
+export const WEEKDAYS = [
+  { short: 'D', label: 'dom', long: 'domingo' },
+  { short: 'S', label: 'seg', long: 'segunda' },
+  { short: 'T', label: 'ter', long: 'terça' },
+  { short: 'Q', label: 'qua', long: 'quarta' },
+  { short: 'Q', label: 'qui', long: 'quinta' },
+  { short: 'S', label: 'sex', long: 'sexta' },
+  { short: 'S', label: 'sáb', long: 'sábado' }
+]
+
+export function parseWorkDays(raw: string | null | undefined): number[] {
+  try {
+    const v = JSON.parse(raw || '[]')
+    return Array.isArray(v) ? v.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : []
+  } catch {
+    return []
+  }
+}
+export const workDaysLabel = (raw: string | null | undefined): string => parseWorkDays(raw).map((d) => WEEKDAYS[d].label).join(', ')
+export const isProjectDay = (p: Pick<Project, 'workDays'>, date: Date = new Date()): boolean => parseWorkDays(p.workDays).includes(date.getDay())

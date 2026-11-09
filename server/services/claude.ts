@@ -43,6 +43,8 @@ export interface RunOptions {
    * tool_use / tool_result progress. Prompt is sent as a JSON message on stdin.
    */
   agentic?: boolean
+  /** Agentic only: `default` (pergunta → nega) ou `acceptEdits` (edita arquivos sozinho — ex.: worktree isolado). */
+  permissionMode?: 'default' | 'acceptEdits'
   /**
    * Token accounting: when set, the run's usage (tokens/custo reported by the CLI in its
    * `result` event) is saved to `ai_usage`, tagged with the source module/project.
@@ -120,7 +122,9 @@ function shquote(s: string): string {
  */
 function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOptions = {}): Promise<string> {
   return new Promise((resolve, reject) => {
-    const env = { ...process.env, PATH: buildPath() }
+    // RICKOS_CLAUDE_RUN marca execuções do próprio rickOS: o hook SessionEnd ignora
+    // essas sessões (senão o resumo do "onde parei" dispararia outro resumo, em loop).
+    const env = { ...process.env, PATH: buildPath(), RICKOS_CLAUDE_RUN: '1' }
     const model = opts.model?.trim()
     const extra = opts.extraArgs ?? []
     const agentic = !!opts.agentic
@@ -130,8 +134,9 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
     // final text plus token usage; runs streaming plain text keep the raw output.
     const oneShotJson = !useStreamParse && !opts.onChunk
     // agentic: bidirectional stream-json (stdin open, prompt via JSON message, tools execute)
-    const agenticArgs = ['--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'default']
-    const agenticShell = ' --input-format stream-json --output-format stream-json --verbose --permission-mode default'
+    const permissionMode = opts.permissionMode ?? 'default'
+    const agenticArgs = ['--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--permission-mode', permissionMode]
+    const agenticShell = ` --input-format stream-json --output-format stream-json --verbose --permission-mode ${permissionMode}`
     const jsonArgs = agentic
       ? agenticArgs
       : streamJson
@@ -262,6 +267,14 @@ function attempt(bin: string, prompt: string, viaShell: boolean, opts: RunOption
         }
       } else if (evt.type === 'result') {
         if (typeof evt.result === 'string') finalText = evt.result
+        // agentic: a tarefa terminou → fecha o stdin para o CLI sair (senão espera outra mensagem para sempre)
+        if (agentic) {
+          try {
+            child.stdin?.end()
+          } catch {
+            // já fechado
+          }
+        }
       }
     }
 

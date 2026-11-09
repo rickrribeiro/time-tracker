@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import type { Project, Todo } from '../../../types'
+import type { NextActionSize, Project, Todo } from '../../../types'
 import { useProjectStore } from '../store/projectStore'
 import { projectContext, runJson } from '../lib/ai'
+import { SIZES } from '../lib/constants'
 
 /**
  * Concluir a próxima ação já pede a seguinte (sugestões: TODOs abertos do projeto,
@@ -10,6 +11,7 @@ import { projectContext, runJson } from '../lib/ai'
 export function NextActionModal({ project, mode, onClose }: { project: Project; mode: 'complete' | 'set'; onClose: () => void }): React.ReactElement {
   const { completeNextAction, patch, overview, milestones } = useProjectStore()
   const [next, setNext] = useState(mode === 'set' ? project.nextAction ?? '' : '')
+  const [size, setSize] = useState<NextActionSize | null>(mode === 'set' ? project.nextActionSize : null)
   const [todos, setTodos] = useState<Todo[]>([])
   const [aiIdeas, setAiIdeas] = useState<string[]>([])
   const [aiRunning, setAiRunning] = useState(false)
@@ -37,8 +39,8 @@ export function NextActionModal({ project, mode, onClose }: { project: Project; 
   }
 
   async function save(): Promise<void> {
-    if (mode === 'complete') await completeNextAction(project.id, next.trim() || null)
-    else await patch(project.id, { nextAction: next.trim() || null })
+    if (mode === 'complete') await completeNextAction(project.id, next.trim() || null, size)
+    else await patch(project.id, { nextAction: next.trim() || null, nextActionSize: next.trim() ? size : null })
     onClose()
   }
 
@@ -51,6 +53,13 @@ export function NextActionModal({ project, mode, onClose }: { project: Project; 
         {mode === 'complete' && project.nextAction && <p className="ph-muted ph-strike">{project.nextAction}</p>}
         <label className="ph-label">Próxima ação de {project.name}</label>
         <input autoFocus value={next} onChange={(e) => setNext(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} placeholder="Uma ação concreta" />
+        <div className="ph-seg" style={{ marginTop: 8 }} role="group" aria-label="Tamanho">
+          {SIZES.map((sz) => (
+            <button key={sz.key} className={size === sz.key ? 'active' : ''} onClick={() => setSize(size === sz.key ? null : sz.key)}>
+              {sz.icon} {sz.label}
+            </button>
+          ))}
+        </div>
         {chips.length > 0 && (
           <div className="ph-chips">
             {chips.map((c) => (

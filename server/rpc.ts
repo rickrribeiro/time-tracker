@@ -56,6 +56,8 @@ import {
   getProjectTasks,
   getProjectHours,
   getUnlinkedTagHours,
+  getDelegations,
+  getProjectCycle,
   getHabits,
   createHabit,
   updateHabit,
@@ -197,7 +199,10 @@ import { encodeSecret, decodeSecret, legacySecrets } from './services/secrets'
 import { broadcast } from './events'
 import { notify, notificationsChanged } from './services/notifications'
 import { suggestProjects, ignoreProjectSuggestion, restoreProjectSuggestions } from './services/projectScan'
-import { projectsOverview, projectCommits, readRoadmap, setRoadmapItem, createRoadmapTemplate, checkProjectRadar } from './services/projectHub'
+import { projectsOverview, projectCommits, readRoadmap, setRoadmapItem, createRoadmapTemplate, checkProjectRadar, generateCycleChangelog, cycleCommits, setProjectSchedule } from './services/projectHub'
+import { claudeHookStatus, installClaudeHook, uninstallClaudeHook, handleClaudeSession, AUTO_WHERE_KEY, HOOK_MODEL_KEY } from './services/claudeHook'
+import type { SessionPayload } from './services/claudeHook'
+import { delegateNextAction, cancelDelegation, reviewDelegation, discardDelegation, acceptDelegation, prDelegation, recoverDelegations } from './services/delegation'
 import type { ProjectStatusPayload } from './database/queries'
 import {
   scanGit,
@@ -267,6 +272,7 @@ export function startScheduler(): void {
   setInterval(() => void maybeAutoSyncGoogle(), 6 * 60 * 60 * 1000)
   // Radar de projetos: notificações 1x/dia (pausa vencida, foco sem próxima ação, ciclos…).
   setTimeout(() => void checkProjectRadar().catch(() => undefined), 60000)
+  void recoverDelegations().catch(() => undefined)
   setInterval(() => void checkProjectRadar().catch(() => undefined), 60 * 60 * 1000)
 }
 
@@ -671,8 +677,8 @@ ipcMain.handle('projects:setStatus', async (_, id: number, status: string, paylo
   projectsChanged(id)
   return p
 })
-ipcMain.handle('projects:completeNextAction', async (_, id: number, next: string | null) => {
-  const p = await completeNextAction(id, next)
+ipcMain.handle('projects:completeNextAction', async (_, id: number, next: string | null, size?: string | null) => {
+  const p = await completeNextAction(id, next, size ?? null)
   projectsChanged(id)
   return p
 })
@@ -697,7 +703,37 @@ ipcMain.handle('cycles:getAll', (_, projectId?: number | null) => getProjectCycl
 ipcMain.handle('cycles:create', (_, projectId: number, name: string, goal: string | null, startDate: string, dueDate: string | null) => createProjectCycle(projectId, name, goal, startDate, dueDate))
 ipcMain.handle('cycles:update', (_, id: number, name: string, goal: string | null, dueDate: string | null) => updateProjectCycle(id, name, goal, dueDate))
 ipcMain.handle('cycles:extend', (_, id: number, newDueDate: string, reason: string | null) => extendProjectCycle(id, newDueDate, reason))
-ipcMain.handle('cycles:close', (_, id: number, status: 'concluido' | 'cancelado', retrospective: string | null) => closeProjectCycle(id, status, retrospective))
+ipcMain.handle('cycles:close', async (_, id: number, status: 'concluido' | 'cancelado', retrospective: string | null) => {
+  await closeProjectCycle(id, status, retrospective)
+  // sempre deixa um changelog (agrupado pelos commits) — a versão com IA é opcional
+  const c = await getProjectCycle(id)
+  if (status === 'concluido' && c && !c.changelog) await generateCycleChangelog(id, false).catch(() => undefined)
+})
+ipcMain.handle('cycles:changelog', (_, id: number, useAi: boolean) => generateCycleChangelog(id, !!useAi))
+ipcMain.handle('cycles:commits', (_, id: number) => cycleCommits(id))
+ipcMain.handle('projects:setSchedule', async (_, projectId: number, days: number[], start: string | null, minutes: number | null, syncCalendar: boolean) => {
+  const r = await setProjectSchedule(projectId, days, start, minutes, !!syncCalendar)
+  projectsChanged(projectId)
+  return r
+})
+// Hook do Claude Code ("onde parei" automático)
+ipcMain.handle('projects:claudeSession', (_, payload: SessionPayload) => handleClaudeSession(payload))
+ipcMain.handle('projects:hookStatus', () => claudeHookStatus())
+ipcMain.handle('projects:hookInstall', () => installClaudeHook())
+ipcMain.handle('projects:hookUninstall', () => uninstallClaudeHook())
+ipcMain.handle('projects:hookConfig', async (_, enabled: boolean, model: string | null) => {
+  await setSetting(AUTO_WHERE_KEY, enabled ? '1' : '0')
+  if (model != null) await setSetting(HOOK_MODEL_KEY, model.trim())
+  return claudeHookStatus()
+})
+// Delegar a próxima ação ao Claude (worktree isolado)
+ipcMain.handle('delegations:getAll', (_, projectId?: number | null) => getDelegations(projectId ?? null))
+ipcMain.handle('delegations:start', (_, projectId: number, action: string | null, instructions: string | null) => delegateNextAction(projectId, action, instructions))
+ipcMain.handle('delegations:cancel', (_, id: number) => cancelDelegation(id))
+ipcMain.handle('delegations:review', (_, id: number) => reviewDelegation(id))
+ipcMain.handle('delegations:discard', (_, id: number) => discardDelegation(id))
+ipcMain.handle('delegations:accept', (_, id: number) => acceptDelegation(id))
+ipcMain.handle('delegations:pr', (_, id: number) => prDelegation(id))
 ipcMain.handle('cycles:delete', (_, id: number) => deleteProjectCycle(id))
 ipcMain.handle('projectNotes:getAll', (_, projectId: number) => getProjectNotes(projectId))
 ipcMain.handle('projectNotes:save', (_, note: { id?: number | null; projectId: number; kind: string; title: string; body: string | null; url: string | null; pinned?: number }) => saveProjectNote(note))

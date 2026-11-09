@@ -446,7 +446,9 @@ export type Page =
   | 'goals'
   | 'automations'
   | 'weekly-review'
+  // Social
   | 'crm'
+  | 'chats'
   // Estudos (Learning OS)
   | 'estudos'
   | 'estudos-topic'

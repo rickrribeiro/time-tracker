@@ -473,6 +473,18 @@ const SCHEMA = `
     isError INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX IF NOT EXISTS idx_ai_usage_createdAt ON ai_usage(createdAt);
+
+  -- Central de notificações (sino da sidebar): regras, agentes, IA, sistema
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    createdAt TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT 'sistema', -- automacao | agendador | ia | sistema | …
+    page TEXT,                              -- página do app aberta ao clicar (opcional)
+    readAt TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_notifications_createdAt ON notifications(createdAt);
 `;
 const SKILLS = [
   {
@@ -2212,6 +2224,46 @@ async function getAiUsage(from, to) {
     [from, to]
   );
 }
+const NOTIFICATIONS_KEEP = 500;
+async function createNotification(n) {
+  const db2 = await getDb();
+  run$1(db2, "INSERT INTO notifications (createdAt, title, body, source, page) VALUES (?, ?, ?, ?, ?)", [
+    (/* @__PURE__ */ new Date()).toISOString(),
+    n.title,
+    n.body ?? "",
+    n.source || "sistema",
+    n.page ?? null
+  ]);
+  const created = getOne(db2, "SELECT * FROM notifications ORDER BY id DESC LIMIT 1");
+  if (created.id > NOTIFICATIONS_KEEP) {
+    run$1(db2, "DELETE FROM notifications WHERE id <= ?", [created.id - NOTIFICATIONS_KEEP]);
+  }
+  return created;
+}
+async function getNotifications(limit = 100) {
+  const db2 = await getDb();
+  return getAll(db2, "SELECT * FROM notifications ORDER BY id DESC LIMIT ?", [limit]);
+}
+async function getUnreadNotificationCount() {
+  const db2 = await getDb();
+  return getOne(db2, "SELECT COUNT(*) AS n FROM notifications WHERE readAt IS NULL")?.n ?? 0;
+}
+async function markNotificationRead(id, read = true) {
+  const db2 = await getDb();
+  run$1(db2, "UPDATE notifications SET readAt = ? WHERE id = ?", [read ? (/* @__PURE__ */ new Date()).toISOString() : null, id]);
+}
+async function markAllNotificationsRead() {
+  const db2 = await getDb();
+  run$1(db2, "UPDATE notifications SET readAt = ? WHERE readAt IS NULL", [(/* @__PURE__ */ new Date()).toISOString()]);
+}
+async function deleteNotification(id) {
+  const db2 = await getDb();
+  run$1(db2, "DELETE FROM notifications WHERE id = ?", [id]);
+}
+async function clearNotifications(onlyRead = false) {
+  const db2 = await getDb();
+  run$1(db2, onlyRead ? "DELETE FROM notifications WHERE readAt IS NOT NULL" : "DELETE FROM notifications");
+}
 const SENSITIVE_KEYS = /* @__PURE__ */ new Set([
   "github_token",
   "google_client_secret",
@@ -3201,8 +3253,19 @@ function broadcast(channel, payload) {
     }
   }
 }
-function notify(title, body) {
-  broadcast("notify", { title, body });
+async function notify(input) {
+  try {
+    const n = await createNotification(input);
+    broadcast("notify", n);
+    broadcast("notifications:updated", { id: n.id });
+    return n;
+  } catch {
+    broadcast("notify", { title: input.title, body: input.body ?? "" });
+    return null;
+  }
+}
+function notificationsChanged() {
+  broadcast("notifications:updated", {});
 }
 function toolPath() {
   const home = os.homedir();
@@ -3735,9 +3798,28 @@ ipcMain.handle("jobs:getAll", () => getScheduledJobs());
 ipcMain.handle("jobs:create", (_, name, prompt, hour) => createScheduledJob(name, prompt, hour));
 ipcMain.handle("jobs:update", (_, id, name, prompt, hour, enabled) => updateScheduledJob(id, name, prompt, hour, enabled));
 ipcMain.handle("jobs:delete", (_, id) => deleteScheduledJob(id));
-function notifyNative(title, body) {
-  notify(title, body);
+function notifyNative(title, body, page) {
+  void notify({ title, body, source: "automacao", page: page ?? null });
 }
+ipcMain.handle("notifications:list", (_, limit) => getNotifications(limit ?? 100));
+ipcMain.handle("notifications:unreadCount", () => getUnreadNotificationCount());
+ipcMain.handle("notifications:create", (_, n) => notify(n));
+ipcMain.handle("notifications:markRead", async (_, id, read) => {
+  await markNotificationRead(id, read !== false);
+  notificationsChanged();
+});
+ipcMain.handle("notifications:markAllRead", async () => {
+  await markAllNotificationsRead();
+  notificationsChanged();
+});
+ipcMain.handle("notifications:delete", async (_, id) => {
+  await deleteNotification(id);
+  notificationsChanged();
+});
+ipcMain.handle("notifications:clear", async (_, onlyRead) => {
+  await clearNotifications(!!onlyRead);
+  notificationsChanged();
+});
 function todayRangeISO() {
   const n = /* @__PURE__ */ new Date();
   return {
@@ -3765,6 +3847,7 @@ async function runScheduledJobs() {
         if (text) {
           await createTodo(`🤖 ${job.name}`, text.slice(0, 4e3), "inbox", "agent", 1, null, null, 1);
           broadcast("inbox:updated", { jobId: job.id });
+          void notify({ title: `🤖 ${job.name}`, body: "O agente agendado terminou — resultado no Inbox.", source: "agendador", page: "inbox" });
         }
       } catch {
       }
@@ -3808,7 +3891,7 @@ async function evaluateRules() {
           workStart.setHours(startHour, 0, 0, 0);
           const ref = lastEnd || workStart.getTime();
           if (now - ref >= minutes * 6e4) {
-            notifyNative("⏳ Hora de focar?", `Você está há ~${Math.round((now - ref) / 6e4)}min sem tarefa produtiva.`);
+            notifyNative("⏳ Hora de focar?", `Você está há ~${Math.round((now - ref) / 6e4)}min sem tarefa produtiva.`, "timeline");
             await setRuleFired(r.id, (/* @__PURE__ */ new Date()).toISOString());
           }
         } else if (r.type === "due_flashcards") {
@@ -3816,7 +3899,7 @@ async function evaluateRules() {
           if (now - last < 6 * 3600 * 1e3) continue;
           const due = await getDueFlashcards((/* @__PURE__ */ new Date()).toISOString());
           if (due.length > count2) {
-            notifyNative("🔁 Revisões acumulando", `${due.length} flashcards vencidos — hora de revisar.`);
+            notifyNative("🔁 Revisões acumulando", `${due.length} flashcards vencidos — hora de revisar.`, "estudos-review");
             await setRuleFired(r.id, (/* @__PURE__ */ new Date()).toISOString());
           }
         } else if (r.type === "stale_branches") {
@@ -3830,7 +3913,8 @@ async function evaluateRules() {
             const repos = [...new Set(lost.map((b) => b.repoName))];
             notifyNative(
               "🌿 Trabalho esquecido em branches",
-              `${lost.length} branch(es) parada(s) há ${days}+ dias com código não entregue: ${repos.slice(0, 4).join(", ")}${repos.length > 4 ? "…" : ""}`
+              `${lost.length} branch(es) parada(s) há ${days}+ dias com código não entregue: ${repos.slice(0, 4).join(", ")}${repos.length > 4 ? "…" : ""}`,
+              "worktrees"
             );
             await setRuleFired(r.id, (/* @__PURE__ */ new Date()).toISOString());
           }
@@ -3848,7 +3932,7 @@ async function evaluateRules() {
             const cats = await getCategories();
             const names = crossed.map((b) => cats.find((c) => c.id === b.categoryId)?.name ?? `#${b.categoryId}`);
             await createTodo(`Revisar orçamento: ${names.join(", ")} passou de ${percent}%`, "Gerado por regra automática", "inbox", "rule", 2, null, null, 1);
-            notifyNative("💸 Orçamento estourando", `${names.join(", ")} passou de ${percent}%.`);
+            notifyNative("💸 Orçamento estourando", `${names.join(", ")} passou de ${percent}%.`, "budget");
             await setRuleFired(r.id, (/* @__PURE__ */ new Date()).toISOString());
           }
         }
@@ -4234,6 +4318,12 @@ ipcMain.handle("ai:start", async (_, params) => {
   const runId = crypto.randomUUID();
   const run2 = { id: runId, status: "running", output: "", error: null };
   aiRuns.set(runId, run2);
+  const startedAt = Date.now();
+  const notifyIfLong = (title, body) => {
+    if (Date.now() - startedAt < 60 * 1e3) return;
+    void notify({ title, body, source: "ia", page: params.save !== false ? "ai-history" : null });
+  };
+  const promptPreview = (params.userPrompt || params.prompt).replace(/\s+/g, " ").trim().slice(0, 120);
   const command = await resolveClaudeCommand(params.projectId ?? void 0);
   const model = await resolveModel(params.model);
   const context = await buildProjectContext(params.projectId);
@@ -4270,11 +4360,13 @@ ipcMain.handle("ai:start", async (_, params) => {
       }
     }
     broadcast("ai:done", { runId, ok: true, output: result, error: null });
+    notifyIfLong("✅ Execução de IA concluída", promptPreview);
   }).catch((e) => {
     const cancelled = run2.status === "cancelled";
     run2.status = cancelled ? "cancelled" : "error";
     run2.error = cancelled ? "Execução cancelada." : e instanceof Error ? e.message : String(e);
     broadcast("ai:done", { runId, ok: false, output: run2.output, error: run2.error });
+    if (!cancelled) notifyIfLong("⚠️ Execução de IA falhou", run2.error ?? promptPreview);
   }).finally(() => {
     setTimeout(() => aiRuns.delete(runId), 10 * 60 * 1e3);
   });

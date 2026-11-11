@@ -15,8 +15,3 @@ https://andydanger.github.io/live-lol-esports/#/
 https://github.com/AndyDanger/live-lol-esports
 
 no momento não quero que desenvolva nada, quero que crie a issue no github com o planejamento total do projeto, para eu revisar e, a partir dela, criar as sub issues de desenvolvimento
-
-faça em tasks separadas
-- quero poder colocar um nome nas abas do prompt runner
-- nos habitos quero ter um stats lá que eu possa ver meio que uma planilha de cada mes dos dias e nos habitos que eu fiz, e alguns dados que possam me ajudar a melhorar os habitos, ex: aos sabaos só completo 50% e terças 100%. Colocar isso na mesma pagina dos habitos, em baixo 
-- no prompt runner não quero o timeout de "Tempo esgotado (120s) executando o Claude CLI.", tem tasks que demoram mais. Seria legal eu conseguir ir acompanhando o que o claude ta fazendo, o pensamento dele para saber qeu ainda ta processando

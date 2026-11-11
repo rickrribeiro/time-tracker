@@ -1,8 +1,7 @@
-VER APLICAÇÃO DE GABRIEL, ADICIONAR O FINANCEIRO AQUI TB - EXPORTAR LA DO SHEETS E IMPROTAR AQ (PROCESSO REVERSO TB)
-
-fazer lista de agentes e skills
 ter a base de conhecimento dos projetos, ter uma base de conhecimento minha pessoal
 
+- na parte de criação/edição dos flashcards, onde está a lista dos flashcards, quero a data de qnd os flashs vão aparecer novamente
+- na lista de TÓPICOS ver quantos flashcards tem
 
 
-
+no chat social botar tags nos chats por projeto (ou p0 p1 p2 p3)

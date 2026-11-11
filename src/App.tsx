@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useState } from 'react'
 import { useUIStore } from './store/uiStore'
 import { useTaskStore } from './modules/timetracker/store/taskStore'
 import { useTagStore } from './modules/timetracker/store/tagStore'
@@ -40,6 +40,7 @@ import {
   ReportsPage
 } from './modules/finance/pages'
 import { DestinationsPage } from './modules/travel/pages'
+import { ExportDbModal } from './components/ExportDbModal'
 import { SettingsPage } from './modules/settings/pages/SettingsPage'
 import { LinksPage } from './modules/links/pages/LinksPage'
 import { AIPage } from './modules/ai/pages/AIPage'
@@ -197,6 +198,7 @@ const COLLAPSED_KEY = 'rickos:collapsedGroups'
 
 export default function App(): React.ReactElement {
   const { currentPage, setPage, selectedProjectId } = useUIStore()
+  const [exportOpen, setExportOpen] = useState(false)
   const flightId = useFlightStore((st) => st.selectedId)
   const { refreshActive, stopActiveTask, activeTask } = useTaskStore()
   const { refreshTags } = useTagStore()
@@ -366,11 +368,7 @@ export default function App(): React.ReactElement {
         <div className="sidebar-footer">
           <button
             className="nav-btn export-btn"
-            onClick={async () => {
-              const res = await window.api.app.exportDb()
-              if (res.ok) alert(res.message || 'Backup exportado!')
-              else if (res.error) alert('Falha ao exportar: ' + res.error)
-            }}
+            onClick={() => setExportOpen(true)}
             title="Exportar backup (local ou Google Drive)"
             style={{ marginTop: '8px' }}
           >
@@ -394,6 +392,7 @@ export default function App(): React.ReactElement {
           </button>
         </div>
       </nav>
+      {exportOpen && <ExportDbModal onClose={() => setExportOpen(false)} />}
 
       <main className="main-content">
         <ActiveTask />

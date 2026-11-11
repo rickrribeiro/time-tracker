@@ -1312,6 +1312,26 @@ select:focus {
   margin-top: 20px;
 }
 
+/* Export DB */
+.export-db-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.export-db-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.export-db-option .btn {
+  min-width: 200px;
+}
+.export-db-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* ── Scrollbar ─────────────────────────────────────────────────────────────────── */
 
 ::-webkit-scrollbar {

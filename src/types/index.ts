@@ -393,6 +393,14 @@ export interface InvestmentHistory {
   amount: number
 }
 
+export interface ExportDbResult {
+  ok: boolean
+  target?: 'local' | 'drive'
+  message?: string
+  error?: string
+  link?: string | null
+}
+
 export interface Trip {
   id: number
   origin: string | null
@@ -1071,7 +1079,8 @@ declare global {
         calendarUpdated: (cb: () => void) => () => void
       }
       app: {
-        exportDb: () => Promise<{ ok: boolean; target?: 'local' | 'drive'; message?: string; error?: string; link?: string | null }>
+        exportDbToDevice: () => Promise<ExportDbResult>
+        exportDbToDrive: (email: string) => Promise<ExportDbResult>
         importDb: () => Promise<boolean>
         snapshots: () => Promise<{ name: string; path: string; date: string; size: number }[]>
         restoreSnapshot: (snapPath: string) => Promise<boolean>

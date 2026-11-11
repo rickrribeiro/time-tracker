@@ -22,32 +22,49 @@ async function connectGoogle(): Promise<boolean> {
   return invoke<boolean>('google:awaitConnect')
 }
 
-/** Backup: download the SQLite file, or send it to Google Drive when connected. */
-async function exportDb(): Promise<{ ok: boolean; target?: 'local' | 'drive'; message?: string; error?: string; link?: string | null }> {
-  const accounts = await invoke<string[]>('google:accounts').catch(() => [] as string[])
-  let toDrive = false
-  if (accounts.length) {
-    toDrive = window.confirm('Enviar o backup para o Google Drive?\n\nOK = Google Drive · Cancelar = baixar neste dispositivo')
-  }
-  if (toDrive) {
-    let email = accounts[0]
-    if (accounts.length > 1) {
-      const pick = window.prompt(
-        'Enviar para qual conta?\n' + accounts.map((a, i) => `${i + 1}. ${a}`).join('\n'),
-        '1'
-      )
-      if (!pick) return { ok: false }
-      email = accounts[Number(pick) - 1] ?? accounts[0]
+type ExportResult = { ok: boolean; target?: 'local' | 'drive'; message?: string; error?: string; link?: string | null }
+
+/** Backup no dispositivo: diálogo "Salvar como" (escolhe pasta/nome) quando o navegador suporta, senão download comum. */
+async function exportDbToDevice(): Promise<ExportResult> {
+  const now = new Date()
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  const name = `timetracker_snapshot_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.sqlite`
+  const picker = (window as unknown as { showSaveFilePicker?: (o?: unknown) => Promise<SaveHandle> }).showSaveFilePicker
+  if (picker) {
+    // O diálogo precisa abrir ainda dentro do clique (gesto do usuário): só depois busca o arquivo.
+    let handle: SaveHandle
+    try {
+      handle = await picker({
+        suggestedName: name,
+        types: [{ description: 'Banco SQLite', accept: { 'application/x-sqlite3': ['.sqlite'] } }]
+      })
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return { ok: false } // cancelado
+      throw e
     }
-    return invoke('app:exportDbToDrive', email)
+    try {
+      const res = await fetch(downloadUrl('/api/export/db'))
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const w = await handle.createWritable()
+      await w.write(await res.blob())
+      await w.close()
+      return { ok: true, target: 'local', message: `Backup salvo em ${handle.name}.` }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    }
   }
   const a = document.createElement('a')
   a.href = downloadUrl('/api/export/db')
-  a.download = ''
+  a.download = name
   document.body.appendChild(a)
   a.click()
   a.remove()
   return { ok: true, target: 'local', message: 'Download do backup iniciado.' }
+}
+
+interface SaveHandle {
+  name: string
+  createWritable: () => Promise<{ write: (data: Blob) => Promise<void>; close: () => Promise<void> }>
 }
 
 /**
@@ -556,7 +573,9 @@ export function createApi() {
       calendarUpdated: (cb: () => void) => subscribe('calendar:updated', () => cb())
     },
     app: {
-      exportDb: () => exportDb(),
+      exportDbToDevice: () => exportDbToDevice(),
+      exportDbToDrive: (email: string): Promise<ExportResult> =>
+        invoke<ExportResult>('app:exportDbToDrive', email).catch((e) => ({ ok: false, error: e instanceof Error ? e.message : String(e) })),
       importDb: async () => {
         const f = await pickFile('.sqlite,.db,application/x-sqlite3')
         if (!f) return false

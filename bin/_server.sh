@@ -35,6 +35,25 @@ script_server_pid() {
   if ps -p "$pid" -o command= 2>/dev/null | grep -q "dist-server/main.js"; then echo "$pid"; fi
 }
 
+# Uma busca no Chrome (Skyscanner) em andamento: reiniciar agora a perderia.
+server_busy() {
+  curl -fsS --max-time 1 "${URL}/api/health" 2>/dev/null | grep -q '"busy":true'
+}
+
+# Desliga um PID e ESPERA ele sair (um servidor que fica vivo sem a porta continua
+# gravando no mesmo banco que o próximo). Depois de 12 s, força.
+stop_pid() {
+  local pid="$1"
+  kill "$pid" 2>/dev/null || return 0
+  for _ in $(seq 1 48); do
+    kill -0 "$pid" 2>/dev/null || return 0
+    sleep 0.25
+  done
+  echo "• o servidor ${pid} não saiu em 12 s — forçando" >&2
+  kill -9 "$pid" 2>/dev/null
+  sleep 0.5
+}
+
 build_stamp() {
   stat -f %m "${ROOT}/dist-server/main.js" 2>/dev/null || echo 0
 }
@@ -50,10 +69,13 @@ ensure_server() {
   if server_up; then
     local pid
     pid="$(script_server_pid)"
-    if [ -n "$pid" ] && { needs_build || running_is_stale; }; then
+    if [ -n "$pid" ] && { needs_build || running_is_stale; } && server_busy; then
+      echo "• há uma busca no Chrome em andamento — a versão nova entra quando você rodar de novo depois que ela terminar"
+      echo "✓ servidor já rodando em ${URL}"
+      return 0
+    elif [ -n "$pid" ] && { needs_build || running_is_stale; }; then
       echo "… código mudou: reiniciando o servidor com a versão nova"
-      kill "$pid" 2>/dev/null
-      for _ in $(seq 1 20); do server_up || break; sleep 0.25; done
+      stop_pid "$pid"
     else
       if [ -z "$pid" ] && needs_build; then
         echo "• servidor rodando é do TimeTracker.app ou do npm run dev — feche-o para usar a versão nova"

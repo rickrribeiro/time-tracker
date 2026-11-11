@@ -9,7 +9,7 @@ stopped=0
 if [ -f "$PID_FILE" ]; then
   pid="$(awk '{print $1}' "$PID_FILE")"
   if ps -p "$pid" -o command= 2>/dev/null | grep -q "dist-server/main.js"; then
-    kill "$pid" && stopped=1
+    stop_pid "$pid" && stopped=1
   fi
   rm -f "$PID_FILE"
 fi
@@ -18,7 +18,7 @@ fi
 if [ "$stopped" = 0 ]; then
   for pid in $(lsof -ti "tcp:${PORT}" -sTCP:LISTEN 2>/dev/null); do
     if ps -p "$pid" -o command= | grep -q "dist-server/main.js"; then
-      kill "$pid" && stopped=1
+      stop_pid "$pid" && stopped=1
     fi
   done
 fi

@@ -345,5 +345,103 @@ describe('Skyscanner via Chrome', () => {
     assert.equal(combos.length, 3)
     assert.equal(new Set(combos.map((c) => c.url)).size, 3)
     assert.ok(new Set(combos.map((c) => c.origin + c.destination)).size >= 2, 'combinações devem variar de par')
+    // sugestões variam a data (antes a 1ª rodada repetia a mesma data em todos os pares)
+    const pv = await sky.buildPreview(m, 8)
+    assert.ok(new Set(pv.recommended.map((c) => c.depart)).size >= Math.min(4, pv.datesTotal), 'sugestões devem variar de data')
+    assert.equal(pv.dates.length, Math.min(pv.datesTotal, 240))
+    assert.ok(pv.origins.every((o) => o.label.length > 0))
+    // escolha manual: aceita combinações do universo, rejeita o resto e remonta a URL no servidor
+    const d0 = pv.dates[pv.dates.length - 1]
+    const [o0, t0] = pv.pairs[0].split('|')
+    const ok = sky.validatePicks(m, [{ origin: o0, destination: t0, depart: d0.depart, ret: d0.ret, url: 'https://evil.example' }, { origin: 'XXX', destination: t0, depart: d0.depart, ret: d0.ret }])
+    assert.equal(ok.length, 1)
+    assert.match(ok[0].url, /^https:\/\/www\.skyscanner\.com\.br\//)
+    assert.throws(() => sky.validatePicks(m, [{ origin: o0, destination: t0, depart: '2001-01-01', ret: null }]))
+    assert.deepEqual(sky.spreadOrder(5), [0, 4, 2, 1, 3])
+  })
+
+  it('mesmo voo duas vezes na mesma leitura fica com o menor preço; voos sem nº com chegadas diferentes não se fundem', async () => {
+    const sky = await import('../assisted')
+    const id = await newMonitor()
+    const m = (await repo.getMonitor(id))!
+    const pk = planner.paxKey(m.config)
+    const at = new Date().toISOString()
+    const combo = { origin: 'BKK', destination: 'SSA', depart: day(30), ret: null, url: 'https://www.skyscanner.com.br/x' }
+    const row = (price: number, arrive: string): Record<string, unknown> => ({ depart: `${day(30)}T18:00`, arrive: `${day(31)}T${arrive}`, price, currency: 'BRL', stops: 1, carrier: 'Qatar Airways' })
+    const r = sky.toOffers(combo, [row(4782, '06:00'), row(4159, '06:00'), row(3900, '09:30')], at)
+    await repo.upsertOffers(id, r.offers.map((o) => ({ offer: o, fp: evaluate.fingerprint(o, pk) })), pk, null)
+    const offers = (await repo.listOffers(id)).sort((a, b) => a.priceMinor - b.priceMinor)
+    assert.deepEqual(offers.map((o) => o.priceMinor), [390000, 415900])
+    assert.equal(offers[1].prevPriceMinor, null, 'mesma leitura não é mudança de preço')
+    const obs = await repo.listObservations(id, '2000-01-01')
+    assert.deepEqual(obs.map((o) => o.priceMinor).sort(), [390000, 415900])
+  })
+
+  it('linhas RESULT no streaming: extrai só as completas e válidas', async () => {
+    const sky = await import('../assisted')
+    const r = sky.takeResultLines('blá\nRESULT {"combo":0,"status":"ok","offers":[]}\nRESULT {quebrado}\nRESULT {"combo":1')
+    assert.deepEqual(r.results.map((x) => x.combo), [0])
+    assert.equal(r.rest, 'RESULT {"combo":1')
+  })
+
+  it('grava cada combinação ao vivo, antes de a sessão terminar (claude falso)', async () => {
+    const sky = await import('../assisted')
+    const q = await import('../../database/queries')
+    const id = await newMonitor()
+    const m = (await repo.getMonitor(id))!
+    const pv = await sky.buildPreview(m, 3)
+    const picks = pv.recommended.slice(0, 3)
+    const offer = (h: string): string => JSON.stringify({ depart: `${picks[0].depart}T${h}`, arrive: `${picks[0].depart}T23:00`, price: 3999.9, currency: 'BRL', stops: 1, via: ['DOH'], carrier: 'QR' })
+    const ev = (text: string): string => JSON.stringify({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text } } })
+    const final = JSON.stringify({ status: 'ok', results: [{ combo: 2, status: 'empty', offers: [] }] })
+    const o1 = offer('09:00')
+    // combo 1 chega quebrada em dois pedaços do streaming; combo 2 só no JSON final
+    const script = [
+      ev(`Abrindo…\nRESULT {"combo":0,"status":"ok","offers":[${offer('08:00')}]}\n`),
+      2500,
+      ev(`RESULT {"combo":1,"status":"ok","offers":[${o1.slice(0, 20)}`),
+      ev(`${o1.slice(20)}]}\n`),
+      700,
+      JSON.stringify({ type: 'result', result: final, usage: {} })
+    ]
+    fs.writeFileSync(path.join(dir, 'fake-script.json'), JSON.stringify(script))
+    const fake = path.join(dir, 'fake-claude.mjs')
+    fs.writeFileSync(
+      fake,
+      `#!/usr/bin/env node
+import fs from 'node:fs'
+for (const step of JSON.parse(fs.readFileSync(${JSON.stringify(path.join(dir, 'fake-script.json'))}, 'utf8'))) {
+  if (typeof step === 'number') await new Promise((r) => setTimeout(r, step))
+  else process.stdout.write(step + '\\n')
+}
+`
+    )
+    fs.chmodSync(fake, 0o755)
+    await q.setSetting('claude_command', fake)
+    await q.setSetting('flights_chrome_assisted', '1')
+    const { runId } = await sky.startSkyscanner(id, picks)
+    const doneNow = async (): Promise<number> => (await repo.listTasks(id)).filter((t) => t.provider === 'skyscanner_chrome' && t.status === 'done').length
+    for (let i = 0; i < 60 && (await doneNow()) === 0; i++) await new Promise((r) => setTimeout(r, 50))
+    const mid = { length: await doneNow() }
+    assert.equal(mid.length, 1, 'a 1ª combinação deve estar gravada enquanto a sessão ainda roda')
+    assert.ok(sky.assistedBusy(), 'a sessão ainda está rodando')
+    for (let i = 0; i < 100 && sky.assistedBusy(); i++) await new Promise((r) => setTimeout(r, 100))
+    const run = (await repo.listRuns(id)).find((r) => r.id === runId)!
+    assert.equal(run.status, 'done', run.message ?? '')
+    assert.equal(run.done, 3)
+    assert.equal(run.offersFound, 2)
+    // o que foi pesquisado passa a ser acompanhado, com o preço do dia
+    const tv = await sky.trackedView((await repo.getMonitor(id))!)
+    assert.equal(tv.combos.length, 3)
+    const c0 = tv.combos.find((c) => c.origin === picks[0].origin && c.depart === picks[0].depart && c.destination === picks[0].destination)!
+    assert.equal(c0.latest?.amountMinor, 399990)
+    assert.equal(c0.points.length, 1)
+    assert.ok(c0.lastCheckedAt)
+    assert.ok(c0.originLabel.includes(`(${picks[0].origin})`))
+    assert.equal(tv.combos[0].latest?.amountMinor, 399990, 'com preço vem antes de sem preço')
+    const pv2 = await sky.buildPreview((await repo.getMonitor(id))!, 3)
+    assert.equal(pv2.tracked.length, 3)
+    await repo.removeTracked(id, picks[2])
+    assert.equal((await sky.trackedView((await repo.getMonitor(id))!)).combos.length, 2)
   })
 })

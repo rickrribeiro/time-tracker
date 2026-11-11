@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import type { MonitorSummary } from '../../../../shared/flights'
+import type { MonitorSummary, SkyPick } from '../../../../shared/flights'
 import { formatMoney } from '../../../../shared/flights'
 import { useUIStore } from '../../../store/uiStore'
 import { useTripStore } from '../../travel/store/tripStore'
@@ -7,16 +7,18 @@ import { ImportModal } from '../components/ImportModal'
 import { MonitorEditor } from '../components/MonitorEditor'
 import { AlertsPanel, HistoryPanel, PlanPanel, PriceCalendar, PromosPanel } from '../components/Panels'
 import { SkyscannerModal } from '../components/SkyscannerModal'
+import { TrackedPanel } from '../components/TrackedPanel'
 import { ResultsExplorer } from '../components/ResultsExplorer'
 import { SourcesModal } from '../components/SourcesModal'
 import { rel, StateBadge } from '../components/ui'
 import { errMsg, useFlightStore } from '../store/flightStore'
 import '../flights.css'
 
-type Tab = 'results' | 'calendar' | 'history' | 'promos' | 'plan' | 'alerts'
+type Tab = 'results' | 'tracked' | 'calendar' | 'history' | 'promos' | 'plan' | 'alerts'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'results', label: 'Resultados' },
   { id: 'calendar', label: 'Calendário de preços' },
+  { id: 'tracked', label: 'Acompanhadas' },
   { id: 'history', label: 'Histórico' },
   { id: 'promos', label: 'Promoções (blogs)' },
   { id: 'plan', label: 'Plano e cobertura' },
@@ -35,7 +37,7 @@ export function FlightMonitorPage(): React.ReactElement {
   const [notFound, setNotFound] = useState(false)
   const [editing, setEditing] = useState(false)
   const [importing, setImporting] = useState<{ text?: string; mode?: 'structured' | 'ai' } | null>(null)
-  const [sky, setSky] = useState(false)
+  const [sky, setSky] = useState<boolean | SkyPick[]>(false)
   const [sources, setSources] = useState(false)
   const [insight, setInsight] = useState<{ text: string; cached: boolean } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -262,6 +264,7 @@ export function FlightMonitorPage(): React.ReactElement {
       </div>
 
       {tab === 'results' && <ResultsExplorer m={m} version={version} canSearch={canSearch} onMore={(n) => act('more', () => window.api.flightMon.run(m.id, { more: n }))} />}
+      {tab === 'tracked' && <TrackedPanel m={m} version={version} onResearch={(picks) => (skyOn ? setSky(picks) : setSources(true))} />}
       {tab === 'calendar' && <PriceCalendar m={m} version={version} />}
       {tab === 'history' && <HistoryPanel m={m} version={version} />}
       {tab === 'promos' && <PromosPanel m={m} version={version} onStructure={(text) => setImporting({ text, mode: 'ai' })} />}
@@ -284,6 +287,7 @@ export function FlightMonitorPage(): React.ReactElement {
       {sky && (
         <SkyscannerModal
           m={m}
+          initial={Array.isArray(sky) ? sky : undefined}
           onClose={() => setSky(false)}
           onStarted={() => {
             setSky(false)

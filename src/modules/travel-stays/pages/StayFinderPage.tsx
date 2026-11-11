@@ -177,7 +177,7 @@ export function StayFinderPage(): React.ReactElement {
     <div className="module-page">
       <div className="module-header">
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 700 }}>🏨 Hospedagens</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 700 }}>🏨 Hospedagens (A DESENVOLVER)</h2>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Busca multi-plataforma (mock) · ranqueada por custo-benefício.</p>
         </div>
         <div className="runner-tabs" style={{ border: 'none', margin: 0, padding: 0 }}>

@@ -240,3 +240,49 @@
   .fm-filters > * { flex: 1 1 calc(50% - 6px); }
   .fm-compare { overflow-x: auto; }
 }
+
+/* Skyscanner: seletor de combinações */
+.fm-sky-list { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.fm-sky-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.fm-sky-row:last-child { border-bottom: none; }
+.fm-sky-row.on { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.fm-sky-row input { margin: 0; flex: none; }
+.fm-sky-route { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
+.fm-sky-route b { color: var(--text-primary); }
+.fm-sky-date { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.fm-sky-pick { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; }
+.fm-sky-pick select { min-width: 0; width: 100%; }
+.fm-datechips { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 4px; max-height: 220px; overflow-y: auto; }
+.fm-datechip { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 4px 8px; font-size: 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); cursor: pointer; text-align: left; }
+.fm-datechip small { font-size: 10px; color: var(--text-muted); min-height: 12px; }
+.fm-datechip.recent { opacity: 0.7; }
+.fm-datechip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fm-datechip.on small { color: rgba(255, 255, 255, 0.85); }
+.fm-datechip:disabled { opacity: 0.4; cursor: default; }
+@media (max-width: 600px) {
+  .fm-sky-row { flex-wrap: wrap; }
+  .fm-sky-route { flex-basis: calc(100% - 24px); white-space: normal; }
+  .fm-sky-date { margin-left: 22px; }
+  .fm-sky-pick { grid-template-columns: 1fr; }
+  .fm-sky-pick > .fm-muted { display: none; }
+}
+.fm-suggest-group { padding: 6px 10px 2px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); position: sticky; top: 0; background: var(--bg-secondary); }
+.fm-suggest button.sel { color: var(--accent); font-weight: 600; }
+.fm-sky-pick .fm-picker, .fm-sky-pick .fm-picker input { width: 100%; min-width: 0; }
+.fm-sky-pick .fm-suggest { max-height: 200px; }
+
+/* Acompanhadas */
+.fm-table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.fm-tracked { width: 100%; font-size: 12px; border-collapse: collapse; }
+.fm-tracked th, .fm-tracked td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; text-align: left; }
+.fm-tracked th { font-size: 11px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+.fm-tracked .fm-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fm-tracked-route { min-width: 220px; }
+.fm-tracked tr.best td { background: color-mix(in srgb, var(--success) 8%, transparent); }
+.fm-tracked tr.past td { opacity: 0.55; }
+.fm-tracked td.colbest { color: var(--success); font-weight: 700; }
+.fm-tracked .fm-pill { margin-top: 3px; }
+.fm-nowrap { white-space: nowrap; }
+.fm-delta { font-weight: 700; }
+.fm-delta.down { color: var(--success); }
+.fm-delta.up { color: var(--danger); }

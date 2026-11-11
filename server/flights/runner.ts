@@ -1,6 +1,6 @@
 import type { FlightMonitor, NormalizedOffer, RunInfo } from '../../shared/flights'
 import { formatMoney } from '../../shared/flights'
-import { getSetting } from '../database/queries'
+import { getSetting, setSetting } from '../database/queries'
 import { broadcast } from '../events'
 import { decodeSecret } from '../services/secrets'
 import { notify } from '../services/notifications'
@@ -461,4 +461,10 @@ export async function bootFlights(): Promise<void> {
     return hit ? { kind: hit.kind as 'airport' | 'city', code: hit.code, label: hit.label } : null
   }, defaultMonitorConfig)
   if (migrated) log('boot.migrated_legacy', { count: migrated })
+  // uma vez: buscas no Skyscanner feitas antes da lista de acompanhadas existir
+  if ((await getSetting('flights_tracked_backfill')) !== '1') {
+    const n = await repo.backfillTrackedFromSkyscanner()
+    await setSetting('flights_tracked_backfill', '1')
+    if (n) log('boot.tracked_backfill', { count: n })
+  }
 }

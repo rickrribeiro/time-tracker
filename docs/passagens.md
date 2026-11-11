@@ -192,11 +192,24 @@ app pesquisa o Skyscanner **no seu Chrome**, sob demanda e com você acompanhand
   logado num plano pago. Verificado: o `claude --chrome -p` expõe as ferramentas
   `mcp__claude-in-chrome__*` e o app libera **só** essas.
 - **Fluxo:**
-  1. O botão "🔍 Skyscanner (Chrome)" mostra as combinações escolhidas (2–8): primeiro
-     pares/datas com melhor preço conhecido, depois a ordem do planejador, sem repetir o que
-     foi consultado nas últimas 12 h.
-  2. Ao confirmar, roda **uma** sessão do Claude, que abre uma aba, navega pelas URLs de busca e
-     lê o texto da página, sem screenshots repetidos nem HTML inteiro.
+  1. O botão "🔍 Skyscanner (Chrome)" abre o seletor (`buildPreview`):
+     - **Sugestões** (até 24), marcáveis uma a uma: primeiro as combinações com melhor preço
+       já visto, depois um rodízio de pares (países intercalados) em que a data muda a cada par
+       e a cada rodada (`spreadOrder`: extremos, meio, quartos…), sem repetir o consultado
+       nas últimas 12 h.
+     - **Escolher rota e datas:** origem e destino (com cidade e país quando o lado tem
+       vários países) e **todas** as datas do intervalo, com o preço conhecido e o que já foi
+       consultado. "Marcar todas" seleciona o intervalo inteiro da rota.
+     - Até 30 combinações por execução. O servidor revalida cada escolha contra os pares e
+       datas do monitor e remonta as URLs (`validatePicks`).
+  2. Ao confirmar, roda sessões do Claude de até 5 combinações, uma após a outra (sessões
+     curtas mantêm pequeno o contexto com o texto das páginas). Cada sessão abre uma aba,
+     navega pelas URLs de busca e lê o texto da página, sem screenshots repetidos nem HTML
+     inteiro. Chrome desconectado, verificação de robô ou cancelamento param as sessões
+     seguintes, e o que não rodou volta para a fila.
+     **Ao vivo:** depois de ler cada combinação, o Claude escreve uma linha `RESULT {…}` no
+     streaming (`--output-format stream-json`); o app grava na hora e a tela atualiza. O JSON
+     final só completa o que não veio nessas linhas.
   3. A sessão devolve JSON compacto: preço, horários, escalas, aeroportos de escala, companhia,
      self-transfer e bagagem quando visível.
   4. O JSON passa pelo mesmo validador da importação; as ofertas entram como "Busca assistida",
@@ -207,11 +220,25 @@ app pesquisa o Skyscanner **no seu Chrome**, sob demanda e com você acompanhand
 - **Verificação de robô:** se o Skyscanner pedir verificação ("pressione e segure"/CAPTCHA), o
   Claude **para**; o app não contorna. As tarefas voltam para a fila. Os termos do Skyscanner
   restringem acesso automatizado; o uso aqui é pessoal, raro e supervisionado.
-- **Custo:** só abrir a sessão com as ferramentas do Chrome custa ~US$ 0,10–0,20 equivalente
+- **Custo:** cada sessão (até 5 combinações) tem um custo fixo: só abrir a sessão com as ferramentas do Chrome custa ~US$ 0,10–0,20 equivalente
   API (medido: US$ 0,17 com sonnet, ~105 mil tokens de contexto), mesmo quando o Chrome não
   está conectado. O total de cada execução aparece em Plano → Execuções e em uso de IA
   (`passagens-chrome`).
+- **Acompanhadas:** toda combinação pesquisada no Skyscanner entra na lista
+  `flight_tracked_combos` do monitor (as anteriores a esta lista foram importadas uma vez
+  das tarefas). A aba "Acompanhadas" mostra o menor preço de cada combinação em cada dia
+  local de leitura (observações de todas as fontes, sem ofertas excluídas), a variação
+  em relação ao dia anterior, o menor já visto e um gráfico comparativo. "Pesquisar de novo"
+  abre o seletor já com todas marcadas.
+- **Mesmo voo duas vezes:** sem número de voo, a assinatura do itinerário inclui a chegada; o
+  mesmo voo visto duas vezes na mesma leitura (ex.: "mais barato" e "melhor") fica com o
+  menor preço, sem contar como mudança de preço.
 - Não entra no agendador. Uma busca no Chrome por vez.
+- **Reinício do servidor:** `bin/rickos-*` não reinicia sozinho com busca no Chrome em
+  andamento (`/api/health` → `busy`). Ao desligar, o servidor fecha o SSE, mata a sessão do
+  Claude e sai em até 8 s; o boot devolve à fila o que não foi lido. (Antes, o `close()`
+  esperava o SSE para sempre e o processo ficava vivo sem a porta, gravando no mesmo banco
+  que o servidor novo.)
 
 ## Radar de promoções (RSS)
 

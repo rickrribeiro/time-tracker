@@ -457,7 +457,9 @@ export function fingerprint(offer: NormalizedOffer, paxKey: string): string {
     const first = s.segments[0]
     const flight = first ? `${first.marketingCarrier ?? ''}${first.flightNumber ?? ''}` : `${s.carriers[0] ?? ''}${s.firstFlightNumber ?? ''}`
     const stops = Math.max(s.stops, s.segments.length - 1)
-    return `${s.from}>${s.to}@${s.departLocal.slice(0, 16)}#${flight}/${stops}`
+    // sem nº de voo (ex.: Skyscanner lido na página), a chegada separa voos que saem no mesmo minuto
+    const id = flight || `~${(s.arriveLocal ?? "").slice(0, 16)}`
+    return `${s.from}>${s.to}@${s.departLocal.slice(0, 16)}#${id}/${stops}`
   })
   return `${paxKey}|${legs.join('|')}`
 }

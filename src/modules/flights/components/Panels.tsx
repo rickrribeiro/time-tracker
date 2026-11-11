@@ -86,9 +86,9 @@ export function PriceCalendar(props: { m: MonitorSummary; version: number }): Re
 
 // ── Histórico ─────────────────────────────────────────────────────────────────
 
-const PALETTE = ['var(--accent)', 'var(--success)', 'var(--warning)', 'var(--danger)', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
+const PALETTE = ['var(--accent)', '#06b6d4', 'var(--warning)', 'var(--danger)', '#8b5cf6', '#ec4899', '#84cc16', '#f97316']
 
-function LineChart(props: { series: { label: string; points: HistoryPoint[] }[]; currency: string }): React.ReactElement {
+export function LineChart(props: { series: { label: string; points: HistoryPoint[] }[]; currency: string }): React.ReactElement {
   const all = props.series.flatMap((s) => s.points)
   if (all.length < 2) return <div className="fm-muted">Dados insuficientes para o gráfico (precisa de observações em pelo menos 2 dias).</div>
   const days = [...new Set(all.map((p) => p.day))].sort()

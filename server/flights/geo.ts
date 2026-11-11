@@ -54,6 +54,12 @@ export const METRO: Record<string, { label: string; airports: string[] }> = {
   YTO: { label: 'Toronto', airports: ['YYZ', 'YTZ'] }
 }
 
+const METRO_OF = new Map(Object.values(METRO).flatMap((m) => m.airports.map((a) => [a, m.label] as const)))
+/** Nome da cidade para exibir: a metrópole quando o aeroporto é de uma (KUL fica em "Sepang"). */
+export function displayCity(a: AirportInfo): string {
+  return METRO_OF.get(a.iata) ?? (a.city.replace(/\s*\(.*\)$/, '') || a.name)
+}
+
 const airports: AirportInfo[] = (data.airports as unknown as Row[]).map((r) => ({
   iata: r[0],
   name: r[1],

@@ -546,6 +546,81 @@ export interface PromoFeedView {
   keywords: string[]
 }
 
+// ── Skyscanner via Claude + Chrome ───────────────────────────────────────────
+
+/** Uma combinação rota × datas escolhida para pesquisar no Skyscanner. */
+export interface SkyPick {
+  origin: string
+  destination: string
+  depart: string
+  ret: string | null
+}
+
+export interface SkyCombo extends SkyPick {
+  url: string
+}
+
+export interface SkyPlace {
+  iata: string
+  /** "Bangkok, Tailândia" quando o lado tem vários países; senão só a cidade. */
+  label: string
+  country: string
+  countryName: string
+  city: string
+}
+
+export interface SkyPreview {
+  origins: SkyPlace[]
+  destinations: SkyPlace[]
+  /** Pares válidos "ORIG|DEST" (exclui mesmo aeroporto / muito próximos). */
+  pairs: string[]
+  /** Todas as datas do intervalo (ida, ou ida+volta), até `datesTotal`. */
+  dates: { depart: string; ret: string | null }[]
+  datesTotal: number
+  /** Sugestões já intercaladas: preços conhecidos primeiro, depois pares × datas espalhadas. */
+  recommended: SkyCombo[]
+  /** Melhor tarifa já vista por combinação ("O|D|ida|volta-ou-'-'"), em unidades mínimas de `currency`. */
+  known: Record<string, number>
+  /** Consultadas no Skyscanner nas últimas 12 h (mesma chave) → ISO de quando. */
+  recent: Record<string, string>
+  currency: string
+  busy: { monitorId: number; runId: number } | null
+  /** Combinações acompanhadas ainda futuras (para pesquisar de novo de uma vez). */
+  tracked: SkyPick[]
+  maxPerRun: number
+  perSession: number
+}
+
+/** Uma combinação acompanhada: preço por dia de observação (todas as fontes, sem excluídas). */
+export interface TrackedCombo extends SkyPick {
+  originLabel: string
+  destinationLabel: string
+  url: string
+  addedAt: string
+  /** Menor preço observado em cada dia (dia da leitura, não do voo). */
+  points: HistoryPoint[]
+  latest: Money | null
+  latestDay: string | null
+  /** Menor preço do dia de leitura anterior ao último. */
+  previous: Money | null
+  best: Money | null
+  /** Última vez que o Skyscanner pesquisou esta combinação. */
+  lastCheckedAt: string | null
+  /** Ofertas disponíveis (não excluídas) desta combinação. */
+  offers: number
+  /** Datas já passaram. */
+  past: boolean
+}
+
+export interface TrackedView {
+  currency: string
+  /** Últimos dias com leitura (colunas da comparação). */
+  days: string[]
+  combos: TrackedCombo[]
+}
+
+export const skyKey = (p: SkyPick): string => `${p.origin}|${p.destination}|${p.depart}|${p.ret ?? '-'}`
+
 // ── IA ───────────────────────────────────────────────────────────────────────
 
 export interface AiDraft {

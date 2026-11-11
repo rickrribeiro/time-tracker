@@ -1,8 +1,8 @@
-import type { FlightMonitor, ImportPreview, LocationRef, MonitorConfig, MonitorStatus, OfferQuery, ProviderStatus } from '../../shared/flights'
+import type { FlightMonitor, ImportPreview, LocationRef, MonitorConfig, MonitorStatus, OfferQuery, ProviderStatus, SkyPick } from '../../shared/flights'
 import { fmtMinutes, formatMoney } from '../../shared/flights'
 import { broadcast } from '../events'
 import { draftFromText, insights, structureImportText } from './ai'
-import { assistedBusy, cancelAssisted, pickCombos, startSkyscanner } from './assisted'
+import { buildPreview, cancelAssisted, startSkyscanner, trackedView, validatePicks } from './assisted'
 import { promosFor } from './promos'
 import { todayLocal } from './dates'
 import { fingerprint } from './evaluate'
@@ -155,10 +155,12 @@ export function registerFlightRpc(handle: Handle): void {
     return insights(m, rows)
   })
   // ── Skyscanner via Claude + Chrome (sob demanda, usuário presente) ──
-  handle('flightMon:skyscanner', (_, id: number, count?: number) => startSkyscanner(Number(id), Number(count) || 4))
-  handle('flightMon:skyscannerPreview', async (_, id: number, count?: number) => {
-    const m = await mustGet(id)
-    return { combos: await pickCombos(m, Math.max(1, Math.min(8, Number(count) || 4))), busy: assistedBusy() }
+  handle('flightMon:skyscanner', (_, id: number, picks: SkyPick[] | number) => startSkyscanner(Number(id), Array.isArray(picks) ? picks : Number(picks) || 4))
+  handle('flightMon:skyscannerPreview', async (_, id: number) => buildPreview(await mustGet(id)))
+  handle('flightMon:tracked', async (_, id: number, days?: number) => trackedView(await mustGet(id), Math.max(7, Math.min(365, Number(days) || 60))))
+  handle('flightMon:track', async (_, id: number, picks: SkyPick[]) => repo.addTracked(Number(id), validatePicks(await mustGet(id), picks)))
+  handle('flightMon:untrack', async (_, id: number, pick: SkyPick) => {
+    await repo.removeTracked(Number(id), { origin: String(pick?.origin ?? ''), destination: String(pick?.destination ?? ''), depart: String(pick?.depart ?? ''), ret: pick?.ret ? String(pick.ret) : null })
   })
 
   // ── radar de promoções (RSS) ──

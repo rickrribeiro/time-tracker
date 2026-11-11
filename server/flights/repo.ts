@@ -385,12 +385,14 @@ export async function upsertOffers(monitorId: number, items: { offer: Normalized
         const curRank = VERIFICATION_RANK[cur.verification] ?? 0
         const newRank = VERIFICATION_RANK[offer.verification] ?? 0
         const curOld = Date.parse(offer.observedAt) - Date.parse(cur.lastSeenAt) > 24 * 3600_000
-        const replace = newRank >= curRank || curOld
+        // mesma leitura viu o mesmo voo duas vezes (ex.: "mais barato" e "melhor"): fica o menor preço
+        const sameReading = cur.lastSeenAt === offer.observedAt && cur.currency === offer.price.currency
+        const replace = sameReading ? offer.price.amountMinor < cur.priceMinor : newRank >= curRank || curOld
         const sources = new Set<string>(JSON.parse(cur.sources || '[]'))
         sources.add(offer.provider)
         if (replace) {
-          priceChanged = cur.priceMinor !== offer.price.amountMinor || cur.currency !== offer.price.currency
-          prevMinor = cur.priceMinor
+          priceChanged = !sameReading && (cur.priceMinor !== offer.price.amountMinor || cur.currency !== offer.price.currency)
+          prevMinor = sameReading ? cur.prevPriceMinor : cur.priceMinor
           exec(
             db,
             `UPDATE flight_offers SET provider = ?, priceMinor = ?, currency = ?, prevPriceMinor = ?, prevCurrency = ?, verification = ?, data = ?, sources = ?, lastSeenAt = ?, available = 1 WHERE id = ?`,
@@ -413,7 +415,8 @@ export async function upsertOffers(monitorId: number, items: { offer: Normalized
       }
       exec(
         db,
-        'INSERT OR IGNORE INTO flight_price_observations (offerId, monitorId, observedAt, priceMinor, currency, provider, verification, paxKey, runId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        `INSERT INTO flight_price_observations (offerId, monitorId, observedAt, priceMinor, currency, provider, verification, paxKey, runId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (offerId, provider, observedAt) DO UPDATE SET priceMinor = MIN(priceMinor, excluded.priceMinor)`,
         [id, monitorId, offer.observedAt, offer.price.amountMinor, offer.price.currency, offer.provider, offer.verification, paxKey, runId]
       )
       out.push({ id, isNew, priceChanged, prevMinor })
@@ -460,6 +463,45 @@ export interface ObservationRow {
 
 export async function listObservations(monitorId: number, sinceIso: string): Promise<ObservationRow[]> {
   return read((db) => all<ObservationRow>(db, 'SELECT offerId, observedAt, priceMinor, currency, provider, verification, paxKey FROM flight_price_observations WHERE monitorId = ? AND observedAt >= ? ORDER BY observedAt', [monitorId, sinceIso]))
+}
+
+// ── Combinações acompanhadas ──────────────────────────────────────────────────
+
+export interface TrackedRow {
+  origin: string
+  destination: string
+  departDate: string
+  returnDate: string
+  createdAt: string
+}
+
+export async function listTracked(monitorId: number): Promise<TrackedRow[]> {
+  return read((db) => all<TrackedRow>(db, 'SELECT origin, destination, departDate, returnDate, createdAt FROM flight_tracked_combos WHERE monitorId = ? ORDER BY id', [monitorId]))
+}
+
+export async function addTracked(monitorId: number, picks: { origin: string; destination: string; depart: string; ret: string | null }[]): Promise<number> {
+  if (!picks.length) return 0
+  return tx((db) => {
+    let n = 0
+    for (const p of picks)
+      n += exec(db, 'INSERT OR IGNORE INTO flight_tracked_combos (monitorId, origin, destination, departDate, returnDate, createdAt) VALUES (?, ?, ?, ?, ?, ?)', [monitorId, p.origin, p.destination, p.depart, p.ret ?? '', nowIso()])
+    return n
+  })
+}
+
+export async function backfillTrackedFromSkyscanner(): Promise<number> {
+  return tx((db) =>
+    exec(
+      db,
+      `INSERT OR IGNORE INTO flight_tracked_combos (monitorId, origin, destination, departDate, returnDate, createdAt)
+       SELECT monitorId, origin, destination, departDate, COALESCE(returnDate, ''), COALESCE(finishedAt, ?) FROM flight_search_tasks WHERE provider = 'skyscanner_chrome'`,
+      [nowIso()]
+    )
+  )
+}
+
+export async function removeTracked(monitorId: number, p: { origin: string; destination: string; depart: string; ret: string | null }): Promise<void> {
+  await tx((db) => exec(db, 'DELETE FROM flight_tracked_combos WHERE monitorId = ? AND origin = ? AND destination = ? AND departDate = ? AND returnDate = ?', [monitorId, p.origin, p.destination, p.depart, p.ret ?? '']))
 }
 
 // ── Alertas ───────────────────────────────────────────────────────────────────

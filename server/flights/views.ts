@@ -221,7 +221,7 @@ export async function history(m: FlightMonitor, days = 60): Promise<HistoryView>
   const reduce = (list: repo.ObservationRow[]): HistoryPoint[] => {
     const per = new Map<string, number>()
     for (const o of list) {
-      const day = o.observedAt.slice(0, 10)
+      const day = todayLocal(new Date(o.observedAt)) // dia local da leitura
       per.set(day, Math.min(per.get(day) ?? Infinity, o.priceMinor))
     }
     return [...per.entries()].sort().map(([day, minor]) => ({ day, minor }))

@@ -334,6 +334,18 @@ export const SCHEMA = `
     createdAt TEXT NOT NULL
   );
 
+  -- Combinações rota × datas que o usuário acompanha (entram ao pesquisar no Skyscanner).
+  CREATE TABLE IF NOT EXISTS flight_tracked_combos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    monitorId INTEGER NOT NULL REFERENCES flight_monitors(id) ON DELETE CASCADE,
+    origin TEXT NOT NULL,
+    destination TEXT NOT NULL,
+    departDate TEXT NOT NULL,
+    returnDate TEXT NOT NULL DEFAULT '',
+    createdAt TEXT NOT NULL,
+    UNIQUE (monitorId, origin, destination, departDate, returnDate)
+  );
+
   -- Cache de respostas de provedores e de rotas terrestres (compartilhado entre monitores).
   CREATE TABLE IF NOT EXISTS flight_cache (
     key TEXT PRIMARY KEY,

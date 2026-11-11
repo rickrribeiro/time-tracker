@@ -17,16 +17,13 @@ import type {
   PlanView,
   PromoFeedView,
   ProviderStatus,
-  RunInfo
+  RunInfo,
+  SkyCombo,
+  SkyPick,
+  SkyPreview,
+  TrackedView
 } from '../../../shared/flights'
 
-export interface SkyCombo {
-  origin: string
-  destination: string
-  depart: string
-  ret: string | null
-  url: string
-}
 
 export interface MonitorInput {
   name: string
@@ -74,8 +71,11 @@ export interface FlightMonApi {
   ground: (iata: string, to: LocationRef) => Promise<GroundEstimate | null>
   aiDraft: (text: string, currency?: string) => Promise<AiDraft>
   insights: (id: number) => Promise<{ text: string; cached: boolean }>
-  skyscanner: (id: number, count?: number) => Promise<{ runId: number; combos: SkyCombo[] }>
-  skyscannerPreview: (id: number, count?: number) => Promise<{ combos: SkyCombo[]; busy: { monitorId: number; runId: number } | null }>
+  skyscanner: (id: number, picks: SkyPick[]) => Promise<{ runId: number; combos: SkyCombo[] }>
+  skyscannerPreview: (id: number) => Promise<SkyPreview>
+  tracked: (id: number, days?: number) => Promise<TrackedView>
+  track: (id: number, picks: SkyPick[]) => Promise<number>
+  untrack: (id: number, pick: SkyPick) => Promise<void>
   promos: (id: number, force?: boolean) => Promise<PromoFeedView>
   importPreview: (id: number, text: string, mode: 'structured' | 'ai', source?: string, observedAt?: string, assisted?: boolean) => Promise<ImportPreview>
   importCommit: (id: number, text: string, mode: 'structured' | 'ai', source?: string, observedAt?: string, assisted?: boolean) => Promise<{ imported: number; created: number; errors: string[] }>

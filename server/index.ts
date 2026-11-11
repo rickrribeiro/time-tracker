@@ -5,6 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { getConfig, setConfig, isLocalHost, ServerConfig } from './config'
 import { getDb, saveDb, closeDb, dbFilePath, snapshotDailyIfNeeded } from './database/db'
+import { assistedBusy, stopAssisted } from './flights/assisted'
 import { callRpc, handlers, startScheduler } from './rpc'
 import { subscribe } from './events'
 import { finishGoogleConnect } from './services/google'
@@ -65,7 +66,7 @@ export async function startServer(overrides: Partial<ServerConfig> = {}): Promis
     }
   }
 
-  app.get('/api/health', async () => ({ ok: true, auth: !!cfg.token, channels: handlers.size }))
+  app.get('/api/health', async () => ({ ok: true, auth: !!cfg.token, channels: handlers.size, busy: !!assistedBusy() }))
 
   app.post<{ Params: { channel: string }; Body: { args?: unknown[]; undef?: number[] } }>(
     '/api/rpc/:channel',
@@ -139,7 +140,13 @@ export async function startServer(overrides: Partial<ServerConfig> = {}): Promis
     app,
     url,
     close: async () => {
-      await app.close()
+      // A conexão SSE do navegador nunca termina sozinha: sem fechá-la, o app.close() espera
+      // para sempre e o processo fica vivo SEM a porta, gravando no mesmo banco que o próximo
+      // servidor (dois escritores do sql.js = um apaga o que o outro gravou).
+      stopAssisted()
+      const closing = app.close()
+      app.server.closeAllConnections?.()
+      await Promise.race([closing, new Promise((r) => setTimeout(r, 3000))])
       closeDb()
     }
   }

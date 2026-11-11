@@ -394,8 +394,11 @@ export function createApi() {
       ground: (iata: string, to: unknown) => invoke('flightMon:ground', iata, to),
       aiDraft: (text: string, currency?: string) => invoke('flightMon:aiDraft', text, currency),
       insights: (id: number) => invoke('flightMon:insights', id),
-      skyscanner: (id: number, count?: number) => invoke('flightMon:skyscanner', id, count),
-      skyscannerPreview: (id: number, count?: number) => invoke('flightMon:skyscannerPreview', id, count),
+      skyscanner: (id: number, picks: unknown[]) => invoke('flightMon:skyscanner', id, picks),
+      skyscannerPreview: (id: number) => invoke('flightMon:skyscannerPreview', id),
+      tracked: (id: number, days?: number) => invoke('flightMon:tracked', id, days),
+      track: (id: number, picks: unknown[]) => invoke('flightMon:track', id, picks),
+      untrack: (id: number, pick: unknown) => invoke('flightMon:untrack', id, pick),
       promos: (id: number, force?: boolean) => invoke('flightMon:promos', id, force),
       importPreview: (id: number, text: string, mode: 'structured' | 'ai', source?: string, observedAt?: string, assisted?: boolean) =>
         invoke('flightMon:importPreview', id, text, mode, source, observedAt, assisted),

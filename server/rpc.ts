@@ -238,19 +238,45 @@ export async function callRpc(channel: string, args: unknown[]): Promise<unknown
   return fn({ source: 'rpc' }, ...args)
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000
+/** Hora local do sync automático diário do Google Calendar. */
+const GOOGLE_SYNC_HOUR = 7
 
-/** Sync the Google Calendar at most once every 24h (if connected). */
-async function maybeAutoSyncGoogle(): Promise<void> {
+/** Sincroniza e registra o resultado (`google_last_sync` / `google_last_sync_error`). */
+async function runGoogleSync(): Promise<number> {
   try {
-    if (!(await googleConnected())) return
-    const last = await getSetting('google_last_sync')
-    if (last && Date.now() - new Date(last).getTime() < DAY_MS) return
     const n = await syncGoogleCalendar()
     await setSetting('google_last_sync', new Date().toISOString())
+    await setSetting('google_last_sync_error', '')
     broadcast('calendar:updated', { source: 'google', count: n })
-  } catch {
-    // network/auth error — leave the timestamp so it retries on the next check
+    return n
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    await setSetting('google_last_sync_error', `${new Date().toISOString()}|${msg}`)
+    throw e
+  }
+}
+
+/**
+ * Sync diário às 7h (hora local). Se o servidor estava desligado às 7h, roda na
+ * primeira checagem depois disso no mesmo dia. Uma tentativa por dia: se falhar,
+ * avisa na central de notificações em vez de tentar de novo a cada checagem.
+ */
+async function maybeDailyGoogleSync(): Promise<void> {
+  const now = new Date()
+  if (now.getHours() < GOOGLE_SYNC_HOUR) return
+  const today = now.toLocaleDateString('sv-SE') // YYYY-MM-DD local
+  try {
+    if ((await getSetting('google_autosync_day')) === today) return
+    if (!(await googleConnected())) return
+    await setSetting('google_autosync_day', today)
+    await runGoogleSync()
+  } catch (e) {
+    await notify({
+      title: '📅 Falha ao sincronizar o Google Calendar',
+      body: e instanceof Error ? e.message : String(e),
+      source: 'google',
+      page: 'settings'
+    })
   }
 }
 
@@ -265,13 +291,17 @@ export function startScheduler(): void {
   // Scheduled agents: check every 5 minutes (+ shortly after boot).
   setTimeout(() => void runScheduledJobs(), 20000)
   setInterval(() => void runScheduledJobs(), 5 * 60 * 1000)
-  // Daily Google Calendar auto-sync: shortly after boot, then re-check every 6h.
-  setTimeout(() => void maybeAutoSyncGoogle(), 8000)
-  setInterval(() => void maybeAutoSyncGoogle(), 6 * 60 * 60 * 1000)
+  // Google Calendar: sync diário às 7h (checa a cada 5 min).
+  setTimeout(() => void maybeDailyGoogleSync(), 10000)
+  setInterval(() => void maybeDailyGoogleSync(), 5 * 60 * 1000)
   // Radar de projetos: notificações 1x/dia (pausa vencida, foco sem próxima ação, ciclos…).
   setTimeout(() => void checkProjectRadar().catch(() => undefined), 60000)
   void recoverDelegations().catch(() => undefined)
   setInterval(() => void checkProjectRadar().catch(() => undefined), 60 * 60 * 1000)
+  // Passagens: retoma execuções interrompidas, migra registros antigos e dispara monitores vencidos.
+  void bootFlights().catch((e) => console.error('[flights] boot', e))
+  setTimeout(() => void flightsTick().catch(() => undefined), 45000)
+  setInterval(() => void flightsTick().catch(() => undefined), 5 * 60 * 1000)
 }
 
 // ── IPC: Tags ─────────────────────────────────────────────────────────────────
@@ -298,10 +328,6 @@ ipcMain.handle('tasks:getForRange', (_, startDate: string, endDate: string) =>
 
 ipcMain.handle('tasks:getActive', () => getActiveTask())
 
-  // Passagens: retoma execuções interrompidas, migra registros antigos e dispara monitores vencidos.
-  void bootFlights().catch((e) => console.error('[flights] boot', e))
-  setTimeout(() => void flightsTick().catch(() => undefined), 45000)
-  setInterval(() => void flightsTick().catch(() => undefined), 5 * 60 * 1000)
 ipcMain.handle('tasks:start', async (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, studyNodeId?: number | null, projectId?: number | null) => {
   const now = startTime || new Date().toISOString()
   await stopAllActiveTasks(now)
@@ -824,11 +850,7 @@ ipcMain.handle('google:status', () => googleConnected())
 ipcMain.handle('google:accounts', () => listGoogleAccounts())
 ipcMain.handle('google:disconnect', () => disconnectGoogle())
 ipcMain.handle('google:disconnectAccount', (_, email: string) => disconnectGoogleAccount(email))
-ipcMain.handle('google:sync', async () => {
-  const n = await syncGoogleCalendar()
-  await setSetting('google_last_sync', new Date().toISOString())
-  return n
-})
+ipcMain.handle('google:sync', () => runGoogleSync())
 
 // ── IPC: Finance ──────────────────────────────────────────────────────────────
 

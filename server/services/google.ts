@@ -299,7 +299,13 @@ async function accessTokenFor(refreshToken: string): Promise<string> {
     })
   })
   const json = (await res.json()) as { access_token?: string; error?: string }
-  if (!res.ok || !json.access_token) throw new Error(json.error || 'Falha ao renovar o token do Google.')
+  if (!res.ok || !json.access_token) {
+    if (json.error === 'invalid_grant') {
+      // Revogado, senha trocada, ou app OAuth em modo "Testing" (refresh token expira em 7 dias).
+      throw new Error('autorização expirada ou revogada (invalid_grant). Reconecte a conta em Configurações.')
+    }
+    throw new Error(json.error || 'Falha ao renovar o token do Google.')
+  }
   return json.access_token
 }
 
@@ -384,7 +390,7 @@ export async function syncGoogleCalendar(): Promise<number> {
       all.push(...(await fetchEventsFor(token, now, in7)))
       okCount++
     } catch (e) {
-      lastErr = e instanceof Error ? e : new Error(String(e))
+      lastErr = new Error(`Google (${acc.email}): ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 

@@ -392,10 +392,21 @@ export function SettingsPage(): React.ReactElement {
         )}
         {gConnected && (
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
-            ⏱️ Sincroniza automaticamente 1×/dia (na abertura do app, se passou 24h).
+            ⏱️ Sincroniza automaticamente todos os dias às 7h (se o servidor estiver desligado nesse horário, sincroniza assim que ligar, no mesmo dia).
             <br />Última sincronização: <strong>{fmtLastSync(values['google_last_sync'])}</strong>
           </div>
         )}
+        {gConnected && values['google_last_sync_error'] && (() => {
+          const raw = values['google_last_sync_error']
+          const sep = raw.indexOf('|')
+          const at = sep > 0 ? raw.slice(0, sep) : undefined
+          const msg = sep > 0 ? raw.slice(sep + 1) : raw
+          return (
+            <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }}>
+              ⚠️ Falhou em {fmtLastSync(at)}: {msg}
+            </div>
+          )
+        })()}
       </div>
 
       <div className="chart-section" style={{ maxWidth: 560, marginTop: 16 }}>

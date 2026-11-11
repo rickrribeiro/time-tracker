@@ -1,3 +1,4 @@
+import type { FlightMonApi } from '../modules/flights/api'
 import type { StayFavorite, StayWatch, StayPricePoint, StaySearchHistory } from '../modules/travel-stays/types'
 
 export interface Tag {
@@ -403,16 +404,6 @@ export interface Trip {
   status: string
 }
 
-export interface FlightWatch {
-  id: number
-  tripId: number | null
-  origin: string | null
-  destination: string | null
-  price: number | null
-  currency: string
-  lastChecked: string | null
-}
-
 export interface TripDocument {
   tripId: number
   item: string
@@ -662,6 +653,7 @@ export type Page =
   | 'trips'
   | 'stays'
   | 'trip-monitoring'
+  | 'flight-monitor'
   | 'destinations'
   | 'documents'
   | 'recommendations'
@@ -990,13 +982,7 @@ declare global {
         update: (id: number, origin: string | null, destination: string, startDate: string | null, endDate: string | null, budget: number | null, currency: string, status: string) => Promise<void>
         delete: (id: number) => Promise<void>
       }
-      flights: {
-        getAll: () => Promise<FlightWatch[]>
-        create: (tripId: number | null, origin: string | null, destination: string | null, price: number | null, currency: string) => Promise<FlightWatch>
-        delete: (id: number) => Promise<void>
-        search: (origin: string, destination: string, currency: string, date?: string | null) => Promise<number>
-        refreshWatch: (id: number) => Promise<FlightWatch>
-      }
+      flightMon: FlightMonApi
       tripDocs: {
         get: (tripId: number) => Promise<TripDocument[]>
         set: (tripId: number, item: string, checked: number) => Promise<void>

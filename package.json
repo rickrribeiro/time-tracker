@@ -16,7 +16,8 @@
     "app:install": "bash bin/install-app.sh",
     "desktop": "bash bin/rickos-desktop",
     "web": "bash bin/rickos-web",
-    "stop": "bash bin/rickos-stop"
+    "stop": "bash bin/rickos-stop",
+    "test": "tsx --test server/flights/__tests__/*.test.ts"
   },
   "dependencies": {
     "@fastify/static": "^7.0.4",

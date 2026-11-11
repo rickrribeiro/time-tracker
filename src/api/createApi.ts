@@ -368,14 +368,43 @@ export function createApi() {
         invoke('trips:update', id, origin, destination, startDate, endDate, budget, currency, status),
       delete: (id: number) => invoke('trips:delete', id)
     },
-    flights: {
-      getAll: () => invoke('flights:getAll'),
-      create: (tripId: number | null, origin: string | null, destination: string | null, price: number | null, currency: string) =>
-        invoke('flights:create', tripId, origin, destination, price, currency),
-      delete: (id: number) => invoke('flights:delete', id),
-      search: (origin: string, destination: string, currency: string, date?: string | null) =>
-        invoke('flights:search', origin, destination, currency, date),
-      refreshWatch: (id: number) => invoke('flights:refreshWatch', id)
+    // Monitoramento de passagens (server/flights/rpc.ts)
+    flightMon: {
+      list: () => invoke('flightMon:list'),
+      get: (id: number) => invoke('flightMon:get', id),
+      validate: (config: unknown) => invoke('flightMon:validate', config),
+      create: (input: unknown) => invoke('flightMon:create', input),
+      update: (id: number, input: unknown) => invoke('flightMon:update', id, input),
+      setStatus: (id: number, status: string) => invoke('flightMon:setStatus', id, status),
+      duplicate: (id: number) => invoke('flightMon:duplicate', id),
+      delete: (id: number) => invoke('flightMon:delete', id),
+      run: (id: number, opts?: { more?: number }) => invoke('flightMon:run', id, opts),
+      cancel: (runId: number) => invoke('flightMon:cancel', runId),
+      retryFailed: (id: number) => invoke('flightMon:retryFailed', id),
+      offers: (id: number, q: unknown) => invoke('flightMon:offers', id, q),
+      favorite: (offerId: number, fav: boolean) => invoke('flightMon:favorite', offerId, fav),
+      calendar: (id: number) => invoke('flightMon:calendar', id),
+      history: (id: number, days?: number) => invoke('flightMon:history', id, days),
+      plan: (id: number) => invoke('flightMon:plan', id),
+      alerts: (id: number) => invoke('flightMon:alerts', id),
+      checkAlerts: (id: number) => invoke('flightMon:checkAlerts', id),
+      places: (q: string) => invoke('flightMon:places', q),
+      airport: (iata: string) => invoke('flightMon:airport', iata),
+      nearby: (ref: unknown, radiusKm: number, withGround: boolean) => invoke('flightMon:nearby', ref, radiusKm, withGround),
+      ground: (iata: string, to: unknown) => invoke('flightMon:ground', iata, to),
+      aiDraft: (text: string, currency?: string) => invoke('flightMon:aiDraft', text, currency),
+      insights: (id: number) => invoke('flightMon:insights', id),
+      skyscanner: (id: number, count?: number) => invoke('flightMon:skyscanner', id, count),
+      skyscannerPreview: (id: number, count?: number) => invoke('flightMon:skyscannerPreview', id, count),
+      promos: (id: number, force?: boolean) => invoke('flightMon:promos', id, force),
+      importPreview: (id: number, text: string, mode: 'structured' | 'ai', source?: string, observedAt?: string, assisted?: boolean) =>
+        invoke('flightMon:importPreview', id, text, mode, source, observedAt, assisted),
+      importCommit: (id: number, text: string, mode: 'structured' | 'ai', source?: string, observedAt?: string, assisted?: boolean) =>
+        invoke('flightMon:importCommit', id, text, mode, source, observedAt, assisted),
+      providers: () => invoke('flightMon:providers'),
+      testProvider: (id: string) => invoke('flightMon:testProvider', id),
+      onChanged: (cb: (p: { monitorId: number | null; runId: number | null }) => void) =>
+        subscribe('flights:updated', (p) => cb(p as { monitorId: number | null; runId: number | null }))
     },
     tripDocs: {
       get: (tripId: number) => invoke('tripDocs:get', tripId),

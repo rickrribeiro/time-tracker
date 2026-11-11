@@ -17,7 +17,9 @@ export const SENSITIVE_KEYS = new Set([
   'google_accounts',
   'pluggy_client_id',
   'pluggy_client_secret',
-  'skyscanner_rapidapi_key'
+  'skyscanner_rapidapi_key',
+  'flights_travelpayouts_token',
+  'flights_duffel_token'
 ])
 const AES_PREFIX = 'aes:'
 const LEGACY_PREFIX = 'enc:'

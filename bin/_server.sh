@@ -24,7 +24,7 @@ server_up() {
 needs_build() {
   local stamp="${ROOT}/dist-server/main.js"
   [ -f "$stamp" ] && [ -f "${ROOT}/dist/index.html" ] || return 0
-  [ -n "$(find "${ROOT}/server" "${ROOT}/src" "${ROOT}/public" "${ROOT}/index.html" -newer "$stamp" -type f -print -quit 2>/dev/null)" ]
+  [ -n "$(find "${ROOT}/server" "${ROOT}/shared" "${ROOT}/src" "${ROOT}/public" "${ROOT}/index.html" -newer "$stamp" -type f -print -quit 2>/dev/null)" ]
 }
 
 # PID of a server started by these scripts (empty if the port belongs to the app / npm run dev).

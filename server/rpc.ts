@@ -99,9 +99,6 @@ import {
   createTrip,
   updateTrip,
   deleteTrip,
-  getFlightWatches,
-  createFlightWatch,
-  deleteFlightWatch,
   getTripDocuments,
   setTripDocument,
   getSkills,
@@ -194,7 +191,8 @@ import { syncGithubIssues, createIssueViaClaude } from './services/github'
 import { runClaude } from './services/claude'
 import { beginGoogleConnect, awaitGoogleConnect, googleConnected, listGoogleAccounts, disconnectGoogle, disconnectGoogleAccount, syncGoogleCalendar, uploadFileToDrive } from './services/google'
 import { syncPluggy, pluggyConfigured, createConnectToken } from './services/pluggy'
-import { searchFlightPrice, refreshWatchPrice } from './services/flights'
+import { registerFlightRpc } from './flights/rpc'
+import { schedulerTick as flightsTick, bootFlights } from './flights/runner'
 import { encodeSecret, decodeSecret, legacySecrets } from './services/secrets'
 import { broadcast } from './events'
 import { notify, notificationsChanged } from './services/notifications'
@@ -300,6 +298,10 @@ ipcMain.handle('tasks:getForRange', (_, startDate: string, endDate: string) =>
 
 ipcMain.handle('tasks:getActive', () => getActiveTask())
 
+  // Passagens: retoma execuções interrompidas, migra registros antigos e dispara monitores vencidos.
+  void bootFlights().catch((e) => console.error('[flights] boot', e))
+  setTimeout(() => void flightsTick().catch(() => undefined), 45000)
+  setInterval(() => void flightsTick().catch(() => undefined), 5 * 60 * 1000)
 ipcMain.handle('tasks:start', async (_, title: string, tagId: number | null, secondaryTagId: number | null, startTime: string, studyNodeId?: number | null, projectId?: number | null) => {
   const now = startTime || new Date().toISOString()
   await stopAllActiveTasks(now)
@@ -879,21 +881,8 @@ ipcMain.handle('trips:update', (_, id: number, origin: string | null, destinatio
 )
 ipcMain.handle('trips:delete', (_, id: number) => deleteTrip(id))
 
-ipcMain.handle('flights:getAll', () => getFlightWatches())
-ipcMain.handle('flights:create', (_, tripId: number | null, origin: string | null, destination: string | null, price: number | null, currency: string) =>
-  createFlightWatch(tripId, origin, destination, price, currency, new Date().toISOString())
-)
-ipcMain.handle('flights:delete', (_, id: number) => deleteFlightWatch(id))
-ipcMain.handle('flights:search', async (_, origin: string, destination: string, currency: string, date?: string | null) => {
-  const r = await searchFlightPrice(origin, destination, currency, date)
-  await setSetting('skyscanner_last_sync', new Date().toISOString())
-  return r
-})
-ipcMain.handle('flights:refreshWatch', async (_, id: number) => {
-  const r = await refreshWatchPrice(id)
-  await setSetting('skyscanner_last_sync', new Date().toISOString())
-  return r
-})
+// Monitoramento de passagens: canais `flightMon:*` (server/flights/rpc.ts).
+registerFlightRpc((channel, fn) => ipcMain.handle(channel, fn))
 
 ipcMain.handle('tripDocs:get', (_, tripId: number) => getTripDocuments(tripId))
 ipcMain.handle('tripDocs:set', (_, tripId: number, item: string, checked: number) =>

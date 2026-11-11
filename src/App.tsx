@@ -23,6 +23,9 @@ import { TopicWorkspacePage } from './modules/estudos/pages/TopicWorkspacePage'
 import { RevisoesPage } from './modules/estudos/pages/RevisoesPage'
 import { ProjectsPage } from './modules/projects/pages/ProjectsPage'
 import { ProjectDetailPage } from './modules/projects/pages/ProjectDetailPage'
+import { FlightsDashboardPage } from './modules/flights/pages/FlightsDashboardPage'
+import { FlightMonitorPage } from './modules/flights/pages/FlightMonitorPage'
+import { useFlightStore } from './modules/flights/store/flightStore'
 import { SaveContextModal } from './modules/projects/components/SaveContextModal'
 import { IssuesPage } from './modules/projects/pages/IssuesPage'
 import { WorktreesPage } from './modules/projects/pages/WorktreesPage'
@@ -38,7 +41,6 @@ import {
 } from './modules/finance/pages'
 import {
   TripsPage,
-  MonitoringPage,
   DestinationsPage,
   DocumentsPage,
   RecommendationsPage
@@ -131,7 +133,7 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
     items: [
       { id: 'trips', label: 'Próximas', icon: '✈️' },
       { id: 'stays', label: 'Hospedagens', icon: '🏨' },
-      { id: 'trip-monitoring', label: 'Monitoramento', icon: '🔔' },
+      { id: 'trip-monitoring', label: 'Passagens', icon: '🔔' },
       { id: 'destinations', label: 'Destinos', icon: '🗺' },
       { id: 'documents', label: 'Documentos', icon: '📄' },
       { id: 'recommendations', label: 'Recomendações', icon: '⭐' }
@@ -184,7 +186,8 @@ const PAGES: Record<Page, React.ComponentType> = {
   reports: ReportsPage,
   trips: TripsPage,
   stays: StayFinderPage,
-  'trip-monitoring': MonitoringPage,
+  'trip-monitoring': FlightsDashboardPage,
+  'flight-monitor': FlightMonitorPage,
   destinations: DestinationsPage,
   documents: DocumentsPage,
   recommendations: RecommendationsPage,
@@ -205,6 +208,7 @@ const COLLAPSED_KEY = 'rickos:collapsedGroups'
 
 export default function App(): React.ReactElement {
   const { currentPage, setPage, selectedProjectId } = useUIStore()
+  const flightId = useFlightStore((st) => st.selectedId)
   const { refreshActive, stopActiveTask, activeTask } = useTaskStore()
   const { refreshTags } = useTagStore()
 
@@ -269,9 +273,15 @@ export default function App(): React.ReactElement {
       return
     }
     const pid = useUIStore.getState().selectedProjectId
-    const h = currentPage === 'project' && pid ? `#/project?id=${pid}` : `#/${currentPage}`
+    const fid = useFlightStore.getState().selectedId
+    const h =
+      currentPage === 'project' && pid
+        ? `#/project?id=${pid}`
+        : currentPage === 'flight-monitor' && fid
+          ? `#/flight-monitor?id=${fid}`
+          : `#/${currentPage}`
     if (window.location.hash !== h) window.history.pushState(null, '', h)
-  }, [currentPage, setPage, selectedProjectId])
+  }, [currentPage, setPage, selectedProjectId, flightId])
 
   useEffect(() => {
     const onHash = (): void => {
@@ -279,6 +289,11 @@ export default function App(): React.ReactElement {
       const id = window.location.hash.match(/[?&]id=(\d+)/)
       if (p === 'project' && id && Number(id[1]) !== useUIStore.getState().selectedProjectId) {
         useUIStore.getState().openProject(Number(id[1]))
+        return
+      }
+      if (p === 'flight-monitor' && id && Number(id[1]) !== useFlightStore.getState().selectedId) {
+        useFlightStore.getState().open(Number(id[1]))
+        if (useUIStore.getState().currentPage !== 'flight-monitor') setPage('flight-monitor')
         return
       }
       if (p && PAGES[p] && p !== useUIStore.getState().currentPage) setPage(p)

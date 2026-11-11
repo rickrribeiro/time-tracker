@@ -178,8 +178,9 @@ export function AiUsageModal({ onClose }: { onClose: () => void }): React.ReactE
           <button className="btn btn-secondary btn-sm" onClick={onClose}>Fechar</button>
         </div>
         <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 12px' }}>
-          Execuções do Claude CLI disparadas pelo rickOS, com os tokens reportados pelo próprio CLI. O custo é a
-          estimativa do CLI em preço de API (numa assinatura, serve como medida de consumo).
+          Execuções do Claude CLI disparadas pelo rickOS, com os tokens reportados pelo próprio CLI. O custo é uma
+          estimativa em preço de API (equivalente API): com login de assinatura (Pro/Max) não há cobrança à parte —
+          conta no limite de uso do plano; só é cobrado de fato se o CLI usar uma chave de API.
         </p>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
@@ -224,7 +225,7 @@ export function AiUsageModal({ onClose }: { onClose: () => void }): React.ReactE
             { label: 'Execuções', value: String(totals.runs) },
             { label: 'Tokens (total)', value: fmtTokens(totals.tokens) },
             { label: 'Tokens de saída', value: fmtTokens(totals.output) },
-            { label: 'Custo estimado', value: fmtUsd(totals.cost) }
+            { label: 'Custo estimado (equivalente API)', value: fmtUsd(totals.cost) }
           ].map((t) => (
             <div key={t.label} style={{ flex: '1 1 120px', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', background: 'var(--bg-tertiary)' }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.label}</div>
@@ -256,7 +257,7 @@ export function AiUsageModal({ onClose }: { onClose: () => void }): React.ReactE
                     <th style={num}>Cache lido</th>
                     <th style={num}>Saída</th>
                     <th style={num}>Total</th>
-                    <th style={num}>Custo</th>
+                    <th style={num} title="Estimativa do CLI em preço de API; numa assinatura não é cobrado à parte">Custo est. (equiv. API)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -285,7 +286,7 @@ export function AiUsageModal({ onClose }: { onClose: () => void }): React.ReactE
                     <th style={num}>Entrada</th>
                     <th style={num}>Cache lido</th>
                     <th style={num}>Saída</th>
-                    <th style={num}>Custo</th>
+                    <th style={num} title="Estimativa do CLI em preço de API; numa assinatura não é cobrado à parte">Custo est. (equiv. API)</th>
                   </tr>
                 </thead>
                 <tbody>

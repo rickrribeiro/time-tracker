@@ -1,6 +1,6 @@
 /**
  * Server → client push events, delivered over SSE (`GET /api/events`).
- * Channels: ai:chunk, ai:done, calendar:updated, inbox:updated, notify, notifications:updated, db:replaced.
+ * Channels: ai:chunk, ai:done, calendar:updated, inbox:updated, notify, notifications:updated, db:replaced, flights:updated.
  */
 export type EventListener = (channel: string, payload: unknown) => void
 

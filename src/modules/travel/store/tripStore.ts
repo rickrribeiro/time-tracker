@@ -1,25 +1,19 @@
 import { create } from 'zustand'
-import { Trip, FlightWatch } from '../../../types'
+import { Trip } from '../../../types'
 
 interface TripState {
   trips: Trip[]
-  watches: FlightWatch[]
   refresh: () => Promise<void>
   createTrip: (t: Omit<Trip, 'id'>) => Promise<void>
   updateTrip: (t: Trip) => Promise<void>
   removeTrip: (id: number) => Promise<void>
-  addWatch: (tripId: number | null, origin: string | null, destination: string | null, price: number | null, currency: string) => Promise<void>
-  removeWatch: (id: number) => Promise<void>
-  refreshWatchPrice: (id: number) => Promise<void>
 }
 
 export const useTripStore = create<TripState>((set, get) => ({
   trips: [],
-  watches: [],
 
   refresh: async () => {
-    const [trips, watches] = await Promise.all([window.api.trips.getAll(), window.api.flights.getAll()])
-    set({ trips, watches })
+    set({ trips: await window.api.trips.getAll() })
   },
 
   createTrip: async (t) => {
@@ -32,18 +26,6 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
   removeTrip: async (id) => {
     await window.api.trips.delete(id)
-    await get().refresh()
-  },
-  addWatch: async (tripId, origin, destination, price, currency) => {
-    await window.api.flights.create(tripId, origin, destination, price, currency)
-    await get().refresh()
-  },
-  removeWatch: async (id) => {
-    await window.api.flights.delete(id)
-    await get().refresh()
-  },
-  refreshWatchPrice: async (id) => {
-    await window.api.flights.refreshWatch(id)
     await get().refresh()
   }
 }))

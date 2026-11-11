@@ -219,6 +219,136 @@ export const SCHEMA = `
     lastChecked TEXT
   );
 
+  -- ── Monitoramento de passagens (server/flights/) ──
+  -- Dinheiro em centavos (INTEGER) + moeda; config do monitor = JSON validado em código.
+  CREATE TABLE IF NOT EXISTS flight_monitors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    tripId INTEGER REFERENCES trips(id) ON DELETE SET NULL,
+    config TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL,
+    lastRunAt TEXT,
+    lastSuccessAt TEXT,
+    nextRunAt TEXT,
+    lastError TEXT,
+    extraDisplay INTEGER NOT NULL DEFAULT 0,
+    legacyWatchId INTEGER UNIQUE,
+    legacy TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS flight_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    monitorId INTEGER NOT NULL REFERENCES flight_monitors(id) ON DELETE CASCADE,
+    trigger TEXT NOT NULL,
+    status TEXT NOT NULL,
+    startedAt TEXT NOT NULL,
+    finishedAt TEXT,
+    planned INTEGER NOT NULL DEFAULT 0,
+    done INTEGER NOT NULL DEFAULT 0,
+    failed INTEGER NOT NULL DEFAULT 0,
+    queries INTEGER NOT NULL DEFAULT 0,
+    cacheHits INTEGER NOT NULL DEFAULT 0,
+    offersFound INTEGER NOT NULL DEFAULT 0,
+    aiCalls INTEGER NOT NULL DEFAULT 0,
+    tokens INTEGER NOT NULL DEFAULT 0,
+    message TEXT
+  );
+
+  -- Plano/cobertura: uma linha por consulta atômica; UNIQUE(monitorId, key) = idempotência.
+  CREATE TABLE IF NOT EXISTS flight_search_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    monitorId INTEGER NOT NULL REFERENCES flight_monitors(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    origin TEXT NOT NULL,
+    destination TEXT NOT NULL,
+    departDate TEXT NOT NULL,
+    returnDate TEXT,
+    priority REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    nextAttemptAt TEXT,
+    lastError TEXT,
+    resultCount INTEGER NOT NULL DEFAULT 0,
+    minPriceMinor INTEGER,
+    currency TEXT,
+    runId INTEGER,
+    createdAt TEXT NOT NULL,
+    finishedAt TEXT,
+    UNIQUE (monitorId, key)
+  );
+  CREATE INDEX IF NOT EXISTS idx_flight_tasks_status ON flight_search_tasks (monitorId, status, priority);
+
+  -- Ofertas deduplicadas por itinerário (fingerprint independe de provedor e preço).
+  CREATE TABLE IF NOT EXISTS flight_offers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    monitorId INTEGER NOT NULL REFERENCES flight_monitors(id) ON DELETE CASCADE,
+    fingerprint TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    origin TEXT NOT NULL,
+    destination TEXT NOT NULL,
+    departDate TEXT NOT NULL,
+    returnDate TEXT,
+    priceMinor INTEGER NOT NULL,
+    currency TEXT NOT NULL,
+    prevPriceMinor INTEGER,
+    prevCurrency TEXT,
+    verification TEXT NOT NULL,
+    data TEXT NOT NULL,
+    sources TEXT NOT NULL DEFAULT '[]',
+    firstSeenAt TEXT NOT NULL,
+    lastSeenAt TEXT NOT NULL,
+    available INTEGER NOT NULL DEFAULT 1,
+    favorite INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (monitorId, fingerprint)
+  );
+  CREATE INDEX IF NOT EXISTS idx_flight_offers_monitor ON flight_offers (monitorId, available);
+
+  -- Histórico: toda observação de preço (sobrevive à oferta sumir).
+  CREATE TABLE IF NOT EXISTS flight_price_observations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    offerId INTEGER NOT NULL REFERENCES flight_offers(id) ON DELETE CASCADE,
+    monitorId INTEGER NOT NULL,
+    observedAt TEXT NOT NULL,
+    priceMinor INTEGER NOT NULL,
+    currency TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    verification TEXT NOT NULL,
+    paxKey TEXT NOT NULL,
+    runId INTEGER,
+    UNIQUE (offerId, provider, observedAt)
+  );
+  CREATE INDEX IF NOT EXISTS idx_flight_obs_monitor ON flight_price_observations (monitorId, observedAt);
+
+  -- Alertas já disparados (dedupeKey UNIQUE = sem notificação duplicada).
+  CREATE TABLE IF NOT EXISTS flight_alert_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    monitorId INTEGER NOT NULL REFERENCES flight_monitors(id) ON DELETE CASCADE,
+    offerId INTEGER,
+    kind TEXT NOT NULL,
+    dedupeKey TEXT NOT NULL UNIQUE,
+    message TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+  );
+
+  -- Cache de respostas de provedores e de rotas terrestres (compartilhado entre monitores).
+  CREATE TABLE IF NOT EXISTS flight_cache (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    expiresAt TEXT NOT NULL
+  );
+
+  -- Consultas por provedor por dia (cota diária).
+  CREATE TABLE IF NOT EXISTS flight_provider_usage (
+    provider TEXT NOT NULL,
+    day TEXT NOT NULL,
+    queries INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (provider, day)
+  );
+
   CREATE TABLE IF NOT EXISTS trip_documents (
     tripId INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
     item TEXT NOT NULL,

@@ -15,6 +15,8 @@ import { useTripStore, daysUntil } from '../../travel/store/tripStore'
 import { formatMoney, sumByCurrency } from '../../finance/util'
 import { priorityDef } from '../../todo/constants'
 import { localDateStr, localDayStartISO, localDayEndISO } from '../../../utils/dates'
+import type { MonitorSummary } from '../../../../shared/flights'
+import { formatMoney as formatFlightMoney } from '../../../../shared/flights'
 
 function fmtHours(minutes: number): string {
   const h = Math.floor(minutes / 60)
@@ -30,7 +32,11 @@ export function HomePage(): React.ReactElement {
   const { issues, refresh: refreshIssues } = useGithubStore()
   const { upcoming, refresh: refreshEvents } = useCalendarStore()
   const { transactions, refresh: refreshFinance } = useFinanceStore()
-  const { trips, watches, refresh: refreshTrips } = useTripStore()
+  const { trips, refresh: refreshTrips } = useTripStore()
+  const [flightMonitors, setFlightMonitors] = React.useState<MonitorSummary[]>([])
+  React.useEffect(() => {
+    window.api.flightMon.list().then(setFlightMonitors).catch(() => setFlightMonitors([]))
+  }, [])
   const [weekMinutes, setWeekMinutes] = useState(0)
 
   useEffect(() => {
@@ -67,10 +73,11 @@ export function HomePage(): React.ReactElement {
     : formatMoney(0)
 
   const nextTrip = trips[0]
+  // menor preço ELEGÍVEL dos monitores de passagem ligados à viagem
   const nextTripWatch = nextTrip
-    ? watches
-        .filter((w) => w.tripId === nextTrip.id && w.price != null)
-        .sort((a, b) => (a.price as number) - (b.price as number))[0]
+    ? flightMonitors
+        .filter((m) => m.tripId === nextTrip.id && m.minPrice)
+        .sort((a, b) => a.minPrice!.amountMinor - b.minPrice!.amountMinor)[0]
     : undefined
   const tripDays = nextTrip ? daysUntil(nextTrip.startDate) : null
 
@@ -201,7 +208,7 @@ export function HomePage(): React.ReactElement {
             </div>
             <div className="stat-card-sub">
               {nextTripWatch
-                ? `menor preço: ${formatMoney(nextTripWatch.price as number, nextTripWatch.currency)}`
+                ? `menor preço encontrado: ${formatFlightMoney(nextTripWatch.minPrice)}`
                 : nextTrip.budget != null
                   ? `orçamento: ${formatMoney(nextTrip.budget, nextTrip.currency)}`
                   : 'sem preço monitorado'}

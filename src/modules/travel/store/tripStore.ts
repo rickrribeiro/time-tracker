@@ -30,6 +30,13 @@ export const useTripStore = create<TripState>((set, get) => ({
   }
 }))
 
+/** Viagem ainda por acontecer (ou em curso): não concluída e sem volta no passado. */
+export function isUpcoming(t: Trip): boolean {
+  if (t.status === 'done') return false
+  const end = t.endDate ?? t.startDate
+  return !end || (daysUntil(end) ?? 0) >= 0
+}
+
 /** Days from today (local) until an ISO date string; null if no date. */
 export function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null

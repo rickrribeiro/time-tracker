@@ -650,13 +650,10 @@ export type Page =
   | 'investments'
   | 'reports'
   // Viagens
-  | 'trips'
   | 'stays'
   | 'trip-monitoring'
   | 'flight-monitor'
   | 'destinations'
-  | 'documents'
-  | 'recommendations'
   // Jarvis
   | 'jarvis'
   // IA

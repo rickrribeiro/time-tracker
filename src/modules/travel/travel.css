@@ -1,0 +1,141 @@
+/* Viagens → Destinos: conteúdo + barra lateral interna de viagens */
+
+.travel-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+.travel-main {
+  min-width: 0;
+}
+
+.travel-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.travel-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.travel-muted {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.travel-group-label {
+  margin: 8px 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.travel-trip {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+.travel-trip.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.travel-trip-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px 6px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.travel-trip-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.travel-trip-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 10px;
+}
+
+.travel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+}
+.travel-form-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.travel-form input,
+.travel-form select {
+  width: 100%;
+  min-width: 0;
+}
+.travel-form-row {
+  display: flex;
+  gap: 8px;
+}
+
+.travel-dest-card {
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.travel-dest-card:hover {
+  border-color: var(--accent);
+}
+.travel-dest-card.planned {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.travel-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 899px) {
+  .travel-layout {
+    grid-template-columns: 1fr;
+  }
+  .travel-sidebar {
+    position: static;
+    max-height: none;
+  }
+}

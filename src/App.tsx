@@ -39,12 +39,7 @@ import {
   InvestmentsPage,
   ReportsPage
 } from './modules/finance/pages'
-import {
-  TripsPage,
-  DestinationsPage,
-  DocumentsPage,
-  RecommendationsPage
-} from './modules/travel/pages'
+import { DestinationsPage } from './modules/travel/pages'
 import { SettingsPage } from './modules/settings/pages/SettingsPage'
 import { LinksPage } from './modules/links/pages/LinksPage'
 import { AIPage } from './modules/ai/pages/AIPage'
@@ -131,12 +126,9 @@ const NAV_GROUPS: { label: string; groupIcon?: string; items: NavItem[] }[] = [
     label: 'Viagens',
     groupIcon: '✈️',
     items: [
-      { id: 'trips', label: 'Próximas', icon: '✈️' },
-      { id: 'stays', label: 'Hospedagens', icon: '🏨' },
-      { id: 'trip-monitoring', label: 'Passagens', icon: '🔔' },
       { id: 'destinations', label: 'Destinos', icon: '🗺' },
-      { id: 'documents', label: 'Documentos', icon: '📄' },
-      { id: 'recommendations', label: 'Recomendações', icon: '⭐' }
+      { id: 'stays', label: 'Hospedagens', icon: '🏨' },
+      { id: 'trip-monitoring', label: 'Passagens', icon: '🔔' }
     ]
   },
   {
@@ -184,13 +176,10 @@ const PAGES: Record<Page, React.ComponentType> = {
   budget: BudgetPage,
   investments: InvestmentsPage,
   reports: ReportsPage,
-  trips: TripsPage,
   stays: StayFinderPage,
   'trip-monitoring': FlightsDashboardPage,
   'flight-monitor': FlightMonitorPage,
   destinations: DestinationsPage,
-  documents: DocumentsPage,
-  recommendations: RecommendationsPage,
   ai: AIPage,
   'ai-skills': SkillsPage,
   'ai-agents': AgentsPage,

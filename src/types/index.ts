@@ -1,4 +1,6 @@
 import type { FlightMonApi } from '../modules/flights/api'
+import type { ChatsApi } from '../modules/chats/api'
+import type { AiSuggestResult, ChatsStatus } from '../../shared/chats'
 import type { StayFavorite, StayWatch, StayPricePoint, StaySearchHistory } from '../modules/travel-stays/types'
 
 export interface Tag {
@@ -988,6 +990,11 @@ declare global {
         delete: (id: number) => Promise<void>
       }
       flightMon: FlightMonApi
+      chats: ChatsApi & {
+        onUpdated: (cb: (p: { chatIds: number[] }) => void) => () => void
+        onStatus: (cb: (s: ChatsStatus) => void) => () => void
+        onAi: (cb: (r: AiSuggestResult) => void) => () => void
+      }
       tripDocs: {
         get: (tripId: number) => Promise<TripDocument[]>
         set: (tripId: number, item: string, checked: number) => Promise<void>

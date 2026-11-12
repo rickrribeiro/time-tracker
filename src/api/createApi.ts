@@ -1,6 +1,22 @@
 import { invoke, subscribe, downloadUrl } from './transport'
 import { ExportFile, downloadText, pickFile, pickFolderFiles, pickJson, fileToBase64, saveFolder } from './files'
 import type { NextActionSize, ProjectPatch, ProjectStatus, ProjectStatusPayload } from '../types'
+import { CHATS_METHODS, type ChatsApi } from '../modules/chats/api'
+import type { AiSuggestResult, ChatsStatus } from '../../shared/chats'
+
+/** `window.api.chats`: cada método vira o canal `chats:<método>` + assinaturas de eventos SSE. */
+function chatsApi(): ChatsApi & {
+  onUpdated: (cb: (p: { chatIds: number[] }) => void) => () => void
+  onStatus: (cb: (s: ChatsStatus) => void) => () => void
+  onAi: (cb: (r: AiSuggestResult) => void) => () => void
+} {
+  const out: Record<string, unknown> = {}
+  for (const m of CHATS_METHODS) out[m] = (...args: unknown[]) => invoke(`chats:${m}`, ...args)
+  out.onUpdated = (cb: (p: { chatIds: number[] }) => void) => subscribe('chats:updated', (p) => cb(p as { chatIds: number[] }))
+  out.onStatus = (cb: (s: ChatsStatus) => void) => subscribe('chats:status', (p) => cb(p as ChatsStatus))
+  out.onAi = (cb: (r: AiSuggestResult) => void) => subscribe('chats:ai', (p) => cb(p as AiSuggestResult))
+  return out as unknown as ReturnType<typeof chatsApi>
+}
 
 /** Open a URL outside the app: system browser on desktop, new tab on web. */
 export function openExternal(url: string): void {
@@ -385,6 +401,8 @@ export function createApi() {
         invoke('trips:update', id, origin, destination, startDate, endDate, budget, currency, status),
       delete: (id: number) => invoke('trips:delete', id)
     },
+    // Central de Mensagens (server/chats/rpc.ts)
+    chats: chatsApi(),
     // Monitoramento de passagens (server/flights/rpc.ts)
     flightMon: {
       list: () => invoke('flightMon:list'),

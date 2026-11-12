@@ -52,7 +52,7 @@ import { JarvisPage } from './modules/jarvis/pages/JarvisPage'
 import { Page } from './types'
 import { AuthGate } from './components/AuthGate'
 import { NotificationBell, UnreadDot } from './components/NotificationBell'
-import { NAV_GROUPS, groupKey } from './navigation'
+import { NAV_GROUPS, groupKey, lastTab, rememberTab, tabGroupOf } from './navigation'
 import { useModuleStore } from './store/moduleStore'
 
 const PAGES: Record<Page, React.ComponentType> = {
@@ -128,7 +128,11 @@ export default function App(): React.ReactElement {
     })
   }, [])
 
-  const labeledGroups = navGroups.filter((g) => g.label).map((g) => g.label)
+  const labeledGroups = navGroups.filter((g) => g.label && !g.tabs).map((g) => g.label)
+  const tabGroup = tabGroupOf(currentPage)
+  useEffect(() => {
+    if (tabGroup) rememberTab(tabGroup, currentPage)
+  }, [currentPage, tabGroup])
   const allCollapsed = labeledGroups.every((l) => collapsed[l])
 
   const toggleAll = useCallback(() => {
@@ -236,6 +240,20 @@ export default function App(): React.ReactElement {
             {allCollapsed ? '⊞ Expandir tudo' : '⊟ Colapsar tudo'}
           </button>
           {navGroups.map((group, gi) => {
+            if (group.tabs) {
+              return (
+                <div className="nav-group nav-group-tabbed" key={group.label}>
+                  <button
+                    className={`nav-btn nav-module-btn ${tabGroup === group ? 'active' : ''}`}
+                    onClick={() => setPage(lastTab(group))}
+                    title={group.items.map((i) => i.label).join(' · ')}
+                  >
+                    <span className="nav-icon">{group.groupIcon}</span>
+                    <span className="nav-label">{group.label}</span>
+                  </button>
+                </div>
+              )
+            }
             const collapsible = !!group.label
             const isCollapsed = collapsible && collapsed[group.label]
             return (
@@ -307,6 +325,22 @@ export default function App(): React.ReactElement {
       <main className="main-content">
         <ActiveTask />
         <div className="page-content">
+          {tabGroup && (
+            <div className="module-tabs" role="tablist" aria-label={tabGroup.label}>
+              {tabGroup.items.map((item) => (
+                <button
+                  key={item.id}
+                  role="tab"
+                  aria-selected={currentPage === item.id}
+                  className={`module-tab ${currentPage === item.id ? 'active' : ''}`}
+                  onClick={() => setPage(item.id)}
+                >
+                  <span className="module-tab-icon">{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
           <PageComponent />
         </div>
       </main>

@@ -10,6 +10,8 @@ export interface NavItem {
 export interface NavGroup {
   label: string
   groupIcon?: string
+  /** Protótipo: o grupo vira um item só na sidebar e as páginas viram abas no topo. */
+  tabs?: boolean
   items: NavItem[]
 }
 
@@ -59,6 +61,7 @@ export const NAV_GROUPS: NavGroup[] = [
    {
     label: 'Finanças',
     groupIcon: '💰',
+    tabs: true,
     items: [
       { id: 'finance-dashboard', label: 'Dashboard', icon: '💰' },
       { id: 'transactions', label: 'Transações', icon: '💸' },
@@ -105,6 +108,32 @@ export const NAV_GROUPS: NavGroup[] = [
 /** Chave estável do grupo (o rótulo, ou o id da página para itens soltos). */
 export function groupKey(g: NavGroup): string {
   return g.label || g.items[0].id
+}
+
+const LAST_TAB_KEY = 'rickos:lastTab:'
+
+/** Última aba visitada de um grupo com abas (cai na primeira se não houver). */
+export function lastTab(g: NavGroup): Page {
+  try {
+    const saved = localStorage.getItem(LAST_TAB_KEY + groupKey(g)) as Page | null
+    if (saved && g.items.some((i) => i.id === saved)) return saved
+  } catch {
+    /* sem storage: usa a primeira */
+  }
+  return g.items[0].id
+}
+
+export function rememberTab(g: NavGroup, page: Page): void {
+  try {
+    localStorage.setItem(LAST_TAB_KEY + groupKey(g), page)
+  } catch {
+    /* ignora */
+  }
+}
+
+/** Grupo com abas que contém a página (ou undefined). */
+export function tabGroupOf(page: Page): NavGroup | undefined {
+  return NAV_GROUPS.find((g) => g.tabs && g.items.some((i) => i.id === page))
 }
 
 /** Configurações nunca some (senão não dá para reativar nada). */

@@ -73665,7 +73665,9 @@ const NO_CAPABILITIES = {
   realtimeEvents: false,
   search: false,
   reactions: false,
-  replyTo: false
+  replyTo: false,
+  editMessages: false,
+  deleteMessages: false
 };
 class ProviderUnavailableError extends Error {
   constructor(message) {
@@ -73686,6 +73688,8 @@ const ALLOWED_ROUTES = [
   { method: "GET", re: /^\/v1\/chats\/[^/]+$/ },
   { method: "GET", re: /^\/v1\/chats\/[^/]+\/messages$/ },
   { method: "POST", re: /^\/v1\/chats\/[^/]+\/messages$/ },
+  { method: "PUT", re: /^\/v1\/chats\/[^/]+\/messages\/[^/]+$/ },
+  { method: "DELETE", re: /^\/v1\/chats\/[^/]+\/messages\/[^/]+$/ },
   { method: "POST", re: /^\/v1\/chats\/[^/]+\/read$/ },
   { method: "POST", re: /^\/v1\/chats\/[^/]+\/unread$/ },
   { method: "GET", re: /^\/v1\/messages\/search$/ },
@@ -74240,6 +74244,12 @@ async function chatIdsByRemote(providerId, remoteIds) {
 async function patchChatCounters(id, unreadCount, unreadMentions) {
   await tx((db2) => exec(db2, "UPDATE chats SET unreadCount = ?, unreadMentions = ? WHERE id = ?", [unreadCount, unreadMentions, id]));
 }
+async function applyLastFromScan(id, s2) {
+  const inT = s2.lastInboundAt ? Date.parse(s2.lastInboundAt) : 0;
+  const outT = s2.lastOutboundAt ? Date.parse(s2.lastOutboundAt) : 0;
+  const fromMe = !inT && !outT ? null : outT >= inT ? 1 : 0;
+  await tx((db2) => exec(db2, "UPDATE chats SET lastOutboundAt = COALESCE(?, lastOutboundAt), lastMessageFromMe = ? WHERE id = ?", [s2.lastOutboundAt, fromMe, id]));
+}
 async function recordOutbound(id, at, question, preview) {
   await tx(
     (db2) => exec(
@@ -74704,7 +74714,9 @@ function mapChat(c) {
     capabilities: {
       ...caps.reply !== void 0 ? { replyTo: capOk(caps.reply) } : {},
       ...caps.reaction !== void 0 ? { reactions: capOk(caps.reaction) } : {},
-      ...caps.markAsUnread !== void 0 ? { markAsUnread: capOk(caps.markAsUnread) } : {}
+      ...caps.markAsUnread !== void 0 ? { markAsUnread: capOk(caps.markAsUnread) } : {},
+      ...caps.edit !== void 0 ? { editMessages: capOk(caps.edit) } : {},
+      ...caps.delete !== void 0 ? { deleteMessages: capOk(caps.delete) } : {}
     }
   };
 }
@@ -74722,7 +74734,9 @@ function createBeeperProvider(transport, opts = {}) {
     search: true,
     reactions: false,
     // leitura sim; reagir pelo rickOS ainda não
-    replyTo: true
+    replyTo: true,
+    editMessages: true,
+    deleteMessages: true
   };
   return {
     id: "beeper",
@@ -74787,6 +74801,12 @@ function createBeeperProvider(transport, opts = {}) {
         "Enviar"
       );
       return { pendingId: body?.pendingMessageID ?? null };
+    },
+    async editMessage(remoteChatId, messageId, text) {
+      await call({ method: "PUT", path: `/v1/chats/${encodeURIComponent(remoteChatId)}/messages/${encodeURIComponent(messageId)}`, body: { text } }, "Editar");
+    },
+    async deleteMessage(remoteChatId, messageId, forEveryone) {
+      await call({ method: "DELETE", path: `/v1/chats/${encodeURIComponent(remoteChatId)}/messages/${encodeURIComponent(messageId)}`, query: { forEveryone } }, "Apagar");
     },
     async markRead(remoteChatId, upTo) {
       await call({ method: "POST", path: `/v1/chats/${encodeURIComponent(remoteChatId)}/read`, body: upTo ? { messageID: upTo } : {} }, "Marcar como lida");
@@ -75101,7 +75121,7 @@ function defs() {
 }
 const iso = (minutesAgo, now) => new Date(now - minutesAgo * 6e4).toISOString();
 function createMockControl() {
-  return { offline: false, authError: false, pageSize: 25, noMentions: false, sent: [], emit: null };
+  return { offline: false, authError: false, pageSize: 25, noMentions: false, sent: [], edited: [], deleted: [], emit: null };
 }
 function createMockProvider(control = createMockControl()) {
   const now = Date.now();
@@ -75172,7 +75192,9 @@ function createMockProvider(control = createMockControl()) {
     realtimeEvents: true,
     search: true,
     reactions: false,
-    replyTo: true
+    replyTo: true,
+    editMessages: true,
+    deleteMessages: true
   };
   return {
     id: "mock",
@@ -75245,6 +75267,27 @@ function createMockProvider(control = createMockControl()) {
       control.sent.push({ chatId: remoteChatId, text, replyTo: replyToId ?? null });
       control.emit?.({ type: "message.upserted", chatId: remoteChatId, messageIds: [msg.id] });
       return { pendingId: msg.id };
+    },
+    async editMessage(remoteChatId, messageId, text) {
+      guard();
+      const m = store.get(remoteChatId)?.find((x) => x.id === messageId);
+      if (!m) throw new Error("Mensagem não encontrada.");
+      if (!m.isMine) throw new Error("Só dá para editar mensagens suas.");
+      m.text = text;
+      m.edited = true;
+      control.edited.push({ chatId: remoteChatId, messageId, text });
+      control.emit?.({ type: "message.upserted", chatId: remoteChatId, messageIds: [messageId] });
+    },
+    async deleteMessage(remoteChatId, messageId, forEveryone) {
+      guard();
+      const list = store.get(remoteChatId);
+      const i = list?.findIndex((x) => x.id === messageId) ?? -1;
+      if (!list || i < 0) throw new Error("Mensagem não encontrada.");
+      if (!list[i].isMine) throw new Error("Só dá para apagar mensagens suas.");
+      if (forEveryone) list[i] = { ...list[i], text: "", deleted: true, attachments: [] };
+      else list.splice(i, 1);
+      control.deleted.push({ chatId: remoteChatId, messageId, forEveryone });
+      control.emit?.({ type: "message.deleted", chatId: remoteChatId, messageIds: [messageId] });
     },
     async markRead(remoteChatId) {
       guard();
@@ -75741,6 +75784,47 @@ async function sendMessage(chatId, text, replyToId) {
   invalidateMessages(chatId);
   changed$1([chatId]);
   return { ok: true, pendingId: r.pendingId };
+}
+function ownMessage(chatId, messageId) {
+  const m = msgCache.get(chatId)?.items.find((x) => x.id === messageId) ?? null;
+  if (m && !m.isMine) throw new Error("Só dá para alterar mensagens enviadas por você.");
+  if (m?.deleted) throw new Error("Esta mensagem já foi apagada.");
+  return m;
+}
+async function refreshAfterChange(provider, chatId) {
+  invalidateMessages(chatId);
+  try {
+    const scan = await scanChat(provider, chatId);
+    if (scan) {
+      await applyScans([{ id: chatId, scan }]);
+      await applyLastFromScan(chatId, scan);
+    }
+  } catch {
+  }
+  changed$1([chatId]);
+}
+async function editMessage(chatId, messageId, text) {
+  const body = text.trim();
+  if (!messageId) throw new Error("Mensagem inválida.");
+  if (!body) throw new Error("O texto não pode ficar vazio (para remover, apague a mensagem).");
+  if (body.length > 1e4) throw new Error("Mensagem longa demais.");
+  const { provider, chat } = await requireProviderFor(chatId);
+  if (!provider.editMessage || !provider.capabilities().editMessages) throw new Error("Este provedor não permite editar mensagens.");
+  const m = ownMessage(chatId, messageId);
+  if (m?.attachments.length) throw new Error("Mensagens com anexo não podem ser editadas.");
+  if (m && m.text === body) return { ok: true };
+  await provider.editMessage(chat.remoteId, messageId, body);
+  await refreshAfterChange(provider, chatId);
+  return { ok: true };
+}
+async function deleteMessage(chatId, messageId, forEveryone) {
+  if (!messageId) throw new Error("Mensagem inválida.");
+  const { provider, chat } = await requireProviderFor(chatId);
+  if (!provider.deleteMessage || !provider.capabilities().deleteMessages) throw new Error("Este provedor não permite apagar mensagens.");
+  ownMessage(chatId, messageId);
+  await provider.deleteMessage(chat.remoteId, messageId, forEveryone);
+  await refreshAfterChange(provider, chatId);
+  return { ok: true };
 }
 async function markRead(chatId, read2) {
   const { provider, chat } = await requireProviderFor(chatId);
@@ -76459,6 +76543,8 @@ function registerChatRpc(handle) {
     return page;
   });
   handle("chats:send", (_e, id, text, replyToId) => sendMessage(Number(id), String(text ?? ""), replyToId ?? null));
+  handle("chats:editMessage", (_e, id, messageId, text) => editMessage(Number(id), String(messageId ?? ""), String(text ?? "")));
+  handle("chats:deleteMessage", (_e, id, messageId, forEveryone) => deleteMessage(Number(id), String(messageId ?? ""), forEveryone !== false));
   handle("chats:markRead", (_e, id, read2) => markRead(Number(id), read2 !== false));
   handle("chats:search", (_e, query, chatId) => searchMessages(String(query ?? ""), chatId ? Number(chatId) : null));
   handle("chats:pendingMessages", (_e, id) => pendingMessages(Number(id)));

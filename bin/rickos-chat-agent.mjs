@@ -20,7 +20,7 @@
  * Uso: node bin/rickos-chat-agent.mjs   (sem dependências; Node ≥ 18)
  */
 
-const VERSION = '1.0.0'
+const VERSION = '1.1.0'
 const env = (k, d = '') => (process.env[k] ?? d).trim()
 const RICKOS_URL = env('RICKOS_URL').replace(/\/+$/, '')
 const RICKOS_TOKEN = env('RICKOS_TOKEN')
@@ -37,6 +37,8 @@ const ALLOWED = [
   ['GET', /^\/v1\/chats\/[^/]+$/],
   ['GET', /^\/v1\/chats\/[^/]+\/messages$/],
   ['POST', /^\/v1\/chats\/[^/]+\/messages$/],
+  ['PUT', /^\/v1\/chats\/[^/]+\/messages\/[^/]+$/],
+  ['DELETE', /^\/v1\/chats\/[^/]+\/messages\/[^/]+$/],
   ['POST', /^\/v1\/chats\/[^/]+\/read$/],
   ['POST', /^\/v1\/chats\/[^/]+\/unread$/],
   ['GET', /^\/v1\/messages\/search$/],

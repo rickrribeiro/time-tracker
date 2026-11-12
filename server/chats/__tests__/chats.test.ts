@@ -140,7 +140,11 @@ describe('segurança do endpoint e do agente', () => {
     assert.equal(transport.routeAllowed('GET', '/v1/chats'), true)
     assert.equal(transport.routeAllowed('POST', '/v1/chats/!abc:beeper.com/messages'), true)
     assert.equal(transport.routeAllowed('POST', '/v1/app/setup/register'), false)
-    assert.equal(transport.routeAllowed('DELETE', '/v1/chats/x/messages/y'), false)
+    assert.equal(transport.routeAllowed('PUT', '/v1/chats/x/messages/y'), true)
+    assert.equal(transport.routeAllowed('DELETE', '/v1/chats/x/messages/y'), true)
+    assert.equal(transport.routeAllowed('DELETE', '/v1/chats/x'), false) // apagar conversa: nunca
+    assert.equal(transport.routeAllowed('DELETE', '/v1/chats/x/messages/y/reactions/z'), false)
+    assert.equal(transport.routeAllowed('PUT', '/v1/chats/x'), false)
     assert.equal(transport.routeAllowed('GET', '/v1/chats/a/../../app'), false)
   })
 
@@ -379,6 +383,37 @@ describe('central de mensagens (mock)', () => {
     assert.equal(after.snoozeUntil, null)
     assert.equal(after.lastMessageFromMe, true)
     assert.notEqual(after.replyState, 'needs_reply')
+  })
+
+  it('editar e apagar só mensagens suas, com reclassificação', async () => {
+    await call('chats:syncNow', true)
+    const joao = await byRemote('wa-joao')
+    await call('chats:send', joao.id, 'Quinta à tarde?', null)
+    let page = await call<MessagePage>('chats:messages', joao.id)
+    const mine = page.items.filter((m) => m.isMine).at(-1)!
+    const theirs = page.items.find((m) => !m.isMine)!
+    // edição
+    await call('chats:editMessage', joao.id, mine.id, 'Quinta às 15h, fechado.')
+    assert.deepEqual(provider.control.edited.at(-1), { chatId: 'wa-joao', messageId: mine.id, text: 'Quinta às 15h, fechado.' })
+    page = await call<MessagePage>('chats:messages', joao.id)
+    const edited = page.items.find((m) => m.id === mine.id)!
+    assert.equal(edited.text, 'Quinta às 15h, fechado.')
+    assert.equal(edited.edited, true)
+    // regras
+    await assert.rejects(call('chats:editMessage', joao.id, mine.id, '   '), /vazio/)
+    await assert.rejects(call('chats:editMessage', joao.id, theirs.id, 'x'), /enviadas por você/)
+    await assert.rejects(call('chats:deleteMessage', joao.id, theirs.id, true), /enviadas por você/)
+    // apagar para todos: vira marcador e deixa de contar como minha última resposta
+    await call('chats:deleteMessage', joao.id, mine.id, true)
+    assert.deepEqual(provider.control.deleted.at(-1), { chatId: 'wa-joao', messageId: mine.id, forEveryone: true })
+    page = await call<MessagePage>('chats:messages', joao.id)
+    assert.equal(page.items.find((m) => m.id === mine.id)?.deleted, true)
+    assert.equal((await call<ChatSummary>('chats:get', joao.id)).replyState, 'needs_reply')
+    await assert.rejects(call('chats:editMessage', joao.id, mine.id, 'de novo'), /apagada/)
+    // offline: bloqueado
+    provider.control.offline = true
+    await assert.rejects(call('chats:deleteMessage', joao.id, mine.id, false))
+    provider.control.offline = false
   })
 
   it('TODO vinculado à conversa', async () => {

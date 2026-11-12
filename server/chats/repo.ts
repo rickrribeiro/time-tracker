@@ -350,6 +350,17 @@ export async function patchChatCounters(id: number, unreadCount: number | null, 
 }
 
 /** Registra uma mensagem enviada por mim (antes da próxima sincronização confirmar). */
+/**
+ * Depois de editar/apagar uma mensagem: a página lida é a verdade sobre quem falou por último
+ * (sem o COALESCE de applyScans, que preserva o valor antigo quando a página não alcança).
+ */
+export async function applyLastFromScan(id: number, s: ScanResult): Promise<void> {
+  const inT = s.lastInboundAt ? Date.parse(s.lastInboundAt) : 0
+  const outT = s.lastOutboundAt ? Date.parse(s.lastOutboundAt) : 0
+  const fromMe = !inT && !outT ? null : outT >= inT ? 1 : 0
+  await tx((db) => exec(db, 'UPDATE chats SET lastOutboundAt = COALESCE(?, lastOutboundAt), lastMessageFromMe = ? WHERE id = ?', [s.lastOutboundAt, fromMe, id]))
+}
+
 export async function recordOutbound(id: number, at: string, question: boolean, preview: string | null): Promise<void> {
   await tx((db) =>
     exec(

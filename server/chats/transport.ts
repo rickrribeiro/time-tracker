@@ -43,6 +43,8 @@ export const ALLOWED_ROUTES: { method: string; re: RegExp }[] = [
   { method: 'GET', re: /^\/v1\/chats\/[^/]+$/ },
   { method: 'GET', re: /^\/v1\/chats\/[^/]+\/messages$/ },
   { method: 'POST', re: /^\/v1\/chats\/[^/]+\/messages$/ },
+  { method: 'PUT', re: /^\/v1\/chats\/[^/]+\/messages\/[^/]+$/ },
+  { method: 'DELETE', re: /^\/v1\/chats\/[^/]+\/messages\/[^/]+$/ },
   { method: 'POST', re: /^\/v1\/chats\/[^/]+\/read$/ },
   { method: 'POST', re: /^\/v1\/chats\/[^/]+\/unread$/ },
   { method: 'GET', re: /^\/v1\/messages\/search$/ },

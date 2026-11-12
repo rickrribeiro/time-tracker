@@ -546,6 +546,56 @@ export async function sendMessage(chatId: number, text: string, replyToId: strin
   return { ok: true, pendingId: r.pendingId }
 }
 
+/** Confere no cache se a mensagem é sua (o provedor confere de novo; isto só dá um erro mais claro). */
+function ownMessage(chatId: number, messageId: string): RemoteMessage | null {
+  const m = msgCache.get(chatId)?.items.find((x) => x.id === messageId) ?? null
+  if (m && !m.isMine) throw new Error('Só dá para alterar mensagens enviadas por você.')
+  if (m?.deleted) throw new Error('Esta mensagem já foi apagada.')
+  return m
+}
+
+/** Depois de editar/apagar: descarta o cache e reclassifica a conversa com o estado novo. */
+async function refreshAfterChange(provider: ChatProvider, chatId: number): Promise<void> {
+  invalidateMessages(chatId)
+  try {
+    const scan = await scanChat(provider, chatId)
+    if (scan) {
+      await repo.applyScans([{ id: chatId, scan }])
+      await repo.applyLastFromScan(chatId, scan)
+    }
+  } catch {
+    // a próxima sincronização corrige
+  }
+  changed([chatId])
+}
+
+/** Edita o texto de uma mensagem SUA. Ação explícita do usuário (nunca automática). */
+export async function editMessage(chatId: number, messageId: string, text: string): Promise<{ ok: true }> {
+  const body = text.trim()
+  if (!messageId) throw new Error('Mensagem inválida.')
+  if (!body) throw new Error('O texto não pode ficar vazio (para remover, apague a mensagem).')
+  if (body.length > 10_000) throw new Error('Mensagem longa demais.')
+  const { provider, chat } = await requireProviderFor(chatId)
+  if (!provider.editMessage || !provider.capabilities().editMessages) throw new Error('Este provedor não permite editar mensagens.')
+  const m = ownMessage(chatId, messageId)
+  if (m?.attachments.length) throw new Error('Mensagens com anexo não podem ser editadas.')
+  if (m && m.text === body) return { ok: true }
+  await provider.editMessage(chat.remoteId, messageId, body)
+  await refreshAfterChange(provider, chatId)
+  return { ok: true }
+}
+
+/** Apaga uma mensagem SUA: para todos (quando a rede permite) ou só para você. */
+export async function deleteMessage(chatId: number, messageId: string, forEveryone: boolean): Promise<{ ok: true }> {
+  if (!messageId) throw new Error('Mensagem inválida.')
+  const { provider, chat } = await requireProviderFor(chatId)
+  if (!provider.deleteMessage || !provider.capabilities().deleteMessages) throw new Error('Este provedor não permite apagar mensagens.')
+  ownMessage(chatId, messageId)
+  await provider.deleteMessage(chat.remoteId, messageId, forEveryone)
+  await refreshAfterChange(provider, chatId)
+  return { ok: true }
+}
+
 export async function markRead(chatId: number, read: boolean): Promise<void> {
   const { provider, chat } = await requireProviderFor(chatId)
   if (read) {

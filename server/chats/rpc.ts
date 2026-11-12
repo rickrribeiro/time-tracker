@@ -103,6 +103,8 @@ export function registerChatRpc(handle: Handle): void {
     return page
   })
   handle('chats:send', (_e, id: number, text: string, replyToId?: string | null) => svc.sendMessage(Number(id), String(text ?? ''), replyToId ?? null))
+  handle('chats:editMessage', (_e, id: number, messageId: string, text: string) => svc.editMessage(Number(id), String(messageId ?? ''), String(text ?? '')))
+  handle('chats:deleteMessage', (_e, id: number, messageId: string, forEveryone?: boolean) => svc.deleteMessage(Number(id), String(messageId ?? ''), forEveryone !== false))
   handle('chats:markRead', (_e, id: number, read: boolean) => svc.markRead(Number(id), read !== false))
   handle('chats:search', (_e, query: string, chatId?: number | null) => svc.searchMessages(String(query ?? ''), chatId ? Number(chatId) : null))
   handle('chats:pendingMessages', (_e, id: number) => ai.pendingMessages(Number(id)))

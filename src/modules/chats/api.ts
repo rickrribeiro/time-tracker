@@ -69,6 +69,8 @@ export interface ChatsApi {
   networks: () => Promise<{ id: string; label: string; icon: string; color: string; chats: number; unread: number }[]>
   messages: (id: number, cursor?: string | null) => Promise<MessagePage>
   send: (id: number, text: string, replyToId?: string | null) => Promise<{ ok: true; pendingId: string | null }>
+  editMessage: (id: number, messageId: string, text: string) => Promise<{ ok: true }>
+  deleteMessage: (id: number, messageId: string, forEveryone: boolean) => Promise<{ ok: true }>
   markRead: (id: number, read: boolean) => Promise<void>
   search: (query: string, chatId?: number | null) => Promise<{ results: SearchHit[]; partial: boolean; supported: boolean }>
   pendingMessages: (id: number) => Promise<ChatMessage[]>
@@ -105,7 +107,7 @@ export interface ChatsApi {
 /** Nomes dos métodos → canal `chats:<método>`. */
 export const CHATS_METHODS: (keyof ChatsApi)[] = [
   'status', 'config', 'saveConfig', 'test', 'agentKey', 'agentStatus', 'syncNow', 'accounts', 'setAccountSync', 'clearCache', 'disconnect',
-  'list', 'counts', 'get', 'radar', 'networks', 'messages', 'send', 'markRead', 'search', 'pendingMessages', 'setState', 'snooze',
+  'list', 'counts', 'get', 'radar', 'networks', 'messages', 'send', 'editMessage', 'deleteMessage', 'markRead', 'search', 'pendingMessages', 'setState', 'snooze',
   'setPriority', 'setNotes', 'reviewMentions', 'suggestContacts', 'link', 'createContact', 'contactChats', 'contactNetworks', 'contacts',
   'setContactPriority', 'labels', 'saveLabel', 'deleteLabel', 'setLabels', 'contactLabels', 'createTodo', 'todos', 'presets', 'savePreset',
   'deletePreset', 'templates', 'saveTemplate', 'deleteTemplate', 'aiSuggest', 'aiBatch', 'aiSummarize'

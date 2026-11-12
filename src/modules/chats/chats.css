@@ -134,6 +134,11 @@
 .chats-bubble:hover .chats-msg-menu, .chats-bubble:focus-within .chats-msg-menu { display: flex; }
 .chats-msg-menu button { background: none; border: none; cursor: pointer; font-size: 12px; padding: 2px 5px; color: var(--text-secondary); }
 .chats-msg-menu button:hover { color: var(--text-primary); }
+.chats-bubble.editing { width: min(520px, 100%); box-sizing: border-box; }
+.chats-edit { display: flex; flex-direction: column; gap: 6px; }
+.chats-edit textarea { width: 100%; resize: vertical; font-size: 14px; min-height: 48px; }
+.chats-edit-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); }
+.chats-edit-actions span { flex: 1; min-width: 140px; }
 
 .chats-selbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 8px 14px; border-top: 1px solid var(--border); background: var(--bg-tertiary); font-size: 12px; }
 .chats-composer { border-top: 1px solid var(--border); padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; }

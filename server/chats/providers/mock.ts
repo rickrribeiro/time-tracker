@@ -17,6 +17,8 @@ export interface MockControl {
   /** Provedor sem dado de menções (testa estimativa). */
   noMentions: boolean
   sent: { chatId: string; text: string; replyTo: string | null }[]
+  edited: { chatId: string; messageId: string; text: string }[]
+  deleted: { chatId: string; messageId: string; forEveryone: boolean }[]
   emit: ((e: ProviderEvent) => void) | null
 }
 
@@ -88,7 +90,7 @@ function defs(): MockChatDef[] {
 const iso = (minutesAgo: number, now: number): string => new Date(now - minutesAgo * 60_000).toISOString()
 
 export function createMockControl(): MockControl {
-  return { offline: false, authError: false, pageSize: 25, noMentions: false, sent: [], emit: null }
+  return { offline: false, authError: false, pageSize: 25, noMentions: false, sent: [], edited: [], deleted: [], emit: null }
 }
 
 export type MockProvider = ChatProvider & {
@@ -172,7 +174,9 @@ export function createMockProvider(control: MockControl = createMockControl()): 
     realtimeEvents: true,
     search: true,
     reactions: false,
-    replyTo: true
+    replyTo: true,
+    editMessages: true,
+    deleteMessages: true
   }
 
   return {
@@ -246,6 +250,28 @@ export function createMockProvider(control: MockControl = createMockControl()): 
       control.sent.push({ chatId: remoteChatId, text, replyTo: replyToId ?? null })
       control.emit?.({ type: 'message.upserted', chatId: remoteChatId, messageIds: [msg.id] })
       return { pendingId: msg.id }
+    },
+    async editMessage(remoteChatId, messageId, text) {
+      guard()
+      const m = store.get(remoteChatId)?.find((x) => x.id === messageId)
+      if (!m) throw new Error('Mensagem não encontrada.')
+      if (!m.isMine) throw new Error('Só dá para editar mensagens suas.')
+      m.text = text
+      m.edited = true
+      control.edited.push({ chatId: remoteChatId, messageId, text })
+      control.emit?.({ type: 'message.upserted', chatId: remoteChatId, messageIds: [messageId] })
+    },
+    async deleteMessage(remoteChatId, messageId, forEveryone) {
+      guard()
+      const list = store.get(remoteChatId)
+      const i = list?.findIndex((x) => x.id === messageId) ?? -1
+      if (!list || i < 0) throw new Error('Mensagem não encontrada.')
+      if (!list[i].isMine) throw new Error('Só dá para apagar mensagens suas.')
+      // "para todos" deixa o marcador "mensagem apagada"; "só para mim" some da conversa
+      if (forEveryone) list[i] = { ...list[i], text: '', deleted: true, attachments: [] }
+      else list.splice(i, 1)
+      control.deleted.push({ chatId: remoteChatId, messageId, forEveryone })
+      control.emit?.({ type: 'message.deleted', chatId: remoteChatId, messageIds: [messageId] })
     },
     async markRead(remoteChatId) {
       guard()

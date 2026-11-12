@@ -61,6 +61,10 @@ export interface ChatProviderCapabilities {
   search: boolean
   reactions: boolean
   replyTo: boolean
+  /** Editar o texto de uma mensagem enviada por você. */
+  editMessages: boolean
+  /** Apagar uma mensagem enviada por você (para todos ou só para você, se a rede permitir). */
+  deleteMessages: boolean
 }
 
 export type ProviderState = 'disabled' | 'idle' | 'syncing' | 'connected' | 'offline' | 'error' | 'unconfigured'
@@ -415,5 +419,7 @@ export const NO_CAPABILITIES: ChatProviderCapabilities = {
   realtimeEvents: false,
   search: false,
   reactions: false,
-  replyTo: false
+  replyTo: false,
+  editMessages: false,
+  deleteMessages: false
 }

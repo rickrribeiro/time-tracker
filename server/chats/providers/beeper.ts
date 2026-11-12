@@ -162,7 +162,9 @@ export function mapChat(c: BChat): RemoteChat {
     capabilities: {
       ...(caps.reply !== undefined ? { replyTo: capOk(caps.reply) } : {}),
       ...(caps.reaction !== undefined ? { reactions: capOk(caps.reaction) } : {}),
-      ...(caps.markAsUnread !== undefined ? { markAsUnread: capOk(caps.markAsUnread) } : {})
+      ...(caps.markAsUnread !== undefined ? { markAsUnread: capOk(caps.markAsUnread) } : {}),
+      ...(caps.edit !== undefined ? { editMessages: capOk(caps.edit) } : {}),
+      ...(caps.delete !== undefined ? { deleteMessages: capOk(caps.delete) } : {})
     }
   }
 }
@@ -190,7 +192,9 @@ export function createBeeperProvider(transport: BeeperTransport, opts: { onAgent
     realtimeEvents: transport.mode === 'agent' || typeof (globalThis as { WebSocket?: unknown }).WebSocket === 'function',
     search: true,
     reactions: false, // leitura sim; reagir pelo rickOS ainda não
-    replyTo: true
+    replyTo: true,
+    editMessages: true,
+    deleteMessages: true
   }
 
   return {
@@ -262,6 +266,14 @@ export function createBeeperProvider(transport: BeeperTransport, opts: { onAgent
         'Enviar'
       )) as { pendingMessageID?: string }
       return { pendingId: body?.pendingMessageID ?? null }
+    },
+
+    async editMessage(remoteChatId, messageId, text) {
+      await call({ method: 'PUT', path: `/v1/chats/${encodeURIComponent(remoteChatId)}/messages/${encodeURIComponent(messageId)}`, body: { text } }, 'Editar')
+    },
+
+    async deleteMessage(remoteChatId, messageId, forEveryone) {
+      await call({ method: 'DELETE', path: `/v1/chats/${encodeURIComponent(remoteChatId)}/messages/${encodeURIComponent(messageId)}`, query: { forEveryone } }, 'Apagar')
     },
 
     async markRead(remoteChatId, upTo) {

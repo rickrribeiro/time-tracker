@@ -79,6 +79,47 @@ function TodoModal({ chat, message, onClose }: { chat: ChatSummary; message: Cha
   )
 }
 
+function DeleteModal({ chat, message, onClose, onDone }: { chat: ChatSummary; message: ChatMessage; onClose: () => void; onDone: () => void }): React.ReactElement {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => {
+    const k = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [onClose])
+  async function run(forEveryone: boolean): Promise<void> {
+    setBusy(true)
+    setErr(null)
+    try {
+      await window.api.chats.deleteMessage(chat.id, message.id, forEveryone)
+      onDone()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, width: '100%' }}>
+        <h2>Apagar mensagem?</h2>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          Em <b>{chat.contactName || chat.title}</b> no {networkInfo(chat.network).icon} {networkInfo(chat.network).label}. Não dá para desfazer.
+        </p>
+        <div className="chats-bubble" style={{ maxWidth: '100%', margin: '8px 0' }}>{message.text || <i>(sem texto)</i>}</div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>"Para todos" depende da rede (algumas só permitem por um tempo depois do envio). Se a rede recusar, nada é apagado e o motivo aparece aqui.</p>
+        {err && <div className="chats-msg err">{err}</div>}
+        <div className="modal-actions" style={{ flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary btn-sm" onClick={onClose} disabled={busy}>Cancelar</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => void run(false)} disabled={busy}>Apagar só para mim</button>
+          <button className="btn btn-danger btn-sm" onClick={() => void run(true)} disabled={busy} autoFocus>{busy ? 'Apagando…' : 'Apagar para todos'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ChatView({ chat }: { chat: ChatSummary }): React.ReactElement {
   const { status, setPane, setDetailOpen, detailOpen, refreshActive } = useChatsStore()
   const [page, setPage] = useState<MessagePage | null>(null)
@@ -95,11 +136,17 @@ export function ChatView({ chat }: { chat: ChatSummary }): React.ReactElement {
   const [todoFor, setTodoFor] = useState<ChatMessage | null | undefined>(undefined)
   const [templates, setTemplates] = useState<ChatTemplate[]>([])
   const [flash, setFlash] = useState<string | null>(null)
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editErr, setEditErr] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<ChatMessage | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
 
   const offline = status?.state === 'offline' || status?.state === 'error' || status?.state === 'disabled'
   const canSend = !chat.stale && !offline && !!status?.capabilities.sendMessages
+  const canEdit = !chat.stale && !offline && !!status?.capabilities.editMessages
+  const canDelete = !chat.stale && !offline && !!status?.capabilities.deleteMessages
 
   async function load(): Promise<void> {
     setLoading(true)
@@ -123,6 +170,8 @@ export function ChatView({ chat }: { chat: ChatSummary }): React.ReactElement {
     setAi(null)
     setText('')
     setSendErr(null)
+    setEditing(null)
+    setDeleting(null)
     void load()
     void (async () => {
       cfgCache ??= (await window.api.chats.config()).config
@@ -207,6 +256,27 @@ export function ChatView({ chat }: { chat: ChatSummary }): React.ReactElement {
     }
   }
 
+  async function saveEdit(): Promise<void> {
+    if (!editing) return
+    const original = items.find((m) => m.id === editing.id)
+    if (original && original.text === editing.text.trim()) {
+      setEditing(null)
+      return
+    }
+    setEditBusy(true)
+    setEditErr(null)
+    try {
+      await window.api.chats.editMessage(chat.id, editing.id, editing.text)
+      setItems((old) => old.map((m) => (m.id === editing.id ? { ...m, text: editing.text.trim(), edited: true } : m)))
+      setEditing(null)
+      void refreshActive()
+    } catch (e) {
+      setEditErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setEditBusy(false)
+    }
+  }
+
   async function sendComposer(): Promise<void> {
     if (!text.trim() || !canSend) return
     if (await send(text, replyTo)) {
@@ -279,12 +349,38 @@ export function ChatView({ chat }: { chat: ChatSummary }): React.ReactElement {
               <div className={`chats-msgrow ${m.isMine ? 'mine' : ''}`} id={`msg-${m.id}`}>
                 {picking && <input type="checkbox" className="chats-msgsel" checked={picked.includes(m.id)} onChange={() => togglePick(m.id)} aria-label="Selecionar mensagem" />}
                 <div
-                  className={`chats-bubble ${m.mentionsMe ? 'mention' : ''} ${picked.includes(m.id) ? 'picked' : ''} ${flash === m.id ? 'flash' : ''}`}
+                  className={`chats-bubble ${m.mentionsMe ? 'mention' : ''} ${picked.includes(m.id) ? 'picked' : ''} ${flash === m.id ? 'flash' : ''} ${editing?.id === m.id ? 'editing' : ''}`}
                   onClick={picking ? () => togglePick(m.id) : undefined}
                 >
                   {chat.type === 'group' && !m.isMine && <div className="chats-sender">{m.senderName}</div>}
                   {ref && <div className="chats-reply-ref">↩ {ref.isMine ? 'Você' : ref.senderName}: {ref.text.slice(0, 80)}</div>}
-                  {m.deleted ? <i style={{ color: 'var(--text-muted)' }}>Mensagem apagada</i> : m.text}
+                  {m.deleted ? (
+                    <i style={{ color: 'var(--text-muted)' }}>Mensagem apagada</i>
+                  ) : editing?.id === m.id ? (
+                    <div className="chats-edit" onClick={(e) => e.stopPropagation()}>
+                      <textarea
+                        value={editing.text}
+                        autoFocus
+                        rows={Math.min(8, Math.max(2, editing.text.split('\n').length))}
+                        onChange={(e) => setEditing({ id: m.id, text: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') setEditing(null)
+                          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault()
+                            void saveEdit()
+                          }
+                        }}
+                      />
+                      {editErr && <div className="chats-msg err" style={{ margin: 0 }}>{editErr}</div>}
+                      <div className="chats-edit-actions">
+                        <span>A edição aparece para todos na conversa.</span>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setEditing(null)} disabled={editBusy}>Cancelar</button>
+                        <button className="btn btn-primary btn-sm" onClick={() => void saveEdit()} disabled={editBusy || !editing.text.trim()}>{editBusy ? 'Salvando…' : 'Salvar edição'}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    m.text
+                  )}
                   {m.attachments.map((a, i) => (
                     <div className="chats-attach" key={i}>
                       {a.url && a.type === 'image' ? (
@@ -304,11 +400,15 @@ export function ChatView({ chat }: { chat: ChatSummary }): React.ReactElement {
                     {m.edited && <span>editada</span>}
                     <span>{new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
-                  {!picking && !m.deleted && (
+                  {!picking && !m.deleted && editing?.id !== m.id && (
                     <div className="chats-msg-menu">
                       {status?.capabilities.replyTo && <button title="Responder a esta" onClick={() => setReplyTo(m)}>↩</button>}
                       <button title="Selecionar" onClick={() => (setPicking(true), setPicked([m.id]))}>☑</button>
                       <button title="Criar tarefa" onClick={() => setTodoFor(m)}>✓ tarefa</button>
+                      {m.isMine && !m.pending && canEdit && m.text && m.attachments.length === 0 && (
+                        <button title="Editar mensagem" onClick={() => (setEditErr(null), setEditing({ id: m.id, text: m.text }))}>✎ editar</button>
+                      )}
+                      {m.isMine && !m.pending && canDelete && <button title="Apagar mensagem" onClick={() => setDeleting(m)}>🗑 apagar</button>}
                     </div>
                   )}
                 </div>
@@ -385,6 +485,18 @@ export function ChatView({ chat }: { chat: ChatSummary }): React.ReactElement {
         </div>
       </div>
 
+      {deleting && (
+        <DeleteModal
+          chat={chat}
+          message={deleting}
+          onClose={() => setDeleting(null)}
+          onDone={() => {
+            setDeleting(null)
+            void load()
+            void refreshActive()
+          }}
+        />
+      )}
       {todoFor !== undefined && <TodoModal chat={chat} message={todoFor} onClose={() => setTodoFor(undefined)} />}
     </>
   )

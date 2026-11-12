@@ -108,6 +108,10 @@ export interface ChatProvider {
   /** Mensagens (a ordem do retorno é livre; o serviço ordena por sortKey). */
   listMessages(remoteChatId: string, opts: { cursor?: string | null }): Promise<Page<RemoteMessage>>
   sendMessage(remoteChatId: string, text: string, replyToId?: string | null): Promise<{ pendingId: string | null }>
+  /** Edita o texto de uma mensagem SUA (sem anexos). */
+  editMessage?(remoteChatId: string, messageId: string, text: string): Promise<void>
+  /** Apaga uma mensagem SUA; `forEveryone=false` = só para você, quando a rede permite. */
+  deleteMessage?(remoteChatId: string, messageId: string, forEveryone: boolean): Promise<void>
   markRead?(remoteChatId: string, upToMessageId?: string | null): Promise<void>
   markUnread?(remoteChatId: string): Promise<void>
   searchMessages?(query: string, opts: { accountIds?: string[]; chatIds?: string[]; limit?: number }): Promise<RemoteMessage[]>

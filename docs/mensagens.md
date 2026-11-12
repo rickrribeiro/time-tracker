@@ -7,6 +7,35 @@ virar mais um cliente de mensagens.
 
 ## Como ativar
 
+### Com o script (recomendado, repetível em outro Mac)
+
+```bash
+npm run beeper:setup                               # rickOS neste Mac (modo direto)
+RICKOS_URL=https://rickos.seudominio.com RICKOS_TOKEN=… \
+  npm run beeper:setup -- --mode agent --service   # rickOS na VPS: agente como serviço
+npm run beeper:down                                # desfaz (--uninstall remove o app também)
+```
+
+`bin/rickos-beeper-setup.mjs` (sem dependências, Node ≥ 20.6) faz, de forma idempotente:
+
+1. instala o Beeper Desktop (`brew install --cask beeper`) e abre o app;
+2. espera a Desktop API em `http://127.0.0.1:23373` e o estado `ready` de `/v1/app/setup`.
+   O login na conta (e-mail + código) e a verificação do dispositivo são feitos por você na
+   janela do Beeper, e o script avisa o que falta;
+3. obtém o token pelo **OAuth da própria Desktop API** (registro dinâmico + PKCE, callback em
+   `127.0.0.1` numa porta efêmera). Você só aprova o acesso do "rickOS". O token vai para
+   `~/.config/rickos/beeper.json` (0600) e é reaproveitado enquanto valer (`--new-token` força
+   outro, `--paste` aceita um token criado à mão);
+4. configura o rickOS em `RICKOS_URL` (padrão `http://127.0.0.1:4318`):
+   * **direct**: grava endpoint e token no servidor, testa e roda a primeira sincronização;
+   * **agent**: gera a chave do agente e grava `~/.config/rickos/chat-agent.env` (0600).
+     Com `--service`, instala o LaunchAgent `com.rickos.chat-agent`
+     (`node --env-file=… bin/rickos-chat-agent.mjs`, log em `~/Library/Logs/rickOS/chat-agent.log`).
+
+`--token-only` para no passo 3. `--no-install` pula a instalação. `--help` lista tudo.
+
+### Manualmente
+
 1. **Beeper Desktop** no Mac: *Settings → Integrations*, ative a Desktop API e crie um token
    em *Approved connections* (+). A API escuta em `http://localhost:23373`, só em loopback.
 2. rickOS: **Configurações → Mensagens**: ative, escolha o provedor *Beeper Desktop API*
@@ -22,6 +51,7 @@ virar mais um cliente de mensagens.
      BEEPER_TOKEN=<token do Beeper> \
      npm run chat-agent          # = node bin/rickos-chat-agent.mjs (Node ≥ 18; ≥ 22 p/ tempo real)
      ```
+     Ou, com as variáveis num arquivo: `node --env-file=~/.config/rickos/chat-agent.env bin/rickos-chat-agent.mjs`.
 3. Escolha quais contas sincronizar. A primeira carga lê até `Máx. conversas na 1ª carga`
    (padrão 1500); as seguintes são incrementais.
 
@@ -30,7 +60,8 @@ A UI mostra um aviso permanente enquanto ele estiver ativo.
 
 ### Docker / Beeper Server
 
-Não há imagem Docker oficial do Beeper. Existe o **Beeper Server** (headless), instalado pelo
+Não há imagem Docker oficial do Beeper. Para subir e derrubar com um comando, use
+`npm run beeper:setup` / `npm run beeper:down`. Existe o **Beeper Server** (headless), instalado pelo
 CLI oficial (`brew install beeper/tap/cli` → `beeper setup --server --install`). Ele expõe a
 mesma API, mas a paridade e o empacotamento não estão documentados. Hoje o caminho suportado é
 o Beeper Desktop no Mac (direto ou via agente). Se você testar o Beeper Server, aponte o
@@ -104,6 +135,16 @@ identificador (grupos) não são reconciliadas automaticamente.
 * O prompt delimita o conteúdo como dado (JSON) e proíbe seguir instruções vindas das mensagens.
   O Claude roda com `--tools ""`, `--strict-mcp-config`, em diretório temporário.
 * Enviar é sempre uma ação explícita, com tela de confirmação nas sugestões. Não há envio em massa.
+
+### Editar e apagar
+
+Nas mensagens **suas**, o menu da mensagem mostra *editar* (inline, `Ctrl/⌘+Enter` salva) e
+*apagar* (confirmação com **para todos** ou **só para mim**). O servidor recusa mensagem de outra
+pessoa, já apagada, com anexo (não editável) ou texto vazio, e depois reclassifica a conversa.
+Apagar sua última resposta faz a conversa voltar a "preciso responder". No Beeper:
+`PUT`/`DELETE /v1/chats/{chat}/messages/{msg}`. Limites de tempo e de quantidade de edições
+são regras da rede, e o erro dela aparece na tela. Apagar a **conversa** continua fora da
+lista de rotas permitidas.
 * Para trocar o mecanismo (Claude API, Ollama…), implemente `AiEngine` (`server/chats/ai.ts`)
   e chame `setAiEngine()`.
 
@@ -127,8 +168,9 @@ identificador (grupos) não são reconciliadas automaticamente.
   `WebSocket` nativo, então vale o polling. No modo agente, o tempo real depende do agente estar em Node ≥ 22.
 * **Busca no texto**: usa a busca do provedor (até 20 resultados por consulta). A busca da lista
   cobre nome, prévia, pessoa, notas e tags.
-* **Reações, edição/remoção de mensagens e envio de anexos** pelo rickOS ainda não existem
-  (leitura de reações e anexos, sim).
+* **Reações e envio de anexos** pelo rickOS ainda não existem (leitura, sim). Editar/apagar
+  usa a capacidade geral do provedor: numa rede que não permite, o botão aparece e o erro da
+  rede é mostrado.
 * **Grupos**: não há lista completa de participantes para vincular cada um a uma Pessoa pelo grupo.
   Vincule as conversas individuais.
 * Imagens/avatares das conversas (`mxc://`/`file://`) não são exibidos.

@@ -100,7 +100,7 @@ Todas configuráveis em **Configurações**; o app funciona 100% sem elas.
 | **GitHub** | Issues (Kanban) + criar issues via Claude | Token ou SSH da máquina |
 | **Google Calendar** | Eventos na timeline/dashboard | OAuth, **multi-conta**, sync automático 1×/dia |
 | **Pluggy (Open Finance)** | Importar transações bancárias | Client ID/Secret + Pluggy Connect |
-| **Beeper Desktop API** | Central de Mensagens (WhatsApp, Instagram, LinkedIn…) | Token do Beeper; modo direto ou agente local no Mac — ver `docs/mensagens.md` |
+| **Beeper Desktop API** | Central de Mensagens (WhatsApp, Instagram, LinkedIn…) | `npm run beeper:setup` (instala, obtém o token por OAuth e configura); modo direto ou agente local no Mac — ver `docs/mensagens.md` |
 | **Aviasales Data API / Duffel** | Preços de passagens (cache / ao vivo) | Token gratuito (Travelpayouts) / conta live Duffel — ver `docs/passagens.md` |
 
 A data/hora da última sincronização de cada integração aparece em Configurações.

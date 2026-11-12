@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChatMessage, ChatSummary, ChatTemplate, MessagePage } from '../../../../shared/chats'
 import { networkInfo } from '../../../../shared/chats'
+import { authedUrl } from '../../../api/transport'
 import { useChatsStore } from '../store/chatsStore'
 import { SnoozeMenu, StateMenu } from './actions'
 import { AiPanel } from './AiPanel'
@@ -287,9 +288,9 @@ export function ChatView({ chat }: { chat: ChatSummary }): React.ReactElement {
                   {m.attachments.map((a, i) => (
                     <div className="chats-attach" key={i}>
                       {a.url && a.type === 'image' ? (
-                        <a href={a.url} target="_blank" rel="noreferrer"><img src={a.url} alt={a.fileName ?? 'imagem'} loading="lazy" /></a>
+                        <a href={authedUrl(a.url)} target="_blank" rel="noreferrer"><img src={authedUrl(a.url)} alt={a.fileName ?? 'imagem'} loading="lazy" /></a>
                       ) : a.url ? (
-                        <a href={a.url} target="_blank" rel="noreferrer">📎 {a.fileName ?? a.type}</a>
+                        <a href={authedUrl(a.url)} target="_blank" rel="noreferrer">📎 {a.fileName ?? a.type}</a>
                       ) : (
                         <span style={{ color: 'var(--text-muted)' }}>📎 {a.fileName ?? a.type} (indisponível)</span>
                       )}

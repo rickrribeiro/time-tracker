@@ -108,3 +108,10 @@ export function downloadUrl(pathname: string): string {
   const t = getToken()
   return `${serverBase()}${pathname}${t ? `?token=${encodeURIComponent(t)}` : ''}`
 }
+
+/** URL absoluta (base do servidor + token) para um caminho que já tem query string. */
+export function authedUrl(pathWithQuery: string): string {
+  const t = getToken()
+  const sep = pathWithQuery.includes('?') ? '&' : '?'
+  return `${serverBase()}${pathWithQuery}${t ? `${sep}token=${encodeURIComponent(t)}` : ''}`
+}

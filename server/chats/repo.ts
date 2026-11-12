@@ -197,9 +197,9 @@ export async function upsertChats(providerId: string, chats: RemoteChat[], store
     const ids: number[] = []
     for (const c of chats) {
       const key = chatKey(providerId, c.remoteId)
-      const prev = one<{ id: number; lastActivity: string | null; scannedActivity: string | null }>(
+      const prev = one<{ id: number; lastActivity: string | null; scannedActivity: string | null; unreadMentions: number | null; mentionsEstimated: number }>(
         db,
-        'SELECT id, lastActivity, scannedActivity FROM chats WHERE key = ?',
+        'SELECT id, lastActivity, scannedActivity, unreadMentions, mentionsEstimated FROM chats WHERE key = ?',
         [key]
       )
       const p = c.preview
@@ -213,7 +213,8 @@ export async function upsertChats(providerId: string, chats: RemoteChat[], store
         c.participantCount,
         c.peerHandle,
         c.unreadCount,
-        c.unreadMentions,
+        // provedor sem dado de menções (null): mantém a estimativa local em vez de apagá-la
+        c.unreadMentions ?? (prev?.mentionsEstimated ? prev.unreadMentions : null),
         c.lastActivity ?? p?.timestamp ?? null,
         previewOf(p ? p.text || attachmentLabel(p.attachments.length ? p.attachments[0].type : null) : null, storePreviews),
         b(fromMe),
@@ -230,6 +231,8 @@ export async function upsertChats(providerId: string, chats: RemoteChat[], store
              isMuted = ?, isArchived = ?, syncedAt = ? WHERE id = ?`,
           [...values, prev.id]
         )
+        // com dado do provedor, ele passa a valer e a estimativa local é descartada
+        if (c.unreadMentions != null) exec(db, 'UPDATE chats SET mentionsEstimated = 0 WHERE id = ?', [prev.id])
         // A prévia já diz quem falou por último: mantém o lado correspondente atualizado.
         if (p) {
           exec(db, `UPDATE chats SET ${p.isMine ? 'lastOutboundAt' : 'lastInboundAt'} = ? WHERE id = ? AND (${p.isMine ? 'lastOutboundAt' : 'lastInboundAt'} IS NULL OR ${p.isMine ? 'lastOutboundAt' : 'lastInboundAt'} < ?)`, [p.timestamp, prev.id, p.timestamp])

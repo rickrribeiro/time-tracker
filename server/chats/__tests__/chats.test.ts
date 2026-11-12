@@ -244,6 +244,11 @@ describe('central de mensagens (mock)', () => {
     assert.ok((trilha.unreadMentions ?? 0) >= 1)
     const lucas = await byRemote('ig-lucas')
     assert.equal(lucas.unreadMentions, null) // conversa individual: desconhecido
+    // a sincronização seguinte (sem mudança de atividade) não apaga a estimativa
+    await call('chats:syncNow')
+    const again = await byRemote('ig-trilha')
+    assert.equal(again.unreadMentions, trilha.unreadMentions)
+    assert.equal(again.mentionsEstimated, true)
   })
 
   it('filtros combinados', async () => {

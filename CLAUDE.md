@@ -44,7 +44,8 @@ UI React → store Zustand → window.api.<ns>.<ação>()   src/api/createApi.ts
 | `server/config.ts` | variáveis `RICKOS_*` (data dir, porta, host, token, URL pública) |
 | `electron/main` | janela, atalho global, notificações nativas; sobe o servidor ou reusa um já rodando |
 | `electron/preload` | `window.desktop`: só o que o navegador não faz |
-| `src/App.tsx` | `NAV_GROUPS` (sidebar) + `PAGES` (registry); rota = `#/<page>` |
+| `src/App.tsx` | `PAGES` (registry); rota = `#/<page>` |
+| `src/navigation.ts` | `NAV_GROUPS` (sidebar); grupos podem ser ocultados em Configurações → Módulos (`hidden_modules`) |
 | `src/types/index.ts` | interfaces, union `Page`, tipos de `window.api` e `window.desktop` |
 | `src/modules/<módulo>/` | `pages/`, `components/`, `store/` de cada área |
 | `src/store/` | stores globais (`uiStore`, `notificationStore`) |
@@ -57,7 +58,7 @@ UI React → store Zustand → window.api.<ns>.<ação>()   src/api/createApi.ts
 3. `ipcMain.handle('<ns>:<ação>', …)` em `server/rpc.ts`.
 4. Método em `src/api/createApi.ts` e tipo em `src/types/index.ts` (`Window.api`).
 5. Store Zustand do módulo → página/componentes.
-6. Página nova: adicione ao union `Page` **e** a `NAV_GROUPS` **e** a `PAGES` (o TS acusa se faltar no `PAGES`).
+6. Página nova: adicione ao union `Page` **e** a `NAV_GROUPS` (`src/navigation.ts`) **e** a `PAGES` (o TS acusa se faltar no `PAGES`).
 
 Molde simples para copiar: `todos` / `habits`.
 

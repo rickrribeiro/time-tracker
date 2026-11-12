@@ -7,6 +7,7 @@ import { useFinanceStore } from '../../finance/store/financeStore'
 import { PluggyConnect } from 'react-pluggy-connect'
 import { SnapshotsSection } from '../components/SnapshotsSection'
 import { AppearanceSection } from '../components/AppearanceSection'
+import { ModulesSection } from '../components/ModulesSection'
 import { AiUsageModal } from '../components/AiUsageModal'
 
 const FX_CURRENCIES = ['BRL', 'USD', 'JPY', 'EUR']
@@ -255,6 +256,7 @@ export function SettingsPage(): React.ReactElement {
       </div>
 
       <AppearanceSection />
+      <ModulesSection />
 
       <div className="chart-section" style={{ maxWidth: 560 }}>
         <div className="chart-title">🐙 GitHub</div>

@@ -137,7 +137,7 @@ export function AiPanel({
           {messages.length} mensage{messages.length === 1 ? 'm' : 'ns'} selecionada{messages.length === 1 ? '' : 's'}: só elas vão para a IA
         </span>
         <span style={{ flex: 1 }} />
-        <button className="chats-linkbtn" onClick={onClose}>fechar</button>
+        <button className="chats-x" onClick={onClose} title="Fechar (Esc)" aria-label="Fechar">✕</button>
       </div>
 
       {mode === 'suggest' ? (

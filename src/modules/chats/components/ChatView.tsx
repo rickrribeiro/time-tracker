@@ -163,6 +163,24 @@ export function ChatView({ chat }: { chat: ChatSummary }): React.ReactElement {
     }
   }
 
+  // Esc fecha o painel de IA e, depois, a seleção (fora de campos de texto)
+  useEffect(() => {
+    if (!ai && !picking) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.tagName === 'SELECT')) return
+      if (document.querySelector('.modal-overlay')) return
+      if (ai) setAi(null)
+      else {
+        setPicking(false)
+        setPicked([])
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [ai, picking])
+
   useEffect(() => {
     setPicked([])
     setPicking(false)
@@ -428,6 +446,7 @@ export function ChatView({ chat }: { chat: ChatSummary }): React.ReactElement {
           <button className="chats-linkbtn" onClick={pickSinceMyLast}>desde minha última resposta</button>
           <button className="chats-linkbtn" onClick={() => setPicked(items.slice(-5).map((m) => m.id))}>últimas 5</button>
           <button className="chats-linkbtn" onClick={() => setPicked([])}>limpar</button>
+          <button className="chats-x" onClick={() => (setPicking(false), setPicked([]), setAi(null))} title="Fechar seleção (Esc)" aria-label="Fechar seleção">✕</button>
         </div>
       )}
 
@@ -468,7 +487,7 @@ export function ChatView({ chat }: { chat: ChatSummary }): React.ReactElement {
           <button className="btn btn-primary" disabled={!canSend || !text.trim() || sending} onClick={() => void sendComposer()}>{sending ? '…' : 'Enviar'}</button>
         </div>
         <div className="chats-composer-tools">
-          <Popover label="⚡ Respostas rápidas" className="btn btn-secondary btn-sm" align="left">
+          <Popover label="⚡ Respostas rápidas" className="btn btn-secondary btn-sm" align="left" up>
             {(close) => (
               <TemplatesList
                 templates={templates}

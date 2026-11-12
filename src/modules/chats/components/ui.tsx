@@ -79,6 +79,7 @@ export function Popover({
   children,
   className = 'btn btn-secondary btn-sm',
   align = 'right',
+  up = false,
   title,
   disabled
 }: {
@@ -86,6 +87,8 @@ export function Popover({
   children: (close: () => void) => React.ReactNode
   className?: string
   align?: 'left' | 'right'
+  /** Abre para cima (botões perto da borda de baixo, como o compositor). */
+  up?: boolean
   title?: string
   disabled?: boolean
 }): React.ReactElement {
@@ -111,7 +114,7 @@ export function Popover({
       <button className={className} onClick={() => setOpen((o) => !o)} title={title} disabled={disabled} type="button">
         {label}
       </button>
-      {open && <div className={`chats-pop-menu ${align === 'left' ? 'left' : ''}`}>{children(() => setOpen(false))}</div>}
+      {open && <div className={`chats-pop-menu${align === 'left' ? ' left' : ''}${up ? ' up' : ''}`}>{children(() => setOpen(false))}</div>}
     </div>
   )
 }

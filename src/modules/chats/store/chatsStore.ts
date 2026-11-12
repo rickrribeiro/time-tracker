@@ -7,8 +7,9 @@ export type ChatsPane = 'list' | 'chat'
 export type TriageMode = 'backlog' | 'daily' | 'mentions' | 'unread' | 'professional'
 
 const PAGE = 60
-const DEFAULT_FILTER: ChatFilter = { state: 'all', type: 'all', person: 'all', sort: 'priority' }
-const FILTER_KEY = 'rickos:chats:filter'
+const DEFAULT_FILTER: ChatFilter = { state: 'all', type: 'all', person: 'all', sort: 'recent' }
+// v2: o padrão passou a ser "mais recentes" (prioridade escondia mensagens novas)
+const FILTER_KEY = 'rickos:chats:filter:v2'
 const TAB_KEY = 'rickos:chats:tab'
 
 function load<T>(key: string, def: T): T {

@@ -154,7 +154,7 @@ export function ChatFilters(): React.ReactElement {
               <option value="linked">Com pessoa vinculada</option>
               <option value="unlinked">Sem pessoa vinculada</option>
             </select>
-            <select value={filter.sort ?? 'priority'} onChange={(e) => setFilter({ sort: e.target.value as ChatFilter['sort'] })} aria-label="Ordenar">
+            <select value={filter.sort ?? 'recent'} onChange={(e) => setFilter({ sort: e.target.value as ChatFilter['sort'] })} aria-label="Ordenar">
               <option value="priority">Ordenar: prioridade</option>
               <option value="recent">Ordenar: mais recentes</option>
               <option value="oldest_pending">Ordenar: esperando há mais tempo</option>

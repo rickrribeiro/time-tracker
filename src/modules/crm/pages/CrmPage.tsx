@@ -4,6 +4,8 @@ import { useContactStore } from '../store/contactStore'
 import { ContactEditor } from '../components/ContactEditor'
 import { BRAZIL, BRAZIL_STATES } from '../geo'
 import { timeAgo, localDateStr } from '../../../utils/dates'
+import { networkInfo } from '../../../../shared/chats'
+import { openChat } from '../../chats/store/chatsStore'
 
 /** Days until the next occurrence of a MM-DD / YYYY-MM-DD birthday, or null. */
 function daysToBirthday(bday: string | null): number | null {
@@ -72,8 +74,11 @@ export function CrmPage(): React.ReactElement {
   const [countryFilter, setCountryFilter] = useState('')
   const [stateFilter, setStateFilter] = useState('')
 
+  // conversas vinculadas (Central de Mensagens): redes por pessoa e pendências
+  const [nets, setNets] = useState<Record<number, { network: string; chatId: number; pending: boolean }[]>>({})
   useEffect(() => {
     refresh()
+    window.api.chats.contactNetworks().then(setNets).catch(() => setNets({}))
   }, [])
 
   function onCountryFilterChange(value: string): void {
@@ -99,6 +104,7 @@ export function CrmPage(): React.ReactElement {
   const today = localDateStr(new Date())
   const needsAttention = (c: Contact): boolean => {
     if (c.nextFollowUp && c.nextFollowUp <= today) return true
+    if (nets[c.id]?.some((n) => n.pending)) return true
     const bd = daysToBirthday(c.birthday)
     if (bd !== null && bd <= 7) return true
     if (c.lastContactAt) return Date.now() - new Date(c.lastContactAt).getTime() > 30 * 86400000
@@ -163,7 +169,19 @@ export function CrmPage(): React.ReactElement {
             <div key={c.id} className="list-row" style={{ alignItems: 'flex-start', borderLeft: attention ? '3px solid var(--warning, #f59e0b)' : '3px solid transparent' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span className="list-row-title">{c.name}</span>
+                  <span className="list-row-title">{c.vip ? '⭐ ' : ''}{c.name}</span>
+                  {c.priority === 'alta' && <span className="due-badge due-overdue">prioridade alta</span>}
+                  {(nets[c.id] ?? []).map((n) => (
+                    <button
+                      key={n.chatId}
+                      className="project-chip"
+                      style={{ cursor: 'pointer', border: n.pending ? '1px solid var(--danger)' : undefined }}
+                      title={n.pending ? `${networkInfo(n.network).label}: esperando resposta` : `Abrir conversa no ${networkInfo(n.network).label}`}
+                      onClick={() => openChat(n.chatId)}
+                    >
+                      {networkInfo(n.network).icon} {networkInfo(n.network).label}{n.pending ? ' ✍️' : ''}
+                    </button>
+                  ))}
                   {c.location && <span className="project-chip">📍 {c.location}</span>}
                   {c.country && <span className="project-chip">🌎 {c.country}{c.state ? ` / ${c.state}` : ''}</span>}
                   {bd !== null && bd <= 7 && <span className="due-badge due-today">🎂 {bd === 0 ? 'hoje!' : `em ${bd}d`}</span>}

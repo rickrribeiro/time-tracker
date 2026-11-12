@@ -14,6 +14,8 @@ export function ContactEditor({ contact, onClose }: { contact: Contact | null; o
   const [interests, setInterests] = useState(contact?.interests ?? '')
   const [context, setContext] = useState(contact?.context ?? '')
   const [nextFollowUp, setNextFollowUp] = useState(contact?.nextFollowUp ?? '')
+  const [priority, setPriority] = useState<'alta' | 'normal' | 'baixa'>(contact?.priority ?? 'normal')
+  const [vip, setVip] = useState(!!contact?.vip)
 
   const isBrazil = country === BRAZIL
 
@@ -34,8 +36,14 @@ export function ContactEditor({ contact, onClose }: { contact: Contact | null; o
       context: context.trim() || null,
       nextFollowUp: nextFollowUp || null
     }
+    let id = contact?.id
     if (contact) await update({ ...contact, ...fields })
-    else await create(fields)
+    else id = (await create(fields)).id
+    // prioridade/VIP alimentam a priorização da Central de Mensagens e o radar
+    if (id && (priority !== (contact?.priority ?? 'normal') || vip !== !!contact?.vip)) {
+      await window.api.chats.setContactPriority(id, priority, vip)
+      await useContactStore.getState().refresh()
+    }
     onClose()
   }
 
@@ -85,6 +93,21 @@ export function ContactEditor({ contact, onClose }: { contact: Contact | null; o
           <div className="editor-field">
             <label>Próximo follow-up</label>
             <input type="date" value={nextFollowUp} onChange={(e) => setNextFollowUp(e.target.value)} />
+          </div>
+        </div>
+        <div className="editor-row">
+          <div className="editor-field">
+            <label>Prioridade do relacionamento</label>
+            <select value={priority} onChange={(e) => setPriority(e.target.value as 'alta' | 'normal' | 'baixa')}>
+              <option value="alta">Alta</option>
+              <option value="normal">Normal</option>
+              <option value="baixa">Baixa</option>
+            </select>
+          </div>
+          <div className="editor-field" style={{ justifyContent: 'flex-end' }}>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', textTransform: 'none', letterSpacing: 0, fontSize: 13, color: 'var(--text-primary)' }}>
+              <input type="checkbox" checked={vip} onChange={(e) => setVip(e.target.checked)} style={{ width: 'auto' }} /> ⭐ VIP (não deixar esquecer)
+            </label>
           </div>
         </div>
         <div className="editor-field">

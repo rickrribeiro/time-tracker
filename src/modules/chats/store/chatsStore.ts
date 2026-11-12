@@ -4,6 +4,7 @@ import { useUIStore } from '../../../store/uiStore'
 
 export type ChatsTab = 'radar' | 'inbox' | 'triage'
 export type ChatsPane = 'list' | 'chat'
+export type TriageMode = 'backlog' | 'daily' | 'mentions' | 'unread' | 'professional'
 
 const PAGE = 60
 const DEFAULT_FILTER: ChatFilter = { state: 'all', type: 'all', person: 'all', sort: 'priority' }
@@ -51,6 +52,8 @@ interface ChatsState {
   presets: ChatPreset[]
   /** Conversa a abrir quando a página montar (deep link / outros módulos). */
   pendingOpen: number | null
+  /** Modo inicial da triagem (ex.: "Revisão diária" vindo do radar/Home). */
+  triageMode: TriageMode
   init: () => Promise<() => void>
   setTab: (t: ChatsTab) => void
   setFilter: (patch: Partial<ChatFilter>, replace?: boolean) => void
@@ -95,12 +98,14 @@ export const useChatsStore = create<ChatsState>((set, get) => ({
   labels: [],
   presets: [],
   pendingOpen: chatFromHash(),
+  triageMode: 'backlog',
 
   init: async () => {
+    const wanted = chatFromHash() ?? get().pendingOpen // lido antes de qualquer await (o App reescreve o hash)
     const st = await window.api.chats.status()
     set({ status: st, ready: true })
     await Promise.all([get().refreshCounts(), get().refreshLabels(), get().refreshPresets(), get().reload()])
-    const hashId = chatFromHash() ?? get().pendingOpen
+    const hashId = wanted ?? get().pendingOpen
     if (hashId) {
       set({ pendingOpen: null, tab: 'inbox' })
       await get().open(hashId)
@@ -217,4 +222,12 @@ export function openChatsWith(filter: Partial<ChatFilter>, tab: ChatsTab = 'inbo
   useChatsStore.getState().setFilter(filter, true)
   useChatsStore.setState({ tab })
   useUIStore.getState().setPage('chats')
+}
+
+// Deep link #/chats?c=ID: guarda o id no momento do hashchange (antes do App normalizar o hash).
+if (typeof window !== 'undefined') {
+  window.addEventListener('hashchange', () => {
+    const id = chatFromHash()
+    if (id) useChatsStore.setState({ pendingOpen: id, tab: 'inbox' })
+  })
 }

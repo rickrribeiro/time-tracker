@@ -534,6 +534,9 @@ export interface Contact {
   lastContactAt: string | null
   nextFollowUp: string | null
   createdAt: string
+  /** Central de Mensagens: prioridade do relacionamento e VIP. */
+  priority?: 'alta' | 'normal' | 'baixa' | null
+  vip?: number | null
 }
 // ── Git: worktrees & branches (server/services/gitscan.ts) ───────────────────
 export type GitBranchStatus = 'orphan' | 'risk' | 'forgotten' | 'active' | 'merged' | 'base'

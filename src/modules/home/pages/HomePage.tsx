@@ -3,6 +3,7 @@ import { useUIStore } from '../../../store/uiStore'
 import { DailyStandup } from '../components/DailyStandup'
 import { ProjectHomeBlocks } from '../../projects/components/ProjectHomeBlocks'
 import { LostWorkCard } from '../../projects/components/LostWorkCard'
+import { HomeChatsWidget } from '../../chats/components/HomeChatsWidget'
 import '../../projects/worktrees.css'
 import { useTaskStore } from '../../timetracker/store/taskStore'
 import { useTodoStore } from '../../todo/store/todoStore'
@@ -161,6 +162,9 @@ export function HomePage(): React.ReactElement {
       <div style={{ marginTop: 12 }}>
         <UpcomingMeetings />
       </div>
+
+      {/* ── Central de Mensagens (opcional) ── */}
+      <HomeChatsWidget />
 
       {/* ── Branches com trabalho não entregue ── */}
       <LostWorkCard />

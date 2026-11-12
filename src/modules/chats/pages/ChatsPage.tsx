@@ -4,6 +4,8 @@ import { ChatDetails } from '../components/ChatDetails'
 import { ChatFilters } from '../components/ChatFilters'
 import { ChatList } from '../components/ChatList'
 import { ChatView } from '../components/ChatView'
+import { RadarView } from '../components/RadarView'
+import { TriageView } from '../components/TriageView'
 import { StatusBadge } from '../components/StatusBadge'
 import { useChatsStore } from '../store/chatsStore'
 import '../chats.css'
@@ -11,7 +13,7 @@ import '../chats.css'
 /** Central de Mensagens: inbox unificada (WhatsApp, Instagram, LinkedIn… via provedor). */
 export function ChatsPage(): React.ReactElement {
   const s = useChatsStore()
-  const { status, counts, active, pane, detailOpen } = s
+  const { status, counts, active, pane, detailOpen, tab } = s
 
   useEffect(() => {
     let off: (() => void) | undefined
@@ -43,13 +45,19 @@ export function ChatsPage(): React.ReactElement {
   }
 
   return (
-    <div className="chats-page" data-pane={pane}>
+    <div className="chats-page" data-pane={tab === 'inbox' ? pane : 'list'}>
       <div className="chats-topbar">
         <h2>💬 Chats</h2>
         <div className="chats-tabs" role="tablist">
-          <button className="chats-tab active" role="tab" aria-selected>
+          <button className={`chats-tab ${tab === 'radar' ? 'active' : ''}`} role="tab" aria-selected={tab === 'radar'} onClick={() => s.setTab('radar')}>
+            🎯 Atenção {counts?.remindersDue ? <span className="chats-count hot">{counts.remindersDue}</span> : null}
+          </button>
+          <button className={`chats-tab ${tab === 'inbox' ? 'active' : ''}`} role="tab" aria-selected={tab === 'inbox'} onClick={() => s.setTab('inbox')}>
             📥 Inbox {counts?.unreadChats ? <span className="chats-count">{counts.unreadChats}</span> : null}
-            {counts?.mentionChats ? <span className="chats-count mention" title="Conversas com menções a você">@{counts.mentionCount}</span> : null}
+            {counts?.mentionChats ? <span className="chats-count mention" title="Conversas com menções a você">{counts.mentionsEstimated ? '~' : ''}@{counts.mentionCount}</span> : null}
+          </button>
+          <button className={`chats-tab ${tab === 'triage' ? 'active' : ''}`} role="tab" aria-selected={tab === 'triage'} onClick={() => s.setTab('triage')}>
+            🧹 Triagem {counts?.needsReply ? <span className="chats-count">{counts.needsReply}</span> : null}
           </button>
         </div>
         <div className="chats-topbar-right">
@@ -66,6 +74,9 @@ export function ChatsPage(): React.ReactElement {
         </div>
       )}
 
+      {tab === 'radar' && <RadarView />}
+      {tab === 'triage' && <TriageView />}
+      {tab === 'inbox' && (
       <div className={`chats-body ${active ? '' : 'no-detail'} ${detailOpen ? 'detail-open' : ''}`} data-pane={pane}>
         <div className="chats-col chats-left">
           <ChatFilters />
@@ -88,6 +99,7 @@ export function ChatsPage(): React.ReactElement {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }

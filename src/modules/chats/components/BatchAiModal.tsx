@@ -29,10 +29,13 @@ export function BatchAiModal({ chatIds, onClose }: { chatIds: number[]; onClose:
   const [sending, setSending] = useState(false)
 
   useEffect(() => {
-    const chats = chatIds.slice(0, 30).map((id) => items.find((i) => i.id === id)).filter((c): c is ChatSummary => !!c)
-    setRows(chats.map((chat) => ({ chat, messages: [], picked: [], loading: true, error: null, result: null, text: '', generating: false, sent: false })))
     let cancelled = false
     void (async () => {
+      // conversas fora da lista atual (ex.: vindas da triagem) são buscadas no servidor
+      const found = await Promise.all(chatIds.slice(0, 30).map(async (id) => items.find((i) => i.id === id) ?? (await window.api.chats.get(id).catch(() => null))))
+      const chats = found.filter((c): c is ChatSummary => !!c)
+      if (cancelled) return
+      setRows(chats.map((chat) => ({ chat, messages: [], picked: [], loading: true, error: null, result: null, text: '', generating: false, sent: false })))
       // carrega as pendentes de cada conversa (concorrência baixa)
       let i = 0
       const worker = async (): Promise<void> => {

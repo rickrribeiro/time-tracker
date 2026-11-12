@@ -26,6 +26,7 @@ export interface AgentDetails {
   lastSeen: string | null
   version: string | null
   beeper: string | null
+  realtime: boolean
 }
 
 export interface ChatsConfigPatch extends Partial<ChatsConfig> {

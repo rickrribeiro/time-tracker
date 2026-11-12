@@ -3,7 +3,7 @@ import { NO_CAPABILITIES } from '../../shared/chats'
 import { broadcast } from '../events'
 import { getSetting, setSetting } from '../database/queries'
 import { notify } from '../services/notifications'
-import { agentOnline } from './agentRelay'
+import { agentDetails, agentOnline } from './agentRelay'
 import { K, loadConfig } from './config'
 import * as repo from './repo'
 import { activeProvider, changed, getSummary, invalidateMessages, scanChat } from './service'
@@ -50,6 +50,11 @@ let started = false
 
 export function getStatus(): ChatsStatus {
   status.agentOnline = agentOnline()
+  // modo agente: o tempo real depende do WebSocket que o agente mantém com o Beeper
+  if (status.mode === 'agent' && status.realtime !== 'off') {
+    const a = agentDetails()
+    return { ...status, realtime: a.online && a.realtime ? 'on' : 'off', state: status.state === 'connected' && !(a.online && a.realtime) ? 'idle' : status.state }
+  }
   return { ...status }
 }
 
@@ -115,7 +120,7 @@ async function loop(): Promise<void> {
   await syncNow().catch(() => undefined)
   const base = cfg.syncIntervalSec * 1000
   // com tempo real ligado o polling vira só uma rede de segurança (mais espaçado)
-  const interval = status.realtime === 'on' ? Math.max(base, 10 * 60_000) : base
+  const interval = getStatus().realtime === 'on' ? Math.max(base, 10 * 60_000) : base
   const backoff = failures ? Math.min(15 * 60_000, 30_000 * 2 ** Math.min(failures - 1, 5)) : interval
   schedule(failures ? backoff : interval)
 }

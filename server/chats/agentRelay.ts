@@ -37,12 +37,12 @@ const inflight = new Map<string, Pending>()
 let waiter: ((items: Pending[]) => void) | null = null
 let lastSeen = 0
 let eventSink: ((e: ProviderEvent) => void) | null = null
-let agentInfo: { version: string | null; beeper: string | null } = { version: null, beeper: null }
+let agentInfo: { version: string | null; beeper: string | null; realtime: boolean } = { version: null, beeper: null, realtime: false }
 
 export function agentOnline(): boolean {
   return Date.now() - lastSeen < ONLINE_GRACE_MS
 }
-export function agentDetails(): { online: boolean; lastSeen: string | null; version: string | null; beeper: string | null } {
+export function agentDetails(): { online: boolean; lastSeen: string | null; version: string | null; beeper: string | null; realtime: boolean } {
   return { online: agentOnline(), lastSeen: lastSeen ? new Date(lastSeen).toISOString() : null, ...agentInfo }
 }
 export function setAgentEventSink(fn: ((e: ProviderEvent) => void) | null): void {
@@ -120,9 +120,9 @@ export function registerChatAgentRoutes(app: FastifyInstance, requireAuth: Auth)
     }
   }
 
-  app.post<{ Body: { version?: string; beeper?: string } }>('/api/chats/agent/poll', { preHandler: agentAuth }, async (req) => {
+  app.post<{ Body: { version?: string; beeper?: string; realtime?: boolean } }>('/api/chats/agent/poll', { preHandler: agentAuth }, async (req) => {
     lastSeen = Date.now()
-    agentInfo = { version: req.body?.version ?? null, beeper: req.body?.beeper ?? null }
+    agentInfo = { version: req.body?.version ?? null, beeper: req.body?.beeper ?? null, realtime: req.body?.realtime === true }
     // um único agente por vez: um poll novo encerra o anterior
     if (waiter) {
       const w = waiter

@@ -103,6 +103,7 @@ const PAGES: Record<Page, React.ComponentType> = {
 const QUICK_NAV: Page[] = ['home', 'timeline', 'inbox', 'projects']
 
 const COLLAPSED_KEY = 'rickos:collapsedGroups'
+const EXPANDED_TABS_KEY = 'rickos:expandedTabGroups'
 
 export default function App(): React.ReactElement {
   const { currentPage, setPage, selectedProjectId } = useUIStore()
@@ -112,6 +113,26 @@ export default function App(): React.ReactElement {
   const flightId = useFlightStore((st) => st.selectedId)
   const { refreshActive, stopActiveTask, activeTask } = useTaskStore()
   const { refreshTags } = useTagStore()
+
+  // modo abas: módulos cujas subpáginas também aparecem na sidebar (seta ao lado do módulo)
+  const [expandedTabs, setExpandedTabs] = React.useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(EXPANDED_TABS_KEY) || '{}')
+    } catch {
+      return {}
+    }
+  })
+  const toggleTabGroup = useCallback((label: string) => {
+    setExpandedTabs((prev) => {
+      const next = { ...prev, [label]: !prev[label] }
+      try {
+        localStorage.setItem(EXPANDED_TABS_KEY, JSON.stringify(next))
+      } catch {
+        /* ignora */
+      }
+      return next
+    })
+  }, [])
 
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>(() => {
     try {
@@ -247,16 +268,44 @@ export default function App(): React.ReactElement {
           )}
           {navGroups.map((group, gi) => {
             if (tabsMode && group.label) {
+              const expanded = !!expandedTabs[group.label]
               return (
                 <div className="nav-group nav-group-tabbed" key={group.label}>
-                  <button
-                    className={`nav-btn nav-module-btn ${tabGroup === group ? 'active' : ''}`}
-                    onClick={() => setPage(lastTab(group))}
-                    title={group.items.map((i) => i.label).join(' · ')}
-                  >
-                    <span className="nav-icon">{group.groupIcon}</span>
-                    <span className="nav-label">{group.label}</span>
-                  </button>
+                  <div className="nav-module-row">
+                    <button
+                      className={`nav-btn nav-module-btn ${tabGroup === group ? 'active' : ''}`}
+                      onClick={() => setPage(lastTab(group))}
+                      title={group.items.map((i) => i.label).join(' · ')}
+                    >
+                      <span className="nav-icon">{group.groupIcon}</span>
+                      <span className="nav-label">{group.label}</span>
+                    </button>
+                    <button
+                      className="nav-module-toggle"
+                      onClick={() => toggleTabGroup(group.label)}
+                      aria-expanded={expanded}
+                      aria-label={`${expanded ? 'Ocultar' : 'Mostrar'} páginas de ${group.label}`}
+                      title={expanded ? 'Ocultar páginas' : 'Mostrar páginas'}
+                    >
+                      <svg className={`nav-module-chevron ${expanded ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                        <path d="M4 2.5 7.5 6 4 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                  {expanded && (
+                    <ul className="nav-module-sub">
+                      {group.items.map((item) => (
+                        <li key={item.id}>
+                          <button
+                            className={`nav-btn ${currentPage === item.id ? 'active' : ''}`}
+                            onClick={() => setPage(item.id)}
+                          >
+                            <span className="nav-label">{item.label}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )
             }

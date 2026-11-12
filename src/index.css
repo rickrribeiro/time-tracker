@@ -2633,6 +2633,48 @@ button.todo-divider:hover {
 .nav-group-tabbed {
   margin-top: 6px;
 }
+/* seta ao lado do módulo: mostra/oculta as subpáginas na sidebar */
+.nav-module-row {
+  position: relative;
+}
+.nav-list .nav-group-tabbed .nav-module-row .nav-module-btn {
+  padding-right: 34px;
+}
+.nav-module-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm, 4px);
+  color: var(--text-muted);
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+.nav-module-row:hover .nav-module-toggle,
+.nav-module-toggle[aria-expanded='true'] {
+  opacity: 1;
+}
+.nav-module-chevron {
+  transition: transform 0.15s;
+}
+.nav-module-chevron.open {
+  transform: rotate(90deg);
+}
+.nav-module-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.nav-module-sub {
+  margin: 2px 0 4px;
+}
+.nav-list .nav-group-tabbed .nav-module-sub .nav-btn {
+  padding: 6px 12px 6px 42px;
+  font-size: 12.5px;
+}
 .module-tabs {
   display: flex;
   gap: 2px;

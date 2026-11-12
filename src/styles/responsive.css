@@ -264,3 +264,15 @@
     padding: 12px 10px 11px;
   }
 }
+
+/* seta do módulo na sidebar (modo abas): sempre visível e com alvo de toque maior no celular */
+@media (max-width: 899px) {
+  .nav-module-toggle {
+    width: 36px;
+    height: 36px;
+    opacity: 1;
+  }
+  .nav-list .nav-group-tabbed .nav-module-row .nav-module-btn {
+    padding-right: 44px;
+  }
+}

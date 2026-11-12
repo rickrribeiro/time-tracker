@@ -18,6 +18,7 @@ Um "sistema operacional pessoal" de mesa, **local-first**: começou como time tr
 | **🎓 Estudos (Learning OS)** | Tópicos → roadmap em árvore (drag-and-drop) → anotações em Markdown (editor + preview) → flashcards (manuais ou gerados por IA) → revisão espaçada **SM-2** → quiz automático → busca → export (caderno `.md`, JSON, pasta Obsidian). |
 | **💰 Finanças** | Contas, transações (import CSV), orçamento, investimentos com **histórico mensal e gráfico de evolução**, relatórios, câmbio manual, modo privacidade (ocultar valores), e Open Finance via **Pluggy**. |
 | **✈️ Viagens** | Viagens, monitoramento inteligente de passagens (origens/destinos flexíveis, restrições, ranking, histórico e alertas — ver `docs/passagens.md`), destinos, documentos e recomendações. |
+| **👥 Social** | Pessoas (CRM: follow-ups, aniversários, prioridade/VIP) e **Chats**, a Central de Mensagens: WhatsApp, Instagram, LinkedIn… via Beeper numa inbox só, com não lido × não respondido, menções em grupos, triagem em lote, lembretes, radar de pessoas esquecidas e sugestões de resposta com IA (só das mensagens que você selecionar). Ver `docs/mensagens.md`. |
 | **📌 Projetos** | Projetos + Issues (Kanban) sincronizados com o **GitHub** (token ou SSH), criação de issues via Claude local. |
 | **🌿 Worktrees & Branches** | Estado de todas as branches/worktrees locais (projetos + pastas escaneadas): 🔴 em risco, 🟠 esquecida, 👻 órfã, 🟡 em andamento, 🟢 pode limpar. Detalhes (commits/arquivos/diff), criar PR, continuar no Prompt Runner, limpar mergeadas, prune; card na Home e regra de aviso em Automações. |
 | **🤖 IA** | Assistente, biblioteca de **Skills** e **Agentes**, **Prompt Runner** (abas paralelas, executa via Claude local com streaming), e Histórico de execuções. |
@@ -99,6 +100,7 @@ Todas configuráveis em **Configurações**; o app funciona 100% sem elas.
 | **GitHub** | Issues (Kanban) + criar issues via Claude | Token ou SSH da máquina |
 | **Google Calendar** | Eventos na timeline/dashboard | OAuth, **multi-conta**, sync automático 1×/dia |
 | **Pluggy (Open Finance)** | Importar transações bancárias | Client ID/Secret + Pluggy Connect |
+| **Beeper Desktop API** | Central de Mensagens (WhatsApp, Instagram, LinkedIn…) | Token do Beeper; modo direto ou agente local no Mac — ver `docs/mensagens.md` |
 | **Aviasales Data API / Duffel** | Preços de passagens (cache / ao vivo) | Token gratuito (Travelpayouts) / conta live Duffel — ver `docs/passagens.md` |
 
 A data/hora da última sincronização de cada integração aparece em Configurações.

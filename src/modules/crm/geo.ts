@@ -233,3 +233,8 @@ export const BRAZIL_STATES: { uf: string; name: string }[] = [
   { uf: 'SE', name: 'Sergipe' },
   { uf: 'TO', name: 'Tocantins' }
 ]
+
+/** Minúsculas e sem acentos, para buscas por texto ("sao paulo" acha "São Paulo"). */
+export function norm(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+}

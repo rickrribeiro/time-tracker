@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Contact } from '../../../types'
 import { useContactStore } from '../store/contactStore'
 import { ContactEditor } from '../components/ContactEditor'
-import { BRAZIL, BRAZIL_STATES } from '../geo'
+import { BRAZIL, BRAZIL_STATES, norm } from '../geo'
 import { timeAgo, localDateStr } from '../../../utils/dates'
 import { networkInfo } from '../../../../shared/chats'
 import { openChat } from '../../chats/store/chatsStore'
@@ -93,9 +93,17 @@ export function CrmPage(): React.ReactElement {
     .sort((a, b) => a.localeCompare(b))
   const ufLabel = (uf: string): string => BRAZIL_STATES.find((s) => s.uf === uf)?.name ?? uf
 
-  const nameQuery = nameFilter.trim().toLowerCase()
+  // busca por palavras-chave: cada palavra precisa aparecer em algum campo
+  // (nome, cidade, estado/UF, país, interesses, contexto), sem diferenciar acentos
+  const nameQuery = nameFilter.trim()
+  const terms = norm(nameQuery).split(/\s+/).filter(Boolean)
+  const haystack = (c: Contact): string =>
+    norm([c.name, c.location, c.state, c.state ? ufLabel(c.state) : null, c.country, c.interests, c.context].filter(Boolean).join(' '))
   const filtered = contacts.filter((c) => {
-    if (nameQuery && !c.name.toLowerCase().includes(nameQuery)) return false
+    if (terms.length) {
+      const h = haystack(c)
+      if (!terms.every((t) => h.includes(t))) return false
+    }
     if (countryFilter && c.country !== countryFilter) return false
     if (countryFilter === BRAZIL && stateFilter && c.state !== stateFilter) return false
     return true
@@ -136,7 +144,8 @@ export function CrmPage(): React.ReactElement {
           <input
             value={nameFilter}
             onChange={(e) => setNameFilter(e.target.value)}
-            placeholder="🔍 Buscar por nome"
+            placeholder="🔍 Buscar por nome, cidade, interesse…"
+            title="Palavras-chave: nome, cidade, estado, país, interesses ou contexto"
             style={{ minWidth: 180 }}
           />
           {countries.length > 0 && (

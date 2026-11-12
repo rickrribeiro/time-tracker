@@ -1,7 +1,93 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { Contact } from '../../../types'
 import { useContactStore } from '../store/contactStore'
-import { COUNTRIES, BRAZIL_STATES, BRAZIL } from '../geo'
+import { COUNTRIES, BRAZIL_STATES, BRAZIL, norm } from '../geo'
+
+/** Campo de país com busca por texto (sem acentos): digita, filtra a lista e escolhe. */
+function CountryPicker({ value, onChange }: { value: string; onChange: (v: string) => void }): React.ReactElement {
+  const [query, setQuery] = useState(value)
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  const q = norm(query.trim())
+  // com o país já escolhido no campo, mostra a lista inteira; senão, filtra (prefixo primeiro)
+  const showAll = !q || query === value
+  const options = showAll
+    ? COUNTRIES
+    : [...COUNTRIES.filter((c) => norm(c).startsWith(q)), ...COUNTRIES.filter((c) => !norm(c).startsWith(q) && norm(c).includes(q))]
+
+  function pick(c: string): void {
+    onChange(c)
+    setQuery(c)
+    setOpen(false)
+  }
+
+  function onBlur(): void {
+    setOpen(false)
+    // texto que não é um país: volta para o valor atual (ou limpa, se apagou tudo)
+    if (!query.trim()) { if (value) onChange(''); return }
+    const exact = COUNTRIES.find((c) => norm(c) === q)
+    if (exact) pick(exact)
+    else setQuery(value)
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      setOpen(true)
+      const next = Math.max(0, Math.min(options.length - 1, active + (e.key === 'ArrowDown' ? 1 : -1)))
+      setActive(next)
+      listRef.current?.children[next]?.scrollIntoView({ block: 'nearest' })
+    } else if (e.key === 'Enter' && open && options[active]) {
+      e.preventDefault()
+      pick(options[active])
+    } else if (e.key === 'Escape' && open) {
+      e.stopPropagation()
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        value={query}
+        placeholder="Digite para buscar…"
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); setActive(0) }}
+        onFocus={(e) => { e.target.select(); setOpen(true); setActive(Math.max(0, COUNTRIES.indexOf(value))) }}
+        onBlur={onBlur}
+        onKeyDown={onKeyDown}
+      />
+      {open && (
+        <div
+          ref={listRef}
+          style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, marginTop: 2,
+            maxHeight: 220, overflowY: 'auto', background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 6px 18px rgba(0,0,0,0.25)'
+          }}
+        >
+          {options.length === 0 && <div style={{ padding: '6px 10px', fontSize: 13, color: 'var(--text-secondary)' }}>Nenhum país encontrado</div>}
+          {options.map((c, i) => (
+            <div
+              key={c}
+              // mousedown (não click) para escolher antes do blur do input
+              onMouseDown={(e) => { e.preventDefault(); pick(c) }}
+              onMouseEnter={() => setActive(i)}
+              style={{
+                padding: '6px 10px', fontSize: 13, cursor: 'pointer',
+                background: i === active ? 'var(--bg-tertiary)' : undefined,
+                color: c === value ? 'var(--accent)' : 'var(--text-primary)'
+              }}
+            >
+              {c}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /** Create (contact=null) or edit a personal-CRM contact. */
 export function ContactEditor({ contact, onClose }: { contact: Contact | null; onClose: () => void }): React.ReactElement {
@@ -64,12 +150,7 @@ export function ContactEditor({ contact, onClose }: { contact: Contact | null; o
         <div className="editor-row">
           <div className="editor-field">
             <label>País</label>
-            <select value={country} onChange={(e) => onCountryChange(e.target.value)}>
-              <option value="">— Selecione —</option>
-              {COUNTRIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+            <CountryPicker value={country} onChange={onCountryChange} />
           </div>
           <div className="editor-field">
             <label>Estado {isBrazil ? '(UF)' : ''}</label>

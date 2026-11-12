@@ -54,6 +54,7 @@ import { AuthGate } from './components/AuthGate'
 import { NotificationBell, UnreadDot } from './components/NotificationBell'
 import { NAV_GROUPS, groupKey, lastTab, rememberTab, tabGroupOf } from './navigation'
 import { useModuleStore } from './store/moduleStore'
+import { useNavStyleStore } from './store/navStyleStore'
 
 const PAGES: Record<Page, React.ComponentType> = {
   timeline: TimelinePage,
@@ -128,10 +129,13 @@ export default function App(): React.ReactElement {
     })
   }, [])
 
-  const labeledGroups = navGroups.filter((g) => g.label && !g.tabs).map((g) => g.label)
-  const tabGroup = tabGroupOf(currentPage)
+  const tabsMode = useNavStyleStore((st) => st.navStyle) === 'tabs'
+  const labeledGroups = navGroups.filter((g) => g.label).map((g) => g.label)
+  const tabGroup = tabsMode ? tabGroupOf(currentPage) : undefined
   useEffect(() => {
     if (tabGroup) rememberTab(tabGroup, currentPage)
+    // celular: traz a aba ativa para a área visível da barra rolável
+    document.querySelector('.module-tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [currentPage, tabGroup])
   const allCollapsed = labeledGroups.every((l) => collapsed[l])
 
@@ -232,6 +236,7 @@ export default function App(): React.ReactElement {
           <NotificationBell />
         </div>
         <div className="nav-list">
+          {!tabsMode && (
           <button
             className="collapse-all-btn"
             onClick={toggleAll}
@@ -239,8 +244,9 @@ export default function App(): React.ReactElement {
           >
             {allCollapsed ? '⊞ Expandir tudo' : '⊟ Colapsar tudo'}
           </button>
+          )}
           {navGroups.map((group, gi) => {
-            if (group.tabs) {
+            if (tabsMode && group.label) {
               return (
                 <div className="nav-group nav-group-tabbed" key={group.label}>
                   <button

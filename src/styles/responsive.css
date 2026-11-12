@@ -255,7 +255,7 @@
   }
 }
 
-/* protótipo: abas do módulo no celular — rolagem horizontal, alvo de toque maior */
+/* abas do módulo no celular — rolagem horizontal, alvo de toque maior */
 @media (max-width: 899px) {
   .module-tabs {
     padding: 0 8px;

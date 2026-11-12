@@ -10,8 +10,6 @@ export interface NavItem {
 export interface NavGroup {
   label: string
   groupIcon?: string
-  /** Protótipo: o grupo vira um item só na sidebar e as páginas viram abas no topo. */
-  tabs?: boolean
   items: NavItem[]
 }
 
@@ -61,7 +59,6 @@ export const NAV_GROUPS: NavGroup[] = [
    {
     label: 'Finanças',
     groupIcon: '💰',
-    tabs: true,
     items: [
       { id: 'finance-dashboard', label: 'Dashboard', icon: '💰' },
       { id: 'transactions', label: 'Transações', icon: '💸' },
@@ -131,9 +128,9 @@ export function rememberTab(g: NavGroup, page: Page): void {
   }
 }
 
-/** Grupo com abas que contém a página (ou undefined). */
+/** Grupo rotulado (módulo) que contém a página — no modo abas, ele vira a barra de abas. */
 export function tabGroupOf(page: Page): NavGroup | undefined {
-  return NAV_GROUPS.find((g) => g.tabs && g.items.some((i) => i.id === page))
+  return NAV_GROUPS.find((g) => g.label && g.items.some((i) => i.id === page))
 }
 
 /** Configurações nunca some (senão não dá para reativar nada). */

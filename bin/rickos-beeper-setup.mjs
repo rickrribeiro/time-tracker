@@ -158,6 +158,8 @@ async function waitBeeperReady() {
       const r = await fetch(`${BEEPER_URL}/v1/app/setup`, { signal: AbortSignal.timeout(3000) })
       if (r.ok) state = (await r.json()).state ?? 'unknown'
       else if (r.status === 404) return ok('pronta (versão sem /v1/app/setup)')
+      // depois do login o Beeper passa a exigir token neste endpoint: a conta já existe
+      else if (r.status === 401 || r.status === 403) return ok('conta conectada (a verificação/sincronização segue no app)')
     } catch {
       state = 'offline'
     }

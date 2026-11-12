@@ -74090,6 +74090,12 @@ async function upsertAccounts(providerId, accounts) {
         [accountKey(providerId, a.remoteId), providerId, a.remoteId, normalizeNetwork(a.network), a.displayName, a.selfId, a.selfName, a.status, now]
       );
     }
+    const keep = accounts.map((a) => accountKey(providerId, a.remoteId));
+    exec(
+      db2,
+      `UPDATE chat_accounts SET status = 'removed' WHERE providerId = ? ${keep.length ? `AND key NOT IN (${keep.map(() => "?").join(",")})` : ""}`,
+      [providerId, ...keep]
+    );
   });
 }
 async function listAccounts(providerId) {
@@ -74212,7 +74218,7 @@ async function applyScans(scans) {
 const FULL_SELECT = `
   SELECT c.*, o.contactId, ct.name AS contactName, ct.priority AS contactPriority, ct.vip AS contactVip,
          o.priority, o.manualState, o.manualAt, o.snoozeUntil, o.snoozedAt, o.reopenOnMessage, o.reminderNote, o.notes,
-         o.mentionsReviewedCount, a.syncEnabled AS accountSync,
+         o.mentionsReviewedCount, a.syncEnabled AS accountSync, a.status AS accountStatus,
          (SELECT COUNT(*) FROM chat_todos t JOIN todos td ON td.id = t.todoId WHERE t.chatId = c.id AND td.status != 'done') AS todoCount
   FROM chats c
   LEFT JOIN chat_org o ON o.chatId = c.id
@@ -75121,7 +75127,7 @@ function defs() {
 }
 const iso = (minutesAgo, now) => new Date(now - minutesAgo * 6e4).toISOString();
 function createMockControl() {
-  return { offline: false, authError: false, pageSize: 25, noMentions: false, sent: [], edited: [], deleted: [], emit: null };
+  return { offline: false, authError: false, pageSize: 25, noMentions: false, sent: [], edited: [], deleted: [], hiddenAccounts: [], emit: null };
 }
 function createMockProvider(control = createMockControl()) {
   const now = Date.now();
@@ -75209,12 +75215,13 @@ function createMockProvider(control = createMockControl()) {
     },
     async listAccounts() {
       guard();
-      return [
+      const all2 = [
         { remoteId: "wa", network: "WhatsApp", displayName: "WhatsApp pessoal", selfId: SELF.wa, selfName: SELF_NAME, status: "connected" },
         { remoteId: "ig1", network: "Instagram", displayName: "@rick.pessoal", selfId: SELF.ig1, selfName: SELF_NAME, status: "connected" },
         { remoteId: "ig2", network: "Instagram", displayName: "@rick.studio", selfId: SELF.ig2, selfName: SELF_NAME, status: "connected" },
         { remoteId: "li", network: "LinkedIn", displayName: "Ricardo (LinkedIn)", selfId: SELF.li, selfName: "Ricardo", status: "connected" }
       ];
+      return all2.filter((a) => !control.hiddenAccounts.includes(a.remoteId));
     },
     async listChats({ accountIds, cursor, limit }) {
       guard();
@@ -75452,7 +75459,7 @@ function summarize$2(r, ctx) {
     isMuted: !!r.isMuted,
     isArchivedRemote: !!r.isArchived,
     peerHandle: r.peerHandle,
-    stale: r.providerId !== ctx.activeProviderId || r.accountSync === 0,
+    stale: r.providerId !== ctx.activeProviderId || r.accountSync === 0 || r.accountStatus === "removed",
     contactId: r.contactId,
     contactName: r.contactName,
     contactPriority: r.contactId ? contactPriority : null,
@@ -75474,7 +75481,7 @@ function summarize$2(r, ctx) {
 }
 const norm$1 = (s2) => (s2 ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 function visible(s2, r, ctx) {
-  if (r.providerId === ctx.activeProviderId && r.accountSync !== 0) return true;
+  if (r.providerId === ctx.activeProviderId && r.accountSync !== 0 && r.accountStatus !== "removed") return true;
   return !!(r.contactId || r.priority || r.manualState || r.snoozeUntil || r.notes || s2.labels.length);
 }
 function matches(s2, f, ctx) {
@@ -76279,13 +76286,14 @@ async function doSync(full) {
     const accounts = await provider.listAccounts();
     await upsertAccounts(provider.id, accounts);
     const accRows = await listAccounts(provider.id);
-    const enabled = accRows.filter((a) => a.syncEnabled).map((a) => a.remoteId);
+    const live = accRows.filter((a) => a.status !== "removed");
+    const enabled = live.filter((a) => a.syncEnabled).map((a) => a.remoteId);
     if (!enabled.length) {
       status.progress = null;
       await finishOk("Nenhuma conta selecionada para sincronizar.");
       return;
     }
-    const allEnabled = enabled.length === accRows.length;
+    const allEnabled = enabled.length === live.length;
     const initial = full || !lastSyncMs;
     const since = initial ? 0 : lastSyncMs - MARGIN_MS;
     const changedIds = [];
@@ -76411,7 +76419,7 @@ async function flushEvents() {
   const ids2 = [...pendingChats];
   pendingChats.clear();
   const cfg = await loadConfig();
-  const enabled = new Set((await listAccounts(provider.id)).filter((a) => a.syncEnabled).map((a) => a.remoteId));
+  const enabled = new Set((await listAccounts(provider.id)).filter((a) => a.syncEnabled && a.status !== "removed").map((a) => a.remoteId));
   const chats = [];
   for (const id of ids2.slice(0, 50)) {
     try {

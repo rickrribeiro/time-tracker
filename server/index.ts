@@ -9,6 +9,8 @@ import { assistedBusy, stopAssisted } from './flights/assisted'
 import { callRpc, handlers, startScheduler } from './rpc'
 import { subscribe } from './events'
 import { finishGoogleConnect } from './services/google'
+import { registerChatAgentRoutes } from './chats/agentRelay'
+import { fetchAsset } from './chats/service'
 
 export interface StartedServer {
   app: FastifyInstance
@@ -104,6 +106,21 @@ export async function startServer(overrides: Partial<ServerConfig> = {}): Promis
       clearInterval(ping)
       off()
     })
+  })
+
+  // Central de Mensagens: agente local do Beeper (conexão de saída do Mac) e anexos.
+  registerChatAgentRoutes(app, requireAuth)
+  app.get<{ Querystring: { t?: string } }>('/api/chats/asset', { preHandler: requireAuth }, async (req, reply) => {
+    try {
+      const a = await fetchAsset(String(req.query.t || ''))
+      reply.header('Content-Type', a.contentType)
+      reply.header('Cache-Control', 'private, max-age=3600')
+      reply.header('X-Content-Type-Options', 'nosniff')
+      reply.header('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; media-src 'self'")
+      return reply.send(a.body)
+    } catch (e) {
+      return reply.code(404).send({ ok: false, error: e instanceof Error ? e.message : 'anexo indisponível' })
+    }
   })
 
   app.get('/api/export/db', { preHandler: requireAuth }, async (_req, reply) => {

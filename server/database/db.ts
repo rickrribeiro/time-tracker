@@ -276,6 +276,19 @@ const MIGRATIONS: Migration[] = [
         try { db.run(`ALTER TABLE ${t} ADD COLUMN ${c} ${def};`) } catch { /* exists */ }
       }
     }
+  },
+  {
+    version: 18,
+    label: 'Pessoas: prioridade e VIP (Central de Mensagens)',
+    run: (db) => {
+      const cols: [string, string][] = [
+        ['priority', "TEXT NOT NULL DEFAULT 'normal'"], // alta | normal | baixa
+        ['vip', 'INTEGER NOT NULL DEFAULT 0']
+      ]
+      for (const [c, def] of cols) {
+        try { db.run(`ALTER TABLE contacts ADD COLUMN ${c} ${def};`) } catch { /* exists */ }
+      }
+    }
   }
 ]
 

@@ -623,4 +623,106 @@ export const SCHEMA = `
     readAt TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_notifications_createdAt ON notifications(createdAt);
+
+  -- ── Central de Mensagens (server/chats) ────────────────────────────────
+  -- Contas do provedor (Beeper etc.). key = <provedor>:<id remoto da conta>
+  CREATE TABLE IF NOT EXISTS chat_accounts (
+    key TEXT PRIMARY KEY,
+    providerId TEXT NOT NULL,
+    remoteId TEXT NOT NULL,
+    network TEXT NOT NULL,
+    displayName TEXT NOT NULL,
+    selfId TEXT,
+    selfName TEXT,
+    status TEXT NOT NULL DEFAULT 'unknown',
+    syncEnabled INTEGER NOT NULL DEFAULT 1,
+    lastSeenAt TEXT
+  );
+
+  -- Metadados das conversas (cache do provedor). O texto das mensagens NÃO é guardado:
+  -- só uma prévia curta opcional (chats_store_previews) e flags para a classificação.
+  CREATE TABLE IF NOT EXISTS chats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE,               -- <provedor>:<id remoto da conversa>
+    providerId TEXT NOT NULL,
+    accountKey TEXT NOT NULL,
+    remoteId TEXT NOT NULL,
+    network TEXT NOT NULL,
+    title TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL DEFAULT 'single',    -- single | group
+    imgUrl TEXT,
+    participantCount INTEGER,
+    peerHandle TEXT,                        -- telefone/@usuário do outro lado (reconciliação)
+    unreadCount INTEGER,                    -- NULL = provedor não informa
+    unreadMentions INTEGER,
+    mentionsEstimated INTEGER NOT NULL DEFAULT 0,
+    lastActivity TEXT,
+    lastMessagePreview TEXT,
+    lastMessageFromMe INTEGER,
+    lastMessageSender TEXT,
+    lastInboundAt TEXT,
+    lastOutboundAt TEXT,
+    lastInboundClosing INTEGER NOT NULL DEFAULT 0,
+    lastInboundQuestion INTEGER NOT NULL DEFAULT 0,
+    lastOutboundQuestion INTEGER NOT NULL DEFAULT 0,
+    lastInboundRepliesToMe INTEGER NOT NULL DEFAULT 0,
+    pendingSince TEXT,
+    isMuted INTEGER NOT NULL DEFAULT 0,
+    isArchived INTEGER NOT NULL DEFAULT 0,
+    scannedActivity TEXT,                   -- lastActivity da última leitura das mensagens
+    syncedAt TEXT,
+    createdAt TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_chats_activity ON chats(lastActivity);
+  CREATE INDEX IF NOT EXISTS idx_chats_account ON chats(providerId, accountKey);
+  CREATE INDEX IF NOT EXISTS idx_chats_peer ON chats(network, peerHandle);
+
+  -- Organização do rickOS (sobrevive à troca/desconexão do provedor)
+  CREATE TABLE IF NOT EXISTS chat_org (
+    chatId INTEGER PRIMARY KEY REFERENCES chats(id) ON DELETE CASCADE,
+    contactId INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+    priority TEXT,                          -- alta | normal | baixa | NULL
+    manualState TEXT,                       -- needs_reply | waiting | none | resolved | NULL
+    manualAt TEXT,
+    snoozeUntil TEXT,
+    snoozedAt TEXT,
+    reopenOnMessage INTEGER NOT NULL DEFAULT 1,
+    reminderNote TEXT,
+    reminderNotifiedAt TEXT,
+    notes TEXT,
+    mentionsReviewedCount INTEGER,
+    updatedAt TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_org_contact ON chat_org(contactId);
+
+  -- Tags genéricas (conversas e pessoas). Separadas das tags do time tracker.
+  CREATE TABLE IF NOT EXISTS labels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    color TEXT NOT NULL DEFAULT '#6366f1',
+    createdAt TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS label_links (
+    labelId INTEGER NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+    entityType TEXT NOT NULL,               -- chat | contact
+    entityId INTEGER NOT NULL,
+    PRIMARY KEY (labelId, entityType, entityId)
+  );
+  CREATE INDEX IF NOT EXISTS idx_label_links_entity ON label_links(entityType, entityId);
+
+  -- TODOs criados a partir de conversas/mensagens
+  CREATE TABLE IF NOT EXISTS chat_todos (
+    chatId INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    todoId INTEGER NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+    messageId TEXT,
+    PRIMARY KEY (chatId, todoId)
+  );
+
+  -- Respostas rápidas (modelos pessoais)
+  CREATE TABLE IF NOT EXISTS chat_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+  );
 `;

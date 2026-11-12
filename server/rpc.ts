@@ -192,8 +192,10 @@ import { runClaude } from './services/claude'
 import { beginGoogleConnect, awaitGoogleConnect, googleConnected, listGoogleAccounts, disconnectGoogle, disconnectGoogleAccount, syncGoogleCalendar, uploadFileToDrive } from './services/google'
 import { syncPluggy, pluggyConfigured, createConnectToken } from './services/pluggy'
 import { registerFlightRpc } from './flights/rpc'
+import { registerChatRpc } from './chats/rpc'
+import { startChatsEngine } from './chats/sync'
 import { schedulerTick as flightsTick, bootFlights } from './flights/runner'
-import { encodeSecret, decodeSecret, legacySecrets } from './services/secrets'
+import { encodeSecret, decodeSecret, legacySecrets, SERVER_ONLY_KEYS } from './services/secrets'
 import { broadcast } from './events'
 import { notify, notificationsChanged } from './services/notifications'
 import { suggestProjects, ignoreProjectSuggestion, restoreProjectSuggestions } from './services/projectScan'
@@ -302,6 +304,8 @@ export function startScheduler(): void {
   void bootFlights().catch((e) => console.error('[flights] boot', e))
   setTimeout(() => void flightsTick().catch(() => undefined), 45000)
   setInterval(() => void flightsTick().catch(() => undefined), 5 * 60 * 1000)
+  // Central de Mensagens: sincronização (tempo real + polling) e lembretes.
+  startChatsEngine()
 }
 
 // ── IPC: Tags ─────────────────────────────────────────────────────────────────
@@ -797,12 +801,15 @@ ipcMain.handle('habits:completionsForDate', (_, date: string) => getHabitComplet
 // ── IPC: Settings ───────────────────────────────────────────────────────────
 // Sensitive values (tokens) are encrypted at rest via safeStorage — see services/secrets.
 
-ipcMain.handle('settings:get', async (_, key: string) => decodeSecret(await getSetting(key)))
+ipcMain.handle('settings:get', async (_, key: string) => (SERVER_ONLY_KEYS.has(key) ? null : decodeSecret(await getSetting(key))))
 ipcMain.handle('settings:set', (_, key: string, value: string) => setSetting(key, encodeSecret(key, value)))
 ipcMain.handle('settings:legacySecrets', () => legacySecrets())
 ipcMain.handle('settings:getAll', async () => {
   const all = await getAllSettings()
-  for (const k of Object.keys(all)) all[k] = decodeSecret(all[k]) ?? ''
+  for (const k of Object.keys(all)) {
+    if (SERVER_ONLY_KEYS.has(k)) delete all[k]
+    else all[k] = decodeSecret(all[k]) ?? ''
+  }
   return all
 })
 
@@ -905,6 +912,9 @@ ipcMain.handle('trips:delete', (_, id: number) => deleteTrip(id))
 
 // Monitoramento de passagens: canais `flightMon:*` (server/flights/rpc.ts).
 registerFlightRpc((channel, fn) => ipcMain.handle(channel, fn))
+
+// Central de Mensagens: canais `chats:*` (server/chats/rpc.ts).
+registerChatRpc((channel, fn) => ipcMain.handle(channel, fn))
 
 ipcMain.handle('tripDocs:get', (_, tripId: number) => getTripDocuments(tripId))
 ipcMain.handle('tripDocs:set', (_, tripId: number, item: string, checked: number) =>

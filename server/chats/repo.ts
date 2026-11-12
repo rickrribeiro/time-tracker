@@ -87,6 +87,14 @@ export async function upsertAccounts(providerId: string, accounts: RemoteAccount
         [accountKey(providerId, a.remoteId), providerId, a.remoteId, normalizeNetwork(a.network), a.displayName, a.selfId, a.selfName, a.status, now]
       )
     }
+    // Contas que o provedor deixou de listar (desconectadas no Beeper): marcadas como removidas.
+    // As conversas viram "provedor/conta inativo" (somem, salvo se tiverem organização).
+    const keep = accounts.map((a) => accountKey(providerId, a.remoteId))
+    exec(
+      db,
+      `UPDATE chat_accounts SET status = 'removed' WHERE providerId = ? ${keep.length ? `AND key NOT IN (${keep.map(() => '?').join(',')})` : ''}`,
+      [providerId, ...keep]
+    )
   })
 }
 
@@ -172,6 +180,7 @@ export interface FullChatRow extends ChatRow {
   notes: string | null
   mentionsReviewedCount: number | null
   accountSync: number | null
+  accountStatus: string | null
   todoCount: number
 }
 
@@ -309,7 +318,7 @@ export async function applyScans(scans: { id: number; scan: ScanResult }[]): Pro
 const FULL_SELECT = `
   SELECT c.*, o.contactId, ct.name AS contactName, ct.priority AS contactPriority, ct.vip AS contactVip,
          o.priority, o.manualState, o.manualAt, o.snoozeUntil, o.snoozedAt, o.reopenOnMessage, o.reminderNote, o.notes,
-         o.mentionsReviewedCount, a.syncEnabled AS accountSync,
+         o.mentionsReviewedCount, a.syncEnabled AS accountSync, a.status AS accountStatus,
          (SELECT COUNT(*) FROM chat_todos t JOIN todos td ON td.id = t.todoId WHERE t.chatId = c.id AND td.status != 'done') AS todoCount
   FROM chats c
   LEFT JOIN chat_org o ON o.chatId = c.id

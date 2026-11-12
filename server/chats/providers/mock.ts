@@ -19,6 +19,8 @@ export interface MockControl {
   sent: { chatId: string; text: string; replyTo: string | null }[]
   edited: { chatId: string; messageId: string; text: string }[]
   deleted: { chatId: string; messageId: string; forEveryone: boolean }[]
+  /** Contas que o provedor "esqueceu" (desconectadas). */
+  hiddenAccounts: string[]
   emit: ((e: ProviderEvent) => void) | null
 }
 
@@ -90,7 +92,7 @@ function defs(): MockChatDef[] {
 const iso = (minutesAgo: number, now: number): string => new Date(now - minutesAgo * 60_000).toISOString()
 
 export function createMockControl(): MockControl {
-  return { offline: false, authError: false, pageSize: 25, noMentions: false, sent: [], edited: [], deleted: [], emit: null }
+  return { offline: false, authError: false, pageSize: 25, noMentions: false, sent: [], edited: [], deleted: [], hiddenAccounts: [], emit: null }
 }
 
 export type MockProvider = ChatProvider & {
@@ -192,12 +194,13 @@ export function createMockProvider(control: MockControl = createMockControl()): 
     },
     async listAccounts(): Promise<RemoteAccount[]> {
       guard()
-      return [
+      const all: RemoteAccount[] = [
         { remoteId: 'wa', network: 'WhatsApp', displayName: 'WhatsApp pessoal', selfId: SELF.wa, selfName: SELF_NAME, status: 'connected' },
         { remoteId: 'ig1', network: 'Instagram', displayName: '@rick.pessoal', selfId: SELF.ig1, selfName: SELF_NAME, status: 'connected' },
         { remoteId: 'ig2', network: 'Instagram', displayName: '@rick.studio', selfId: SELF.ig2, selfName: SELF_NAME, status: 'connected' },
         { remoteId: 'li', network: 'LinkedIn', displayName: 'Ricardo (LinkedIn)', selfId: SELF.li, selfName: 'Ricardo', status: 'connected' }
       ]
+      return all.filter((a) => !control.hiddenAccounts.includes(a.remoteId))
     },
     async listChats({ accountIds, cursor, limit }): Promise<Page<RemoteChat>> {
       guard()

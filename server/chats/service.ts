@@ -152,7 +152,7 @@ export function summarize(r: FullChatRow, ctx: SummaryCtx): ChatSummary {
     isMuted: !!r.isMuted,
     isArchivedRemote: !!r.isArchived,
     peerHandle: r.peerHandle,
-    stale: r.providerId !== ctx.activeProviderId || r.accountSync === 0,
+    stale: r.providerId !== ctx.activeProviderId || r.accountSync === 0 || r.accountStatus === 'removed',
     contactId: r.contactId,
     contactName: r.contactName,
     contactPriority: r.contactId ? contactPriority : null,
@@ -181,7 +181,7 @@ const norm = (s: string | null | undefined): string =>
 
 /** Visíveis: provedor ativo + contas sincronizadas; de outros provedores só se tiverem organização. */
 function visible(s: ChatSummary, r: FullChatRow, ctx: SummaryCtx): boolean {
-  if (r.providerId === ctx.activeProviderId && r.accountSync !== 0) return true
+  if (r.providerId === ctx.activeProviderId && r.accountSync !== 0 && r.accountStatus !== 'removed') return true
   return !!(r.contactId || r.priority || r.manualState || r.snoozeUntil || r.notes || s.labels.length)
 }
 

@@ -267,7 +267,7 @@ export function ChatsSection(): React.ReactElement {
                 <input type="checkbox" checked={a.syncEnabled} onChange={() => void toggleAccount(a)} />
                 <span>{networkInfo(a.network).icon}</span>
                 <span className="chats-account-name">{a.displayName}</span>
-                <span className="chats-account-meta">{a.chatCount} conversas · {a.status}</span>
+                <span className="chats-account-meta">{a.chatCount} conversas · {a.status === 'removed' ? 'removida do provedor (conversas inativas)' : a.status}</span>
               </label>
             ))}
           </div>

@@ -154,13 +154,14 @@ async function doSync(full: boolean): Promise<void> {
     const accounts = await provider.listAccounts()
     await repo.upsertAccounts(provider.id, accounts)
     const accRows = await repo.listAccounts(provider.id)
-    const enabled = accRows.filter((a) => a.syncEnabled).map((a) => a.remoteId)
+    const live = accRows.filter((a) => a.status !== 'removed')
+    const enabled = live.filter((a) => a.syncEnabled).map((a) => a.remoteId)
     if (!enabled.length) {
       status.progress = null
       await finishOk('Nenhuma conta selecionada para sincronizar.')
       return
     }
-    const allEnabled = enabled.length === accRows.length
+    const allEnabled = enabled.length === live.length
     const initial = full || !lastSyncMs
     const since = initial ? 0 : lastSyncMs - MARGIN_MS
     const changedIds: number[] = []
@@ -305,7 +306,7 @@ async function flushEvents(): Promise<void> {
   const ids = [...pendingChats]
   pendingChats.clear()
   const cfg = await loadConfig()
-  const enabled = new Set((await repo.listAccounts(provider.id)).filter((a) => a.syncEnabled).map((a) => a.remoteId))
+  const enabled = new Set((await repo.listAccounts(provider.id)).filter((a) => a.syncEnabled && a.status !== 'removed').map((a) => a.remoteId))
   const chats: RemoteChat[] = []
   for (const id of ids.slice(0, 50)) {
     try {

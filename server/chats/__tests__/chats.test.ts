@@ -416,6 +416,21 @@ describe('central de mensagens (mock)', () => {
     provider.control.offline = false
   })
 
+  it('conta removida no provedor: conversas ficam inativas e saem da lista', async () => {
+    await call('chats:syncNow', true)
+    const before = (await list()).total
+    provider.control.hiddenAccounts = ['li']
+    await call('chats:syncNow')
+    const accs = await call<{ remoteId: string; status: string }[]>('chats:accounts')
+    assert.equal(accs.find((a) => a.remoteId === 'li')?.status, 'removed')
+    const after = await list()
+    assert.ok(after.total < before)
+    assert.ok(!after.items.some((c) => c.network === 'linkedin' && !c.stale))
+    provider.control.hiddenAccounts = []
+    await call('chats:syncNow')
+    assert.equal((await list()).total, before)
+  })
+
   it('TODO vinculado à conversa', async () => {
     await call('chats:syncNow', true)
     const r = await byRemote('li-recruiter')

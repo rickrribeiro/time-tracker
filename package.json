@@ -18,7 +18,9 @@
     "web": "bash bin/rickos-web",
     "stop": "bash bin/rickos-stop",
     "chat-agent": "node bin/rickos-chat-agent.mjs",
-    "test": "tsx --test server/flights/__tests__/*.test.ts server/chats/__tests__/*.test.ts"
+    "test": "tsx --test server/flights/__tests__/*.test.ts server/chats/__tests__/*.test.ts",
+    "beeper:setup": "node bin/rickos-beeper-setup.mjs",
+    "beeper:down": "node bin/rickos-beeper-setup.mjs --down"
   },
   "dependencies": {
     "@fastify/static": "^7.0.4",
